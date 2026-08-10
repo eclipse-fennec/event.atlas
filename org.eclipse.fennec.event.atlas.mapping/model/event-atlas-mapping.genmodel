@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<genmodel:GenModel xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:genmodel="http://www.eclipse.org/emf/2002/GenModel" copyrightText="Copyright (c) 2012 - 2025 Data In Motion and others.&#xA;All rights reserved. &#xA;&#xA;This program and the accompanying materials are made&#xA;available under the terms of the Eclipse Public License 2.0&#xA;which is available at https://www.eclipse.org/legal/epl-2.0/&#xA;&#xA;SPDX-License-Identifier: EPL-2.0&#xA;&#xA;Contributors:&#xA;     Mark Hoffmann - initial API and implementation"
+    modelDirectory="/org.eclipse.fennec.event.atlas.mapping/src" modelPluginID="org.eclipse.fennec.event.atlas.mapping"
+    modelName="Event-atlas-mapping" rootExtendsClass="org.eclipse.emf.ecore.impl.MinimalEObjectImpl$Container"
+    importerID="org.eclipse.emf.importer.ecore" complianceLevel="21.0" copyrightFields="false"
+    operationReflection="true" importOrganizing="true" oSGiCompatible="true">
+  <foreignModel>event-atlas-mapping.ecore</foreignModel>
+  <genPackages prefix="Mapping" basePackage="org.eclipse.fennec.event.atlas.model"
+      resource="XMI" disposableProviderFactory="true" ecorePackage="event-atlas-mapping.ecore#/">
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-mapping.ecore#//TimestampStrategy">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//TimestampStrategy/NOW"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//TimestampStrategy/FEATURE"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//TimestampStrategy/FUNCTION"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-mapping.ecore#//ProviderStrategy">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//ProviderStrategy/SEPARATE"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//ProviderStrategy/UNIFIED"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-mapping.ecore#//DurationUnit">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//DurationUnit/MILLISECONDS"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//DurationUnit/SECONDS"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//DurationUnit/MINUTES"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//DurationUnit/HOURS"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-mapping.ecore#//DurationUnit/DAYS"/>
+    </genEnums>
+    <genDataTypes ecoreDataType="event-atlas-mapping.ecore#//EInstant"/>
+    <genDataTypes ecoreDataType="event-atlas-mapping.ecore#//JavaStringFunction"/>
+    <genDataTypes ecoreDataType="event-atlas-mapping.ecore#//JavaInstantFunction"/>
+    <genDataTypes ecoreDataType="event-atlas-mapping.ecore#//JavaObjectFunction"/>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//MappingProfile">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingProfile/profileId"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingProfile/name"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingProfile/description"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingProfile/version"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingProfile/providerStrategy"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//MappingProfile/provider"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ProfileProvider">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileProvider/providerId"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProfileProvider/services"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProfileProvider/admin"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ProfileService">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileService/serviceId"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileService/serviceName"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileService/required"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProfileService/resources"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ProfileResource">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileResource/resourceId"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileResource/resourceName"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileResource/required"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProfileResource/expectedType"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileResource/expectedUnit"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ProfileAdmin">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileAdmin/requiresLocation"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProfileAdmin/requiresFriendlyName"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ProviderMapping">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/providerClasses"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/services"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/admin"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProviderMapping/providerTimestamp"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/profile"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ServiceMapping">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ServiceMapping/resources"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ServiceMapping/referencedResource"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ServiceMapping/temporaryResources"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ResourceMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ResourceMapping/unit"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/unitFeature"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/valueFeature"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/timestamp"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ResourceMapping/mid"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/extraMetadata"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/descriptionMapping"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/changeRule"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/deletionRule"/>
+      <genOperations ecoreOperation="event-atlas-mapping.ecore#//ResourceMapping/mapUnit"
+          body="&lt;%java.util.Objects%>.requireNonNull(unitFunction);&#xA;Objects.requireNonNull(eobject);&#xA;setUnit(unitFunction.apply(eobject));">
+        <genParameters ecoreParameter="event-atlas-mapping.ecore#//ResourceMapping/mapUnit/eobject"/>
+        <genParameters ecoreParameter="event-atlas-mapping.ecore#//ResourceMapping/mapUnit/unitFunction"/>
+      </genOperations>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//AdminMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//AdminMapping/friendlyName"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/friendlyNameFeature"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/providerPackage"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//AdminMapping/latitude"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//AdminMapping/longitude"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//AdminMapping/elevation"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/latitudeRef"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/longitudeRef"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/elevationRef"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//MetadataMapping"/>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//Mapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//Mapping/mid"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//Mapping/timestamp"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//Mapping/name"/>
+      <genFeatures property="Readonly" createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//Mapping/fqMid"
+          get="if (&lt;%java.util.Objects%>.nonNull(eContainer())) {&#xA;  String fqId = ((Mapping)eContainer()).getFqMid();&#xA;  Objects.requireNonNull(fqId);&#xA;  return fqId += &quot;.&quot; + getMid();&#xA;} else {&#xA;  return getMid();&#xA;}"/>
+      <genOperations ecoreOperation="event-atlas-mapping.ecore#//Mapping/mapId" body="&lt;%java.util.Objects%>.requireNonNull(idFunction);&#xA;Objects.requireNonNull(eobject);&#xA;setMid(idFunction.apply(eobject));">
+        <genParameters ecoreParameter="event-atlas-mapping.ecore#//Mapping/mapId/idFunction"/>
+        <genParameters ecoreParameter="event-atlas-mapping.ecore#//Mapping/mapId/eobject"/>
+      </genOperations>
+      <genOperations ecoreOperation="event-atlas-mapping.ecore#//Mapping/mapName"
+          body="&lt;%java.util.Objects%>.requireNonNull(nameFunction);&#xA;Objects.requireNonNull(eobject);&#xA;NameMapping name = &lt;%org.eclipse.fennec.event.atlas.model.mapping.MappingFactory%>.eINSTANCE.createNameMapping();&#xA;name.setName(nameFunction.apply(eobject));&#xA;setName(name);">
+        <genParameters ecoreParameter="event-atlas-mapping.ecore#//Mapping/mapName/nameFunction"/>
+        <genParameters ecoreParameter="event-atlas-mapping.ecore#//Mapping/mapName/eobject"/>
+      </genOperations>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//FeatureMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/functionId"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//FeatureMapping/featurePath"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/collectionIndex"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/collectionFilter"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//TimestampMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//TimestampMapping/strategy"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//TimestampMapping/timestamp"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//TimestampMapping/hint"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//NameMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//NameMapping/name"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ValueMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ValueMapping/value"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//StringToStringMap">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//StringToStringMap/key"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//StringToStringMap/value"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ReferenceMapping">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceMapping/filter"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceMapping/exclude"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceMapping/referenceMappings"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceMapping/targetEClass"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//PersistenceRuleRegistry">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//PersistenceRuleRegistry/changeRules"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//PersistenceRuleRegistry/deletionRules"/>
+    </genClasses>
+    <genClasses image="false" ecoreClass="event-atlas-mapping.ecore#//PersistenceRule">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//PersistenceRule/id"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//PersistenceRule/name"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//PersistenceRule/description"/>
+    </genClasses>
+    <genClasses image="false" ecoreClass="event-atlas-mapping.ecore#//ChangeRule"/>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//PercentageChangeRule">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//PercentageChangeRule/percentage"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//AbsoluteChangeRule">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//AbsoluteChangeRule/delta"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//CountChangeRule">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//CountChangeRule/n"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//TimeThrottleChangeRule">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//TimeThrottleChangeRule/interval"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//TimeThrottleChangeRule/intervalUnit"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//DeletionRule">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/retention"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/retentionUnit"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/cleanupInterval"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/cleanupIntervalUnit"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/maxCount"/>
+    </genClasses>
+  </genPackages>
+</genmodel:GenModel>
