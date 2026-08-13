@@ -1,0 +1,39 @@
+{
+  ":configurator:resource-version": 1,
+  ":configurator:symbolicname": "org.eclipse.fennec.event.atlas.mapping.docker.config",
+  ":configurator:version": "1.0.0",
+
+  "FileEObjectProvider~mappings": {
+    "emf.eobject.provider.name": "mapping-files",
+    "locations": ["/opt/eventatlas/runtime/mappings"],
+    "key.feature": "mid"
+  },
+
+  "EObjectRegistry~mappings": {
+    "name": "sensinact-mappings",
+    "initialProvider.target": "(emf.eobject.provider.name=mapping-files)"
+  },
+
+  "FileEObjectProvider~profiles": {
+    "emf.eobject.provider.name": "profile-files",
+    "locations": ["/opt/eventatlas/runtime/profiles"],
+    "key.feature": "profileId"
+  },
+
+  "EObjectRegistry~profiles": {
+    "name": "sensinact-profiles",
+    "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
+  },
+
+  "sensinact.session.manager": {
+    "auth.policy": "ALLOW_ALL"
+  },
+
+  "JakartarsServletWhiteboardRuntimeComponent": {
+    "osgi.jakartars.name": "sensiNact.rest"
+  },
+
+  "sensinact.northbound.rest": {
+    "allow.anonymous": true
+  }
+}

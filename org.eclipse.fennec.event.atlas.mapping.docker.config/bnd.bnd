@@ -1,0 +1,13 @@
+Bundle-Name: Fennec Event Atlas :: SensiNact Mapping Docker Config
+Bundle-Description: Configurator resource for the self-contained docker runtime: wires \
+ the file-based EObject providers for mappings and profiles below /opt/eventatlas/runtime \
+ into the registries the mapping engine listens on, and opens the sensinact session \
+ manager (ALLOW_ALL) for the northbound REST API.
+
+-workingset: SensiNact
+
+-resourceonly: true
+-includeresource: OSGI-INF/configurator/=configs/
+Require-Capability: \
+	osgi.extender;filter:='(osgi.extender=osgi.configurator)',\
+	osgi.implementation;filter:='(&(osgi.implementation=osgi.cm)(version>=1.6.0)(!(version>=2.0.0)))'

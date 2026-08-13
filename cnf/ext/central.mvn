@@ -185,6 +185,19 @@ org.eclipse.fennec.persistence.jpa:org.eclipse.fennec.persistence.jpa.library.wo
 org.eclipse.fennec.models:org.eclipse.fennec.common.models.library:0.0.1-SNAPSHOT
 
 org.geckoprojects.weather:org.gecko.weather.model:1.1.0-SNAPSHOT
+
+# Jackson 3 Jakarta-RS JSON provider - imported by the sensinact northbound REST
+# bundle (tools.jackson.jakarta.rs.json) in the docker runtime.
+tools.jackson.jakarta.rs:jackson-jakarta-rs-base:3.1.0
+tools.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:3.1.0
+# ... and the xmlbind annotations module the provider's JacksonXmlBindJsonProvider
+# instantiates reflectively (optional import, so it must be required explicitly).
+tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.1.0
+
+# Jackson 2 core - imported by sensinact's esri.geometry, which resource.selector.impl
+# (the query handler's filter factory) drags into the docker runtime.
+com.fasterxml.jackson.core:jackson-core:2.19.2
+
 # Model Atlas client bundles used by the eobject.provider workspace project and the
 # mapping.runtime launch bndrun.
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.api:0.1.0-SNAPSHOT
