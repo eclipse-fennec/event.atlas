@@ -85,9 +85,10 @@ gatewayThread.execute(new AbstractSensinactCommand<Void>() {
 });
 ```
 
-In an OSGi deployment you normally don't call `ValueMapper` yourself — you register each
-`ProviderMapping` (and, optionally, `MappingProfile`) as a service and the southbound
-whiteboard does the rest. See [Runtime & OSGi](#runtime--osgi).
+In an OSGi deployment you normally don't call `ValueMapper` yourself — each
+`ProviderMapping` (and, optionally, `MappingProfile`) lands in a named EObject registry
+(from files, a Model Atlas, or programmatically) and the southbound listeners do the
+rest. See [Runtime & OSGi](#runtime--osgi).
 
 ## The XMI skeleton
 
@@ -309,12 +310,50 @@ When a feature path crosses a multi-valued reference, pick the element with
 </name>
 ```
 
-A common pattern is two services reading different indices of the same collection
-(`collectionIndex="0"` for current, `"1"` for the next forecast period).
-
 > **`collectionFilter` is reserved but not yet implemented.** The attribute exists on the
 > metamodel for a future "select the element where …" expression; today the engine logs a
 > warning and falls back to `collectionIndex`.
+
+### Mapping services onto collection elements
+
+A service's `referencedResource` (a `ReferenceMapping`) does double duty: besides
+[automatic resource generation](#automatic-resource-generation) it selects the **source
+element for the whole service**. Its `featurePath` + `collectionIndex` decide which element
+the service's timestamp, explicit `resources`, and (for the admin service) the `*Ref`
+features read from. The classic pattern is two services on different indices of the same
+collection — current weather from `reports[0]`, the 3-hour forecast from `reports[1]`:
+
+```xml
+<services mid="currentWeather">
+  <name name="Current Weather"/>
+  <timestamp strategy="FEATURE">  <!-- resolved against reports[0] -->
+    <featurePath xsi:type="ecore:EAttribute" href="w.ecore#//WeatherReport/timestamp"/>
+  </timestamp>
+
+  <!-- selector only: exclude="false" with no filter generates no resources -->
+  <referencedResource collectionIndex="0" exclude="false">
+    <featurePath xsi:type="ecore:EReference" href="w.ecore#//WeatherReports/reports"/>
+  </referencedResource>
+
+  <!-- explicit resources: valueFeature paths are relative to reports[0] -->
+  <resources name="windSpeed" unit="m/s" mid="windSpeed">
+    <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EFloat"/>
+    <valueFeature xsi:type="ecore:EAttribute" href="w.ecore#//MOSMIXSWeatherReport/windSpeed"/>
+  </resources>
+</services>
+
+<services mid="forecast3H">
+  <!-- same shape, collectionIndex="1" -->
+</services>
+```
+
+Without a `referencedResource` the service reads from the root source object. With one, all
+feature paths inside the service are relative to the selected element — so resource paths
+start at the element type (`MOSMIXSWeatherReport/windSpeed`), not at the container. If the
+selected index does not exist in an incoming instance, the whole instance fails validation,
+so a two-index mapping requires at least two elements in the collection. The complete
+worked example is the tests' `data/WeatherReportsProviderMapping.xmi` (its admin service
+selects `reports[0]` the same way).
 
 ## Automatic resource generation
 
@@ -370,6 +409,9 @@ Notes:
   [Metadata](#metadata-where-values-come-from)), so unit/description/extra come for free.
 - Auto-generated resources are kept in the service's transient `temporaryResources`; they
   are regenerated on each registration and processed identically to explicit `resources`.
+- The same `referencedResource` also selects the service's source element (see
+  [Mapping services onto collection elements](#mapping-services-onto-collection-elements));
+  with `exclude="false"` and no filter it acts as a pure selector and generates nothing.
 
 ## Admin service
 
@@ -535,14 +577,30 @@ duration datatype, so these serialize as plain XMI attributes.
 The engine is plain Java (`ValueMapper` / `ValueMapperFactory`), but the normal deployment
 is service-driven:
 
-- Register each `ProviderMapping` as an OSGi service. `ProviderMappingRegistryImpl` is a
-  whiteboard `@Component` (config pid `sensinact.southbound.emf.mapping`) that collects them,
-  keyed by `providerClasses`, and builds the provider model in the twin on the SensiNact
-  `GatewayThread`.
-- Register `MappingProfile` services; `MappingProfileRegistryImpl` collects them by
-  `profileId` and validates conformance.
+- Put each `ProviderMapping` into the named EObject registry **`sensinact-mappings`**
+  (emf.osgi `org.eclipse.fennec.emf.osgi.eobject.registry`; entry keys = the mapping's
+  `mid`). `ProviderMappingRegistryImpl` (config pid `sensinact.southbound.emf.mapping`)
+  is an `EObjectRegistryListener` whiteboard service on that registry: the registry
+  replays the current content when it binds, the facade validates every entry (`mid`
+  present, provider classes resolved — invalid entries are skipped with a log,
+  uniformly for every content source), indexes it by `providerClasses` and builds the
+  provider model in the twin on the SensiNact `GatewayThread`. Content reaches the
+  registry through its providers — local files via emf.osgi's `FileEObjectProvider`
+  (the registry's initial provider), a Model Atlas via the atlas provider — or
+  programmatically via `registerModelMapping`.
+- `MappingProfile`s flow the same way through the registry **`sensinact-profiles`**
+  (entry keys = `profileId`) into `MappingProfileRegistryImpl`, which validates
+  conformance.
+- Feed data in through the **`InstancePusher`** service: `pushInstance(EObject)` looks up
+  all registered mappings for the instance's EClass and applies each on the gateway thread,
+  returning the number of mappings applied (`0` = nothing registered for that EClass;
+  individual mapping failures are logged and skipped). This is the intended ingress for
+  southbound connectors — receive a payload, deserialize it to an EObject, push.
 - The payload EPackages (your domain models) must be registered in the runtime so both the
-  mapping XMI and the incoming instances resolve.
+  mapping XMI and the incoming instances resolve. **The registry lookup keys on EClass
+  identity**: incoming instances must be built against the same EPackage instance the
+  mappings resolved their `providerClasses` from — when in doubt, take it from the mapping
+  itself (`mapping.getProviderClasses().get(0).getEPackage()`).
 
 Programmatic use (tests, embedding) goes through the factory, always on the gateway thread:
 
