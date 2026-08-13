@@ -1,0 +1,15 @@
+Bundle-Name: Fennec Event Atlas :: SensiNact Mapping Runtime
+Bundle-Description: Runtime assembly project: carries the launch and docker bndruns \
+ for the SensiNact mapping runtime. No code of its own.
+
+-workingset: SensiNact
+
+-buildpath: \
+	osgi.annotation; version=6.0.1,\
+	osgi.core; version=6.0,\
+	osgi.cmpn; version=6.0
+
+javac.source: 21
+javac.target: 21
+
+Bundle-Version: 1.0.0.SNAPSHOT
