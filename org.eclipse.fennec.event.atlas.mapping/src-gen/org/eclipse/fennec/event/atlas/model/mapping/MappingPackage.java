@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:1a3ad8f3361be952b0ab582169e4b83e99c1894ec0e0cd9728ae630a15cf5225", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:8906bc1c1e84644325f05a4d30472acb617cf4e14ff90daf8fef338639d164e5", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -699,7 +699,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int SERVICE_MAPPING__RESOURCES = MAPPING_FEATURE_COUNT + 0;
 
 	/**
-	 * The feature id for the '<em><b>Referenced Resource</b></em>' reference.
+	 * The feature id for the '<em><b>Referenced Resource</b></em>' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
@@ -1133,7 +1133,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int ADMIN_MAPPING__RESOURCES = SERVICE_MAPPING__RESOURCES;
 
 	/**
-	 * The feature id for the '<em><b>Referenced Resource</b></em>' reference.
+	 * The feature id for the '<em><b>Referenced Resource</b></em>' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
@@ -2691,10 +2691,10 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getServiceMapping_Resources();
 
 	/**
-	 * Returns the meta object for the reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getReferencedResource <em>Referenced Resource</em>}'.
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getReferencedResource <em>Referenced Resource</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @return the meta object for the reference '<em>Referenced Resource</em>'.
+	 * @return the meta object for the containment reference '<em>Referenced Resource</em>'.
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getReferencedResource()
 	 * @see #getServiceMapping()
 	 * @generated
@@ -3872,7 +3872,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference SERVICE_MAPPING__RESOURCES = eINSTANCE.getServiceMapping_Resources();
 
 		/**
-		 * The meta object literal for the '<em><b>Referenced Resource</b></em>' reference feature.
+		 * The meta object literal for the '<em><b>Referenced Resource</b></em>' containment reference feature.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
 		 * @generated
