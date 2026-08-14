@@ -35,5 +35,20 @@
 
   "sensinact.northbound.rest": {
     "allow.anonymous": true
+  },
+  
+  "sensinact.southbound.mqtt": {
+    "id": "prod-broker",
+    "protocol": "tcp",
+    "host": "localhost",
+    "port": 1883,
+    "topics": ["eventatlas/#"]
+  },
+
+  "event.atlas.southbound.mqtt": {
+    "mqttTopics": ["eventatlas/weather"],
+    "mqtt.handler.id": "prod-broker",
+    "format": "xmi",
+    "name": "weather-mqtt"
   }
 }

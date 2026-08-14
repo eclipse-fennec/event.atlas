@@ -17,6 +17,7 @@ import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
@@ -31,8 +32,6 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Default {@link InstancePusher}: resolves mappings via the {@link ProviderMappingRegistry}
@@ -43,7 +42,7 @@ import org.slf4j.LoggerFactory;
 @Component
 public class InstancePusherImpl implements InstancePusher {
 
-	private static final Logger logger = LoggerFactory.getLogger(InstancePusherImpl.class);
+	private static final Logger logger = Logger.getLogger(InstancePusherImpl.class.getName());
 
 	@Reference
 	private GatewayThread gatewayThread;
@@ -59,8 +58,7 @@ public class InstancePusherImpl implements InstancePusher {
 		requireNonNull(instance, "Instance must not be null");
 		List<ProviderMapping> mappings = List.copyOf(mappingRegistry.getProviderMapping(instance.eClass()));
 		if (mappings.isEmpty()) {
-			logger.debug("No provider mapping registered for EClass '{}' - instance is dropped",
-					instance.eClass().getName());
+			logger.fine(String.format("No provider mapping registered for EClass '%s' - instance is dropped", instance.eClass().getName()));
 			return 0;
 		}
 		Promise<Integer> execute = gatewayThread.execute(new AbstractSensinactCommand<Integer>() {
@@ -74,8 +72,7 @@ public class InstancePusherImpl implements InstancePusher {
 						ValueMapperFactory.createValueMapper(twin, mapping).mapInstance(instance);
 						applied++;
 					} catch (Throwable e) {
-						logger.warn("Failed pushing instance of '{}' via mapping '{}': {}",
-								instance.eClass().getName(), mapping.getMid(), e.getMessage());
+						logger.warning(String.format("Failed pushing instance of '%s' via mapping '%s': %s", instance.eClass().getName(), mapping.getMid(), e.getMessage()));
 					}
 				}
 				return pf.resolved(applied);

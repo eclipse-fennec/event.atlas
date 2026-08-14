@@ -173,7 +173,8 @@
   <eClassifiers xsi:type="ecore:EClass" name="ServiceMapping" eSuperTypes="#//Mapping">
     <eStructuralFeatures xsi:type="ecore:EReference" name="resources" upperBound="-1"
         eType="#//ResourceMapping" containment="true"/>
-    <eStructuralFeatures xsi:type="ecore:EReference" name="referencedResource" eType="#//ReferenceMapping"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="referencedResource" eType="#//ReferenceMapping"
+        containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="temporaryResources" upperBound="-1"
         eType="#//ResourceMapping" transient="true" containment="true"/>
   </eClassifiers>

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.logging.Logger;
 
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
@@ -43,8 +44,6 @@ import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Collects {@link ProviderMapping}s from the named EObject registry
@@ -62,7 +61,7 @@ import org.slf4j.LoggerFactory;
 		property = EObjectRegistryConstants.EMF_EOBJECT_REGISTRY_NAME + "=sensinact-mappings")
 public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EObjectRegistryListener {
 
-	private static final Logger logger = LoggerFactory.getLogger(ProviderMappingRegistryImpl.class);
+	private static final Logger logger = Logger.getLogger(ProviderMappingRegistryImpl.class.getName());
 
 	private final Map<EClass, List<ProviderMapping>> registry = new ConcurrentHashMap<>();
 	private ProviderModelSensinactMapper.Factory mapperFactory;
@@ -123,23 +122,20 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	private Optional<ProviderMapping> validMapping(EObjectRegistryEntry entry, boolean quiet) {
 		if (!(entry.object() instanceof ProviderMapping mapping)) {
 			if (!quiet) {
-				logger.warn("Registry entry '{}' is a {} - expected ProviderMapping, skipping", entry.key(),
-						entry.object().eClass().getName());
+				logger.warning(String.format("Registry entry '%s' is a %s - expected ProviderMapping, skipping", entry.key(), entry.object().eClass().getName()));
 			}
 			return Optional.empty();
 		}
 		if (mapping.getMid() == null || mapping.getMid().isBlank()) {
 			if (!quiet) {
-				logger.error("ProviderMapping '{}' has no mid - skipping", entry.key());
+				logger.severe(String.format("ProviderMapping '%s' has no mid - skipping", entry.key()));
 			}
 			return Optional.empty();
 		}
 		List<EClass> unresolved = mapping.getProviderClasses().stream().filter(EObject::eIsProxy).toList();
 		if (mapping.getProviderClasses().isEmpty() || !unresolved.isEmpty()) {
 			if (!quiet) {
-				logger.error(
-						"ProviderMapping '{}' ({}) has missing or unresolved provider classes {} - is the sensor model available? Skipping",
-						entry.key(), mapping.getMid(), unresolved);
+				logger.severe(String.format("ProviderMapping '%s' (%s) has missing or unresolved provider classes %s - is the sensor model available? Skipping", entry.key(), mapping.getMid(), unresolved));
 			}
 			return Optional.empty();
 		}
@@ -153,7 +149,7 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	@Override
 	public void registerModelMapping(ProviderMapping mapping) {
 		mapping.getProviderClasses().forEach(ec->{
-			logger.info("Registering provider mapping for '{}' into registry", mapping.getMid());
+			logger.info(String.format("Registering provider mapping for '%s' into registry", mapping.getMid()));
 			registry.computeIfAbsent(ec, e->new ArrayList<>()).add(mapping);
 		});
 		Promise<Boolean> execute = gatewayThread.execute(new AbstractSensinactEMFCommand<Boolean>() {
@@ -162,11 +158,11 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			protected Promise<Boolean> call(SensinactEMFDigitalTwin twin, SensinactEMFModelManager mmgr,
 					PromiseFactory pf) {
 				try {
-					logger.debug("Mapping provider '{}' into sensinact", mapping.getMid());
+					logger.fine(String.format("Mapping provider '%s' into sensinact", mapping.getMid()));
 					mapperFactory.createMapper(twin, mmgr).registerModelMapping(mapping);
 					return pf.resolved(Boolean.TRUE);
 				} catch (Throwable e) {
-					logger.debug("Failed registering provider '{}' into sensinact, with error {}", mapping.getMid(), e.getMessage());
+					logger.warning(String.format("Failed registering provider '%s' into sensinact, with error %s", mapping.getMid(), e.getMessage()));
 					return pf.failed(e);
 				}
 			}
@@ -187,7 +183,7 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	@Override
 	public void unregisterModelMapping(ProviderMapping mapping) {
 		mapping.getProviderClasses().forEach(ec->{
-			logger.debug("Un-registering provider mapping for '{}' into registry", mapping.getMid());
+			logger.fine(String.format("Un-registering provider mapping for '%s' into registry", mapping.getMid()));
 			registry.getOrDefault(ec, Collections.emptyList()).remove(mapping);
 		});
 		gatewayThread.execute(new AbstractSensinactEMFCommand<Boolean>() {
@@ -196,11 +192,11 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			protected Promise<Boolean> call(SensinactEMFDigitalTwin twin, SensinactEMFModelManager mmgr,
 					PromiseFactory pf) {
 				try {
-					logger.debug("Un-registering provider '{}' from sensinact", mapping.getMid());
+					logger.fine(String.format("Un-registering provider '%s' from sensinact", mapping.getMid()));
 					mapperFactory.createMapper(twin, mmgr).unregisterModelMapping(mapping);
 					return pf.resolved(Boolean.TRUE);
 				} catch (Throwable e) {
-					logger.debug("Failed un-registering provider '{}' from sensinact, with error {}", mapping.getMid(), e.getMessage());
+					logger.fine(String.format("Failed un-registering provider '%s' from sensinact, with error %s", mapping.getMid(), e.getMessage()));
 					return pf.failed(e);
 				}
 			}

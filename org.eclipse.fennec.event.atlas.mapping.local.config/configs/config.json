@@ -30,5 +30,26 @@
 
   "sensinact.session.manager": {
     "auth.policy": "ALLOW_ALL"
+  },
+  
+  "sensinact.southbound.mqtt~local": {
+    "id": "local-broker",
+    "protocol": "tcp",
+    "host": "localhost",
+    "port": 1883,
+    "topics": ["eventatlas/#"]
+  },
+
+  "event.atlas.southbound.mqtt~weather": {
+    "mqttTopics": ["eventatlas/weather"],
+    "mqtt.handler.id": "local-broker",
+    "format": "xmi",
+    "name": "weather-mqtt"
+  },
+  
+  "JakartarsServletWhiteboardRuntimeComponent": {
+    "osgi.jakartars.name": "eventatlas.rest"
   }
+  
+  
 }

@@ -76,12 +76,17 @@
 	org.eclipse.sensinact.gateway.northbound.security.security-api;version='[0.0.2,0.0.3)',\
 	org.eclipse.sensinact.gateway.northbound.session.session-api;version='[0.0.2,0.0.3)',\
 	org.eclipse.sensinact.gateway.northbound.session.session-impl;version='[0.0.2,0.0.3)',\
-	org.eclipse.fennec.event.atlas.mapping.test.component;version=snapshot,\
 	org.eclipse.fennec.emf.gecko.compatibility.api;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.component.minimal;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.model.info;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.eobject.registry;version='[1.1.0,1.1.1)',\
-	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot
+	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot,\
+	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
+	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
+	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
+	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
+	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
+	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot
 
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
@@ -97,10 +102,14 @@
 	bnd.identity;id='org.apache.aries.typedevent.bus',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.gogo-shell',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.session.session-impl',\
-	bnd.identity;id='org.eclipse.fennec.event.atlas.mapping.test.component'
+	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter'
 
 -runee: JavaSE-21
 -runfw: org.apache.felix.framework;version='[7.0.5,7.0.5]'
+
+-runproperties: \
+	org.osgi.service.http.port=8080
 
 # The spifly framework-extension variant breaks the typedevent bus at startup
 # ("Weaving hook failed"); force the classic spifly dynamic bundle instead.

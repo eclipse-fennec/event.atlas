@@ -1,0 +1,23 @@
+Bundle-Name: SensiNact REST Southbound Adapter
+Bundle-Description: REST Adapter that is able to extract a payload from a REST endpoint and deserialize it, 
+providing there is a model available for it (if not locally, in the Model Atlas) and, if also
+a sensinact mapping is available (if not locally, in the Model Atlas) then the data is pushed
+to SensiNact
+
+-workingset: SensiNact
+
+-library: enableEMF
+
+-buildpath: \
+	org.eclipse.emf.ecore.xmi;version=latest,\
+	org.eclipse.fennec.emf.osgi.api;version=latest,\
+	org.eclipse.fennec.event.atlas.mapping;version=snapshot,\
+	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
+	jakarta.ws.rs-api;version=latest,\
+	org.osgi.service.jakartars;version=latest
+
+# jakarta.ws.rs.core.Response needs a RuntimeDelegate implementation to build a response;
+# jersey-common carries one, so the plain-JUnit tests can assert real status codes.
+-testpath: \
+	org.glassfish.jersey.core.jersey-common;version=latest
+

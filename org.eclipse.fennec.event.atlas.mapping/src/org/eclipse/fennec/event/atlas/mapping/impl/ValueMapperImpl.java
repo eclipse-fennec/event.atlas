@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 import org.eclipse.emf.common.util.EList;
 import org.eclipse.emf.common.util.Enumerator;
@@ -57,8 +58,6 @@ import org.eclipse.sensinact.core.twin.SensinactService;
 import org.eclipse.sensinact.gateway.geojson.Coordinates;
 import org.eclipse.sensinact.gateway.geojson.GeoJsonObject;
 import org.eclipse.sensinact.gateway.geojson.Point;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of {@link ValueMapper} that transforms EObject instances into SensiNact provider values
@@ -69,7 +68,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ValueMapperImpl implements ValueMapper {
 
-	private static final Logger logger = LoggerFactory.getLogger(ValueMapperImpl.class);
+	private static final Logger logger = Logger.getLogger(ValueMapperImpl.class.getName());
 
 	private final SensinactDigitalTwin twin;
 	private final ProviderMapping mapping;
@@ -126,8 +125,7 @@ public class ValueMapperImpl implements ValueMapper {
 				mapAdminService(adminSource, mapping.getAdmin(), provider, adminTimestamp);
 			}
 
-			logger.debug("Successfully mapped instance {} to provider {}",
-					sourceInstance.eClass().getName(), providerModel);
+			logger.fine(String.format("Successfully mapped instance %s to provider %s", sourceInstance.eClass().getName(), providerModel));
 
 		} catch (Exception e) {
 			throw new ValueMappingException("Failed to map instance to provider " + providerModel, e);
@@ -162,12 +160,11 @@ public class ValueMapperImpl implements ValueMapper {
 									values.put(resourcePath, value);
 								}
 							} catch (Exception e) {
-								logger.warn("Failed to extract auto-generated value for resource path {}: {}",
-										resourcePath, e.getMessage());
+								logger.warning(String.format("Failed to extract auto-generated value for resource path %s: %s", resourcePath, e.getMessage()));
 							}
 						}
 					} catch (ValueMappingException e) {
-						logger.warn("Failed to get referenced source for {}: {}", serviceMapping.getMid(), e.getMessage());
+						logger.warning(String.format("Failed to get referenced source for %s: %s", serviceMapping.getMid(), e.getMessage()));
 					}
 				}
 
@@ -181,11 +178,11 @@ public class ValueMapperImpl implements ValueMapper {
 							values.put(resourcePath, value.get());
 						}
 					} catch (Exception e) {
-						logger.warn("Failed to extract value for resource path {}: {}", resourcePath, e.getMessage());
+						logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
 					}
 				}
 			} catch (ValueMappingException e) {
-				logger.warn("Failed to get service source for {}: {}", serviceMapping.getMid(), e.getMessage());
+				logger.warning(String.format("Failed to get service source for %s: %s", serviceMapping.getMid(), e.getMessage()));
 			}
 		}
 
@@ -348,8 +345,7 @@ public class ValueMapperImpl implements ValueMapper {
 				Object convertedValue = convertValue(rawValue.get(), targetType);
 				return Optional.of(convertedValue);
 			} catch (Exception e) {
-				logger.warn("Failed to convert value {} to type {}: {}", 
-						rawValue.get(), targetType.getName(), e.getMessage());
+				logger.warning(String.format("Failed to convert value %s to type %s: %s", rawValue.get(), targetType.getName(), e.getMessage()));
 				return Optional.empty();
 			}
 		}
@@ -451,13 +447,13 @@ public class ValueMapperImpl implements ValueMapper {
 		if (value.isPresent()) {
 			try {
 				resource.setValue(value.get(), timestamp);
-				logger.trace("Set resource {}.{} = {}", service.getName(), resource.getName(), value.get());
+				logger.finest(String.format("Set resource %s.%s = %s", service.getName(), resource.getName(), value.get()));
 			} catch (Exception e) {
 				throw new ValueMappingException("Failed to set resource value for " + 
 						service.getName() + "." + resource.getName(), e);
 			}
 		} else {
-			logger.debug("No value extracted for resource {}.{}", service.getName(), resource.getName());
+			logger.fine(String.format("No value extracted for resource %s.%s", service.getName(), resource.getName()));
 		}
 	}
 
@@ -495,15 +491,15 @@ public class ValueMapperImpl implements ValueMapper {
 			if (friendlyNameValue.isPresent()) {
 				friendlyName = (String) friendlyNameValue.get();
 			} else {
-				logger.debug("No value extracted for admin.friendlyName");
+				logger.fine("No value extracted for admin.friendlyName");
 			}
 		}
 		if (Objects.nonNull(friendlyName)) {
 			try {
 				friendlyNameResource.setValue(friendlyName, timestamp);
-				logger.trace("Set admin.friendlyName = {}", adminMapping.getFriendlyName());
+				logger.finest(String.format("Set admin.friendlyName = %s", adminMapping.getFriendlyName()));
 			} catch (Exception e) {
-				logger.warn("Failed to set admin friendlyName: {}", e.getMessage());
+				logger.warning(String.format("Failed to set admin friendlyName: %s", e.getMessage()));
 			}
 		}
 	}
@@ -533,21 +529,21 @@ public class ValueMapperImpl implements ValueMapper {
 					Coordinates coordinates = new Coordinates(toDouble(lonValue.get()), toDouble(latValue.get()));
 					final Point point = new Point(coordinates, Collections.emptyList(), Collections.emptyMap());
 					location = point;
-					logger.trace("Set admin.location = {}", point);
+					logger.finest(String.format("Set admin.location = %s", point));
 					return;
 				} catch (Exception e) {
 					throw new ValueMappingException("Failed to set admin location resource", e);
 				}
 			} else {
-				logger.debug("No value extracted for admin.location");
+				logger.fine("No value extracted for admin.location");
 			}
 		}
 		if (locationResource != null) {
 			try {
 				locationResource.setValue(location, timestamp);
-				logger.trace("Set admin.location = {}", location);
+				logger.finest(String.format("Set admin.location = %s", location));
 			} catch (Exception e) {
-				logger.warn("Failed to set admin location: {}", e.getMessage());
+				logger.warning(String.format("Failed to set admin location: %s", e.getMessage()));
 			}
 		}
 	}
@@ -584,7 +580,7 @@ public class ValueMapperImpl implements ValueMapper {
 
 		// Final fallback: use mapping's MID + instance hash
 		String fallback = mapping.getMid() + "-" + Integer.toHexString(sourceInstance.hashCode());
-		logger.debug("Name mapping extraction failed, using fallback provider ID: {}", fallback);
+		logger.fine(String.format("Name mapping extraction failed, using fallback provider ID: %s", fallback));
 		return fallback;
 	}
 
@@ -690,18 +686,15 @@ public class ValueMapperImpl implements ValueMapper {
 					try {
 						return Instant.parse(stringValue);
 					} catch (Exception isoException) {
-						logger.warn("Failed to parse timestamp string '{}' using pattern '{}' and as ISO instant: {}", 
-								stringValue, hint, e.getMessage());
+						logger.warning(String.format("Failed to parse timestamp string '%s' using pattern '%s' and as ISO instant: %s", stringValue, hint, e.getMessage()));
 					}
 				} else {
-					logger.warn("Failed to parse timestamp string '{}' as ISO instant: {}", 
-							stringValue, e.getMessage());
+					logger.warning(String.format("Failed to parse timestamp string '%s' as ISO instant: %s", stringValue, e.getMessage()));
 				}
 			}
 		}
 
-		logger.warn("Cannot convert timestamp value of type {} to Instant: {}", 
-				rawValue.getClass().getName(), rawValue);
+		logger.warning(String.format("Cannot convert timestamp value of type %s to Instant: %s", rawValue.getClass().getName(), rawValue));
 		return null;
 	}
 
@@ -852,8 +845,7 @@ public class ValueMapperImpl implements ValueMapper {
 //		if (serviceMapping.getCollectionFilter() != null &&
 //			!serviceMapping.getCollectionFilter().trim().isEmpty()) {
 //			// Future extension: evaluate filter expression
-//			logger.warn("collectionFilter not yet implemented for service {}, using collectionIndex",
-//				serviceMapping.getMid());
+//			logger.warning(String.format("collectionFilter not yet implemented for service %s, using collectionIndex", //				serviceMapping.getMid()));
 //		}
 //
 //		// Validate index bounds
@@ -871,8 +863,7 @@ public class ValueMapperImpl implements ValueMapper {
 //					index, serviceMapping.getMid()));
 //		}
 //
-//		logger.debug("Service '{}' mapping from collection '{}' at index {}",
-//			serviceMapping.getMid(), collectionFeature.getName(), index);
+//		logger.fine(String.format("Service '%s' mapping from collection '%s' at index %s", //			serviceMapping.getMid(), collectionFeature.getName(), index));
 //
 //		return (EObject) element;
 //	}
@@ -912,7 +903,7 @@ public class ValueMapperImpl implements ValueMapper {
 			if (referenceMapping.getCollectionFilter() != null &&
 				!referenceMapping.getCollectionFilter().trim().isEmpty()) {
 				// Future extension: evaluate filter expression
-				logger.warn("collectionFilter not yet implemented ({}), using collectionIndex", context);
+				logger.warning(String.format("collectionFilter not yet implemented (%s), using collectionIndex", context));
 			}
 
 			int index = referenceMapping.getCollectionIndex();
@@ -923,7 +914,7 @@ public class ValueMapperImpl implements ValueMapper {
 			}
 
 			targetValue = collection.get(index);
-			logger.debug("ReferenceMapping: extracted element at index {} ({})", index, context);
+			logger.fine(String.format("ReferenceMapping: extracted element at index %s (%s)", index, context));
 		}
 
 		if (!(targetValue instanceof EObject)) {
@@ -1020,8 +1011,7 @@ public class ValueMapperImpl implements ValueMapper {
 
 						// Use the collectionIndex from FeatureMapping (default 0)
 						if (collectionIndex < 0 || collectionIndex >= list.size()) {
-							logger.warn("Collection index {} out of bounds for list of size {}, using index 0",
-								collectionIndex, list.size());
+							logger.warning(String.format("Collection index %s out of bounds for list of size %s, using index 0", collectionIndex, list.size()));
 							collectionIndex = 0;
 						}
 
@@ -1035,8 +1025,7 @@ public class ValueMapperImpl implements ValueMapper {
 			return Optional.ofNullable(currentValue);
 		} catch (Exception e) {
 			// An error during path traversal (e.g., feature not found)
-			logger.error("Error getting raw value for feature path: {} from source {}: {}",
-					featurePath, source.eClass().getName(), e.getMessage());
+			logger.severe(String.format("Error getting raw value for feature path: %s from source %s: %s", featurePath, source.eClass().getName(), e.getMessage()));
 			return Optional.empty();
 		}
 	}
@@ -1074,8 +1063,7 @@ public class ValueMapperImpl implements ValueMapper {
 			}
 			return Optional.ofNullable(currentValue);
 		} catch (Exception e) {
-			logger.error("Error getting raw value for feature path: {} from source {}: {}",
-					featurePath, source.eClass().getName(), e.getMessage());
+			logger.severe(String.format("Error getting raw value for feature path: %s from source %s: %s", featurePath, source.eClass().getName(), e.getMessage()));
 			return Optional.empty();
 		}
 	}
