@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
@@ -36,8 +37,6 @@ import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * OSGi service implementation for managing mapping profiles. Collects
@@ -55,7 +54,7 @@ import org.slf4j.LoggerFactory;
         property = EObjectRegistryConstants.EMF_EOBJECT_REGISTRY_NAME + "=sensinact-profiles")
 public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObjectRegistryListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(MappingProfileRegistryImpl.class);
+    private static final Logger logger = Logger.getLogger(MappingProfileRegistryImpl.class.getName());
 
     private final Map<String, MappingProfile> profiles = new ConcurrentHashMap<>();
 
@@ -96,14 +95,13 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
     private Optional<MappingProfile> validProfile(EObjectRegistryEntry entry, boolean quiet) {
         if (!(entry.object() instanceof MappingProfile profile)) {
             if (!quiet) {
-                logger.warn("Registry entry '{}' is a {} - expected MappingProfile, skipping", entry.key(),
-                        entry.object().eClass().getName());
+                logger.warning(String.format("Registry entry '%s' is a %s - expected MappingProfile, skipping", entry.key(), entry.object().eClass().getName()));
             }
             return Optional.empty();
         }
         if (profile.getProfileId() == null || profile.getProfileId().isBlank()) {
             if (!quiet) {
-                logger.error("MappingProfile '{}' has no profileId - skipping", entry.key());
+                logger.severe(String.format("MappingProfile '%s' has no profileId - skipping", entry.key()));
             }
             return Optional.empty();
         }

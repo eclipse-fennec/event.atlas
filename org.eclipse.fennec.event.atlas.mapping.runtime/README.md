@@ -1,0 +1,178 @@
+# Event Atlas mapping runtime
+
+Assembly project — it carries no code of its own, only the two runtime definitions:
+
+| File | Purpose |
+|---|---|
+| `launch.bndrun` | local development runtime: mapping engine + SensiNact gateway + Model Atlas client + both southbound adapters + a Gogo shell |
+| `eventatlas.runtime_docker.bndrun` | self-contained image runtime: mappings and profiles read from XMI files under `/opt/eventatlas/runtime`, no Model Atlas |
+
+Configuration comes from the sibling config bundles — `…mapping.local.config` for `launch.bndrun`,
+`…mapping.docker.config` for the image.
+
+```bash
+./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:run.launch      # start it
+./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:resolve.launch  # after changing -runrequires
+```
+
+Gradle does not forward stdin, so for an interactive Gogo shell use `export.launch` and run
+`generated/distributions/executable/launch.jar` directly.
+
+## Before you send anything
+
+A payload only reaches the digital twin if **both** halves are resolvable:
+
+1. **The domain model** (here: the DWD weather model, nsURI `http://cdc.dwd.de/common/weather`).
+   The payload names it in its root element; the runtime resolves it locally first, then
+   fetch-on-miss through the Model Atlas.
+2. **A `ProviderMapping`** for the payload's `EClass`, reaching the `sensinact-mappings`
+   EObject registry — from the Model Atlas (registry `sensinactmapping`, scope `jena`,
+   re-synced every `refresh.interval.ms`, 60 s by default) or from local XMI files.
+
+> **The mapping's own nsURI is load-bearing.** A `ProviderMapping` XMI must declare
+> `https://fennec.eclipse.org/event.atlas/mapping/1.0`. An XMI still carrying the pre-rename
+> `…/sensinact/core/mapping/1.0` fails to load and is silently skipped — the symptom is
+> "no provider mapping is registered" on every payload.
+
+Watch the log for `Registering provider mapping for '<mid>' into registry` at startup; that
+confirms the mapping arrived. `sna:providers` in the Gogo shell lists the resulting provider
+**before any payload is sent**, because the provider model is built at registration time.
+
+## A payload
+
+Both examples below use the same file. The timestamps are generated at write time, so the
+values are current; SensiNact keeps the newest value per resource, so a stale timestamp can
+look like "nothing happened".
+
+```bash
+cat > /tmp/weather.xmi <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:dwdweather="http://cdc.dwd.de/common/weather">
+  <dwdweather:WeatherReports xmi:id="wr" id="manual-10567" reports="r0 r1"/>
+  <dwdweather:MOSMIXSWeatherReport xmi:id="r0" id="report-current"
+      timestamp="$(date -u +%Y-%m-%dT%H:%M:%S.000+0000)" station="st0" weatherStation="ws0"
+      windDirection="180.0" windSpeed="5.0" cloudCoverTotal="50.0"
+      surfacePressure="101000.0" tempAboveSurface5="290.0"/>
+  <dwdweather:MOSMIXSWeatherReport xmi:id="r1" id="report-forecast-3h"
+      timestamp="$(date -u -d '+3 hours' +%Y-%m-%dT%H:%M:%S.000+0000)" station="st0" weatherStation="ws0"
+      windDirection="190.0" windSpeed="7.5" cloudCoverTotal="60.0"
+      surfacePressure="101200.0" tempAboveSurface5="291.0"/>
+  <dwdweather:WeatherStation xmi:id="ws0" name="GERA" id="10567">
+    <location latitude="50.88" longitude="12.13" elevation="311"/>
+  </dwdweather:WeatherStation>
+  <dwdweather:Station xmi:id="st0" name="GERA">
+    <location latitude="50.88" longitude="12.13" elevation="311"/>
+  </dwdweather:Station>
+</xmi:XMI>
+EOF
+```
+
+The timestamp format is EMF's `EDate` serialization (`yyyy-MM-dd'T'HH:mm:ss.SSSZ`, RFC822
+zone without a colon). Note also that the numbers must use a decimal **point** — rendering
+this file with a tool that honours a comma-decimal locale produces `windSpeed="5,0"`, which
+EMF rejects.
+
+## Testing the MQTT adapter
+
+Needs a broker:
+
+```bash
+docker run --rm -p 1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf
+```
+
+`local.config` already wires both halves — they are two *independent* topic lists and both
+must match, or messages arrive at the broker and are never delivered to the adapter:
+
+```json
+"sensinact.southbound.mqtt~local": {
+  "id": "local-broker", "protocol": "tcp", "host": "localhost", "port": 1883,
+  "topics": ["eventatlas/#"]                       // what is SUBSCRIBED on the broker
+},
+"event.atlas.southbound.mqtt~weather": {
+  "mqttTopics": ["eventatlas/weather"],            // which of those THIS adapter handles
+  "mqtt.handler.id": "local-broker",
+  "format": "xmi",
+  "name": "weather-mqtt"
+}
+```
+
+Send it:
+
+```bash
+mosquitto_pub -h localhost -p 1883 -t eventatlas/weather -f /tmp/weather.xmi
+```
+
+Use `-f` (or `-m`), never `-l` — `-l` publishes every *line* of the XMI as a separate
+message. Add `-r` to publish retained: SensiNact replays the last retained message per topic
+to a listener as soon as it binds, so the payload is re-ingested on every runtime restart.
+
+At startup you should see:
+
+```
+INFO: MQTT southbound adapter 'weather-mqtt' listening on [eventatlas/weather] (format xmi, broker 'local-broker')
+```
+
+and on delivery:
+
+```
+INFO: Pushed payload from 'eventatlas/weather' - 5 object(s), 1 mapping(s) applied
+```
+
+## Testing the REST adapter
+
+The endpoint is served by the Jakarta-RS whiteboard, which is `configuration-policy=require`
+— **without this config nothing is published at all** and every request 404s:
+
+```json
+"JakartarsServletWhiteboardRuntimeComponent": {
+  "osgi.jakartars.name": "eventatlas.rest"
+}
+```
+
+The resource declares no application, so it binds to the default application at `/` —
+unlike SensiNact's northbound REST, which lives under its own `/sensinact` base.
+
+```bash
+curl -i -X POST http://localhost:8080/ingest/weather \
+     -H 'Content-Type: application/xml' \
+     --data-binary @/tmp/weather.xmi
+```
+
+```
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+Applied 1 mapping(s) to 5 object(s)
+```
+
+The `{channel}` path segment (`weather` here) is free-form and only identifies the sender in
+log messages — the model comes from the payload, not the path. The `Content-Type` selects the
+format: `application/xml` for XMI, `application/json` for JSON.
+
+## Reading the result
+
+```
+sna:providers          # in the Gogo shell
+sna:describe 10567
+```
+
+The docker runtime additionally exposes the northbound REST API
+(`curl http://localhost:8080/sensinact/providers`); `launch.bndrun` does not include it.
+
+## Outcomes
+
+Both adapters share one ingest, so the outcomes are the same; only the reporting differs.
+
+| Log | HTTP | Meaning |
+|---|---|---|
+| `Pushed payload … N mapping(s) applied` | 200 | in the twin |
+| `no provider mapping is registered for it` | 202 | model resolved, no mapping for that `EClass` — check the mapping's nsURI and that it reached the registry |
+| `model '<nsURI>' is not available` | 422 | neither deployed nor resolvable via the Model Atlas |
+| `Cannot deserialize … dropping payload` | 400 | malformed payload |
+| `Failed pushing payload … into sensinact` | 503 | gateway unavailable — retryable |
+| — | 404 | Jakarta-RS whiteboard not configured, or wrong path |
+
+## Housekeeping
+
+The Paho MQTT client writes its persistence store into the working directory, so running the
+launch runtime leaves `paho*-tcplocalhost1883/` directories here. They are throw-away.

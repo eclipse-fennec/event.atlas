@@ -1,0 +1,61 @@
+/**
+ * Copyright (c) 2012 - 2026 Data In Motion and others.
+ * All rights reserved.
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Data In Motion - initial API and implementation
+ */
+package org.eclipse.fennec.event.atlas.southbound.common;
+
+import org.osgi.annotation.versioning.ProviderType;
+
+/**
+ * Transport-agnostic ingress for southbound adapters: turns a raw payload into
+ * {@link org.eclipse.emf.ecore.EObject}s and pushes them into the sensinact digital twin.
+ * <p>
+ * This is the piece every southbound adapter shares. An adapter is then only responsible
+ * for its transport - subscribing to an MQTT topic, receiving an HTTP request - and hands
+ * the bytes over here.
+ * <p>
+ * Model resolution is the runtime's own mechanism and needs no configuration: the payload
+ * names its model (an XMI root element carries the nsURI), and the resource set resolves it
+ * locally first, then fetch-on-miss through the Model Atlas client. A payload whose model
+ * cannot be resolved either way is dropped with {@link IngestResult.Outcome#MODEL_UNKNOWN}
+ * rather than failing the adapter.
+ * <p>
+ * Implementations never throw for a bad payload - every foreseeable failure is reported as
+ * an {@link IngestResult} and logged - so an adapter can call this directly from a broker
+ * callback or a request thread without risking the connection.
+ * @author Ilenia Salvadori
+ */
+@ProviderType
+public interface PayloadIngest {
+
+	/** Format hint for EMF XMI payloads, the format in which models describe themselves. */
+	String FORMAT_XMI = "xmi";
+
+	/** Format hint for JSON payloads, deserialized by the Fennec codec. */
+	String FORMAT_JSON = "json";
+
+	/**
+	 * Deserializes a payload and pushes every resulting root object into the digital twin
+	 * through all provider mappings registered for its EClass.
+	 * @param payload the raw payload bytes. Parameter must not be <code>null</code>
+	 * @param formatHint the payload format: either a bare EMF file extension
+	 * ({@link #FORMAT_XMI}, {@link #FORMAT_JSON}) or a media type such as
+	 * {@code application/json}. <code>null</code> or unrecognized values fall back to
+	 * {@link #FORMAT_XMI}
+	 * @param source a short human-readable origin used in log messages - an MQTT topic, a
+	 * REST path. May be <code>null</code>
+	 * @return what happened. Never <code>null</code>
+	 * @throws NullPointerException if the payload parameter is <code>null</code>
+	 */
+	IngestResult ingest(byte[] payload, String formatHint, String source);
+
+}

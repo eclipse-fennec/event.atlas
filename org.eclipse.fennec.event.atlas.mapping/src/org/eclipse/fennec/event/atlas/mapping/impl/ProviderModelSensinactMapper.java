@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import org.eclipse.emf.common.util.EList;
 import org.eclipse.emf.ecore.EAttribute;
@@ -52,8 +53,6 @@ import org.eclipse.sensinact.core.model.ResourceBuilder;
 import org.eclipse.sensinact.core.model.ResourceType;
 import org.eclipse.sensinact.core.model.Service;
 import org.eclipse.sensinact.core.twin.SensinactProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This mapper translates the {@link Mapping} instances into the sensinact core model
@@ -74,7 +73,7 @@ public class ProviderModelSensinactMapper {
 	
 	
 
-	private static final Logger logger = LoggerFactory.getLogger(ProviderModelSensinactMapper.class);
+	private static final Logger logger = Logger.getLogger(ProviderModelSensinactMapper.class.getName());
 	private final SensinactEMFModelManager modelManager;
 	private final SensinactEMFDigitalTwin twin;
 	private final MappingProfileRegistry profileRegistry;
@@ -139,9 +138,9 @@ public class ProviderModelSensinactMapper {
 			// Log warnings if any
 			if (!validationResult.getWarnings().isEmpty()) {
 				String providerName = displayName(providerMapping);
-				logger.warn("Mapping validation warnings for provider '{}':", providerName);
+				logger.warning(String.format("Mapping validation warnings for provider '%s':", providerName));
 				for (String warning : validationResult.getWarnings()) {
-					logger.warn("  - {}", warning);
+					logger.warning(String.format("  - %s", warning));
 				}
 			}
 		}
@@ -155,7 +154,7 @@ public class ProviderModelSensinactMapper {
 				", strategy: " + profile.getProviderStrategy() + ")" : "";
 
 		String providerName = displayName(providerMapping);
-		logger.info("Model for provider '{}' → '{}' successfully registered{}.", providerName, actualProviderId, profileInfo);
+		logger.info(String.format("Model for provider '%s' → '%s' successfully registered%s.", providerName, actualProviderId, profileInfo));
 	}
 
 	/**
@@ -178,7 +177,7 @@ public class ProviderModelSensinactMapper {
 		if (nonNull(providerMapping)) {
 			String actualProviderId = determineProviderId(providerMapping);
 			modelManager.deleteModel(actualProviderId);
-			logger.info("Model successfully unregistered for '{}'.", actualProviderId);
+			logger.info(String.format("Model successfully unregistered for '%s'.", actualProviderId));
 		}
 	}
 
@@ -337,8 +336,7 @@ public class ProviderModelSensinactMapper {
 		// First priority: Check if targetEClass is explicitly set
 		if (refMapping.getTargetEClass() != null) {
 			targetClass = refMapping.getTargetEClass();
-			logger.debug("Using explicitly specified targetEClass: {} for service {}",
-					targetClass.getName(), serviceMapping.getMid());
+			logger.fine(String.format("Using explicitly specified targetEClass: %s for service %s", targetClass.getName(), serviceMapping.getMid()));
 		} else {
 			// Second priority: Infer from the feature path using the helper method
 			targetClass = extractTargetEClassFromFeaturePath(
@@ -349,8 +347,7 @@ public class ProviderModelSensinactMapper {
 				return; // extractTargetEClassFromFeaturePath already logged the reason
 			}
 
-			logger.debug("Inferred targetEClass from feature path: {} for service {}",
-					targetClass.getName(), serviceMapping.getMid());
+			logger.fine(String.format("Inferred targetEClass from feature path: %s for service %s", targetClass.getName(), serviceMapping.getMid()));
 		}
 
 		// Generate resources recursively, passing the base feature path from the ReferenceMapping
@@ -427,7 +424,7 @@ public class ProviderModelSensinactMapper {
 			resourceMapping.getValueFeature().add(attribute);
 
 			resourceList.add(resourceMapping);
-			logger.debug("Auto-generated resource {} from ReferenceMapping", resourceName);
+			logger.fine(String.format("Auto-generated resource %s from ReferenceMapping", resourceName));
 		}
 
 		// Handle nested EReferences if referenceMappings are configured
@@ -441,16 +438,14 @@ public class ProviderModelSensinactMapper {
 				// Find the target reference from the feature path
 				targetReference = findTargetReference(allReferences, nestedMapping);
 				if (targetReference == null) {
-					logger.warn("Could not find target EReference for nested ReferenceMapping in {}",
-							eClass.getName());
+					logger.warning(String.format("Could not find target EReference for nested ReferenceMapping in %s", eClass.getName()));
 					continue;
 				}
 
 				// Check if targetEClass is explicitly set for the nested mapping
 				if (nestedMapping.getTargetEClass() != null) {
 					nestedClass = nestedMapping.getTargetEClass();
-					logger.debug("Using explicitly specified targetEClass: {} for nested reference",
-							nestedClass.getName());
+					logger.fine(String.format("Using explicitly specified targetEClass: %s for nested reference", nestedClass.getName()));
 				} else {
 					// Infer from the feature path using the helper method
 					nestedClass = extractTargetEClassFromFeaturePath(
@@ -461,8 +456,7 @@ public class ProviderModelSensinactMapper {
 						continue; // extractTargetEClassFromFeaturePath already logged the reason
 					}
 
-					logger.debug("Inferred targetEClass from reference: {} for nested reference",
-							nestedClass.getName());
+					logger.fine(String.format("Inferred targetEClass from reference: %s for nested reference", nestedClass.getName()));
 				}
 
 				String nestedPrefix = namePrefix.isEmpty() ?
@@ -516,7 +510,7 @@ public class ProviderModelSensinactMapper {
 	 */
 	private EClass extractTargetEClassFromFeaturePath(List<EStructuralFeature> featurePath, String contextDescription) {
 		if (featurePath == null || featurePath.isEmpty()) {
-			logger.warn("Feature path is empty for {}", contextDescription);
+			logger.warning(String.format("Feature path is empty for %s", contextDescription));
 			return null;
 		}
 
@@ -526,13 +520,13 @@ public class ProviderModelSensinactMapper {
 
 		// Check if target is the Ecore EPackage (which we don't map)
 		if (targetType.getEPackage().getName().equals("ecore")) {
-			logger.warn("ReferenceMapping target is the Ecore EPackage for {} - not mapping", contextDescription);
+			logger.warning(String.format("ReferenceMapping target is the Ecore EPackage for %s - not mapping", contextDescription));
 			return null;
 		}
 
 		// Ensure it's an EClass (not an EDataType)
 		if (!(targetType instanceof EClass)) {
-			logger.warn("Feature path target is not an EClass for {}", contextDescription);
+			logger.warning(String.format("Feature path target is not an EClass for %s", contextDescription));
 			return null;
 		}
 
