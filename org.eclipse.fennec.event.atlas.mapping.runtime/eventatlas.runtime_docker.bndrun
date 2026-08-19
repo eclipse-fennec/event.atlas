@@ -138,11 +138,12 @@
 	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
-	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot,\
 	org.eclipse.fennec.model.atlas.rest.client.api;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.model.atlas.rest.client.impl;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.model.atlas.rest.client.osgi;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.model.atlas.scope.api;version='[0.1.0,0.1.1)',\
 	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
 	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
-	org.apache.felix.configadmin.plugin.interpolation;version='[1.2.8,1.2.9)'
+	org.apache.felix.configadmin.plugin.interpolation;version='[1.2.8,1.2.9)',\
+	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)',\
+	org.osgi.service.cm;version='[1.6.1,1.6.2)'
