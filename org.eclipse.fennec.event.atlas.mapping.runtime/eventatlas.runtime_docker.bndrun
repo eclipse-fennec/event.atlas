@@ -7,6 +7,13 @@
 
 -resolve.effective: active
 
+# Deployment-specific values (broker host/credentials, Model Atlas base.uri) are NOT baked
+# in: the ConfigAdmin interpolation plugin resolves $[env:...] / $[secret:...] placeholders
+# in config.json at delivery time, so one published image serves every environment.
+#
+# Kept in sync with launch.bndrun: the Model Atlas REST client + Atlas-backed EObject
+# provider (mappings come from the Model Atlas service, not only local XMI files) and the
+# MQTT/REST southbound adapters that feed payloads in.
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.command)',\
@@ -23,10 +30,17 @@
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.gogo-shell',\
 	bnd.identity;id='org.eclipse.osgitech.rest',\
 	bnd.identity;id='tools.jackson.module.jackson-module-jakarta-xmlbind-annotations',\
-	bnd.identity;id='slf4j.simple'
+	bnd.identity;id='slf4j.simple',\
+	bnd.identity;id='org.eclipse.fennec.model.atlas.rest.client.impl',\
+	bnd.identity;id='org.eclipse.fennec.model.atlas.rest.client.osgi',\
+	bnd.identity;id='org.eclipse.fennec.model.atlas.eobject.provider',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
+	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation'
 
 -runproperties: \
-	org.osgi.service.http.port=8080
+	org.osgi.service.http.port=8080,\
+	felix.cm.config.plugins=org.apache.felix.configadmin.plugin.interpolation
 
 -runee: JavaSE-21
 -runfw: org.apache.felix.framework;version='[7.0.5,7.0.5]'
@@ -120,4 +134,15 @@
 	tools.jackson.jakarta.rs.jackson-jakarta-rs-base;version='[3.1.0,3.1.1)',\
 	tools.jackson.jakarta.rs.jackson-jakarta-rs-json-provider;version='[3.1.0,3.1.1)',\
 	org.eclipse.fennec.event.atlas.mapping.docker.config;version=snapshot,\
-	tools.jackson.module.jackson-module-jakarta-xmlbind-annotations;version='[3.1.0,3.1.1)'
+	tools.jackson.module.jackson-module-jakarta-xmlbind-annotations;version='[3.1.0,3.1.1)',\
+	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
+	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
+	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
+	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot,\
+	org.eclipse.fennec.model.atlas.rest.client.api;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.model.atlas.rest.client.impl;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.model.atlas.rest.client.osgi;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.model.atlas.scope.api;version='[0.1.0,0.1.1)',\
+	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
+	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
+	org.apache.felix.configadmin.plugin.interpolation;version='[1.2.8,1.2.9)'

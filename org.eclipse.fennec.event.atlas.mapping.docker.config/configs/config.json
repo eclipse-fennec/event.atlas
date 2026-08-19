@@ -3,6 +3,23 @@
   ":configurator:symbolicname": "org.eclipse.fennec.event.atlas.mapping.docker.config",
   ":configurator:version": "1.0.0",
 
+  /*
+   * Deployment-specific values are $[env:...] placeholders, resolved at configuration-delivery
+   * time by org.apache.felix.configadmin.plugin.interpolation (enabled through the bndrun's
+   * felix.cm.config.plugins property). Every placeholder carries a default, so the image still
+   * starts standalone; set the variables in the container environment to point it at a real
+   * Model Atlas and MQTT broker. Comments are legal here - the Configurator reads this file
+   * through Felix cm.json's comment-aware reader.
+   */
+
+  /* Mappings come from the Model Atlas service. The file provider below stays as the registry's
+   * initial content, so mounted XMIs still seed it; the Atlas provider syncs on top. */
+  "org.eclipse.fennec.model.atlas.rest.client~atlas": {
+    "base.uri": "$[env:EVENTATLAS_ATLAS_BASE_URI;default=http://localhost:8086/atlas/rest]",
+    "scope.allow.list": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
+    "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000;type=Long]"
+  },
+
   "FileEObjectProvider~mappings": {
     "emf.eobject.provider.name": "mapping-files",
     "locations": ["/opt/eventatlas/runtime/mappings"],
@@ -12,6 +29,16 @@
   "EObjectRegistry~mappings": {
     "name": "sensinact-mappings",
     "initialProvider.target": "(emf.eobject.provider.name=mapping-files)"
+  },
+
+  "AtlasEObjectProvider~atlas": {
+    "atlasScope.target": "(atlas.scope=$[env:EVENTATLAS_ATLAS_SCOPE;default=jena])",
+    "writer.target": "(emf.eobject.registry.name=sensinact-mappings)",
+    "emf.eobject.provider.name": "atlas-mappings",
+    "registries": ["$[env:EVENTATLAS_ATLAS_REGISTRY;default=sensinactmapping]"],
+    "key.feature": "mid",
+    "required.nsuris": ["https://fennec.eclipse.org/event.atlas/mapping/1.0"],
+    "refresh.interval.ms": "$[env:EVENTATLAS_ATLAS_REFRESH_INTERVAL_MS;default=60000;type=Long]"
   },
 
   "FileEObjectProvider~profiles": {
@@ -36,19 +63,23 @@
   "sensinact.northbound.rest": {
     "allow.anonymous": true
   },
-  
-  "sensinact.southbound.mqtt": {
-    "id": "prod-broker",
-    "protocol": "tcp",
-    "host": "localhost",
-    "port": 1883,
-    "topics": ["eventatlas/#"]
+
+  /* MQTT: the sensiNact client is the transport only (connection + subscription); all mapping
+   * and ingest happens in event.atlas's MqttPayloadListener, which binds this handler by id. */
+  "sensinact.southbound.mqtt~broker": {
+    "id": "eventatlas-broker",
+    "protocol": "$[env:EVENTATLAS_MQTT_PROTOCOL;default=tcp]",
+    "host": "$[env:EVENTATLAS_MQTT_HOST;default=localhost]",
+    "port": "$[env:EVENTATLAS_MQTT_PORT;default=1883;type=Integer]",
+    "user": "$[env:EVENTATLAS_MQTT_USER;default=]",
+    ".password": "$[env:EVENTATLAS_MQTT_PASSWORD;default=]",
+    "topics": "$[env:EVENTATLAS_MQTT_TOPICS;default=eventatlas/#;delimiter=,]"
   },
 
-  "event.atlas.southbound.mqtt": {
-    "mqttTopics": ["eventatlas/weather"],
-    "mqtt.handler.id": "prod-broker",
-    "format": "xmi",
-    "name": "weather-mqtt"
+  "event.atlas.southbound.mqtt~ingest": {
+    "mqttTopics": "$[env:EVENTATLAS_MQTT_TOPICS;default=eventatlas/#;delimiter=,]",
+    "mqtt.handler.id": "eventatlas-broker",
+    "format": "$[env:EVENTATLAS_MQTT_FORMAT;default=xmi]",
+    "name": "eventatlas-mqtt"
   }
 }
