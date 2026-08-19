@@ -20,12 +20,16 @@ Gradle graph automatically):
 | `…event.atlas.mapping` | the mapping metamodel (`model/event-atlas-mapping.ecore` → `src-gen`) + the mapping engine + its DS components |
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
 | `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles}` mount-point skeleton |
-| `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider) |
+| `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring) |
 | `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image (file providers + northbound REST) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
-| `…event.atlas.mqtt.southbound.adapter` | **empty scaffold** (`bnd.bnd` only) — the work in progress on the `southbound_adapters` branch |
-| `…event.atlas.rest.southbound.adapter` | **empty scaffold** (`bnd.bnd` only) — likewise |
+| `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload, pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, …) |
+| `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
+| `…event.atlas.rest.southbound.adapter` | `PayloadIngestResource` — `POST <whiteboard base>/ingest/{channel}`; the HTTP status mirrors the `IngestResult` outcome |
 | `org.eclipse.fennec.model.atlas.eobject.provider` | note the *different* namespace: a generic **Model Atlas** content source for the emf.osgi EObject registry, not mapping-specific |
+
+`docker/eventatlas/` (not a bnd project, in `bnd_exclude`) holds the Dockerfile; its
+`content/` staging dir is git-ignored (see `docker/eventatlas/README.md`).
 
 Java packages follow the BSNs: `org.eclipse.fennec.event.atlas.mapping` (hand-written) and
 `org.eclipse.fennec.event.atlas.model.mapping` (generated, genmodel `basePackage`
@@ -50,6 +54,7 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew codeCoverageReport     # aggregate JaCoCo (xml for Sonar + html)
 ./gradlew perfTest               # @Tag("perf") only — excluded from `build`
 ./gradlew remoteTest             # @Tag("remote") only — excluded from `build`
+./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
 Baseline as of 2026-08-14: `./gradlew clean build` is green — **54 OSGi tests, 1 `@Disabled`**
@@ -160,9 +165,10 @@ important thing to know, and the part that changed most recently:
   southbound connectors: receive a payload, deserialize it to an EObject, push. Lookup keys on
   **EClass identity**, so incoming instances must come from the same `EPackage` instance the
   mappings resolved their `providerClasses` against.
-- `ValueMapper` / `ValueMapperFactory` — the plain-Java engine face: `mapInstance`,
-  `mapResourceValues`, `validateInstance`. `ValueMapperImpl` (~1100 lines) does path navigation,
-  collection handling, type conversion, timestamp strategies, admin/location mapping.
+- `ValueMapper` / `ValueMapperFactory` — the plain-Java engine face: `mapInstance` (update the
+  twin), `mapResourceValues` (extract only), `validateInstance`. `ValueMapperImpl` (~1100 lines,
+  package `…mapping.impl`) does path navigation, collection handling, type conversion, timestamp
+  strategies, admin/location mapping.
 - `ProviderModelSensinactMapper` — builds the provider model in the twin from a `ProviderMapping`
   (via its inner `Factory`, needs the profile registry).
 - `converters/` — `TypeConverter` + `TypeConverterRegistry` for source→resource value coercion.
@@ -194,6 +200,17 @@ EPackages a runtime maps must be registered in that runtime.
   through `-library:` in `fennec.bnd` (`fennec`, `fennecTest`, `fennecJacoco`, `fennecEMF`,
   `fennecM2X`, `fennecJPA`, `fennecEMFModels`, `fennecCodec`); a project opts into a setup with
   e.g. `-library: enableEMF` / `enableOSGi-Test` in its own `bnd.bnd`.
+- SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
+  `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots);
+  `central.mvn` additionally carries the Model Atlas client bundles
+  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api`) and the Jackson 2/3
+  pieces the northbound REST chain needs (`jackson-jakarta-rs-*`,
+  `jackson-module-jakarta-xmlbind-annotations`, jackson 2 `jackson-core` for
+  esri.geometry). The atlas eobject.provider is a workspace project (see table above),
+  no longer consumed from Maven.
+- **A new bundle is a new top-level directory with a `bnd.bnd`** — the bnd workspace plugin
+  sweeps it into the Gradle graph automatically; the root build applies `java` + `jacoco` to
+  every subproject.
 - After bumping a library version in `central.mvn`, clear `cnf/cache/<bndversion>/expanded` so
   the new library content is unpacked.
 - A resource-only config bundle is `-resourceonly: true` + `-includeresource:
@@ -214,16 +231,19 @@ PRs merge into **`snapshot`** (snapshot artifacts published from there); release
 the protected **`main`** branch. Workflows delegate to **SHA-pinned reusable workflows in
 `eclipse-fennec/.github`**, except the repo-local container job:
 
-- `build.yml` — `reusable-verify.yml` on PRs and every branch except `main`/`snapshot`; it also
-  runs `runtime:resolve.launch` and `runtime:export.eventatlas.runtime_docker` so a bndrun that
-  no longer resolves fails the PR.
+- `build.yml` — `reusable-verify.yml` on PRs and every branch except `main`/`snapshot`; its
+  `extra-gradle-tasks` re-resolve `launch.bndrun` and export the docker runtime jar, so a bndrun
+  that no longer resolves fails the PR (with `gradle-parallel: false` — bnd resolve/export tasks
+  are not parallel-safe).
 - `snapshot.yml` / `release.yml` — `verify → release (do-release: false|true) → container + docs`,
-  gated by `needs:`. The release job exports the docker runtime jar **in the same build that
-  publishes to Maven** and hands it over as the `release-jars` artifact.
+  gated by `needs:`. The release job exports `eventatlas.runtime_docker.jar` **in the same build
+  that publishes to Maven** and uploads it (plus the mapping bundle jar, for the version tag) as
+  the `release-jars` artifact.
 - `reusable-container.yml` (repo-local) — does *not* rebuild the jar; it downloads `release-jars`,
-  reads `Bundle-Version` out of the mapping jar with the bnd CLI, and pushes multi-arch images to
-  `docker.io/eclipsefennec/event.atlas` and `ghcr.io/eclipse-fennec/event.atlas` tagged
-  `snapshot`/`latest` plus that version.
+  reads `Bundle-Version` out of the mapping jar with the bnd CLI, stages `docker/eventatlas/content/`
+  and pushes `docker.io/eclipsefennec/event.atlas` and `ghcr.io/eclipse-fennec/event.atlas`
+  (amd64 + arm64/v8), tagged `snapshot`/`latest` plus that version. Needs the
+  `DOCKER_USERNAME`/`DOCKER_API_TOKEN` secrets and `packages: write` (GHCR).
 - `docs.yml` — `workflow_dispatch` only; plus `scorecard.yml` and `dependency-review.yml`.
 
 Branch protection and secret scanning live in the EF-managed `eclipse-fennec/.eclipsefdn`
