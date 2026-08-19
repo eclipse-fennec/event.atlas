@@ -62,7 +62,12 @@ import org.eclipse.fennec.model.atlas.scope.api.ReadableScopeService;
  * returns the identical instance, which the writer's identity compare short-circuits.
  *
  * @since 08/2026
+ *
+ * @deprecated Moved to the {@code eclipse-fennec/model.atlas} repository (same BSN
+ * and packages, Maven group {@code org.eclipse.fennec.model.atlas}). This copy is
+ * frozen; see the project README.
  */
+@Deprecated
 public final class AtlasObjectSync implements AutoCloseable {
 
 	/** Entry property holding the atlas object id an entry was fetched as. */

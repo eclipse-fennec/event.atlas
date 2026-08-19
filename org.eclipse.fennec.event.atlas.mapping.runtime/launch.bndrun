@@ -88,6 +88,9 @@
 	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot
 
+# org.eclipse.fennec.model.atlas.eobject.provider is the frozen local copy - the bundle
+# moved to eclipse-fennec/model.atlas (Maven group org.eclipse.fennec.model.atlas). Switch
+# this to the published artifact once it is indexed in cnf/ext/central.mvn.
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.command)',\
