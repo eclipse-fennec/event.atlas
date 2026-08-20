@@ -192,20 +192,33 @@ org.eclipse.fennec.models:org.eclipse.fennec.common.models.library:0.0.1-SNAPSHO
 
 org.geckoprojects.weather:org.gecko.weather.model:1.1.0-SNAPSHOT
 
-# Jackson 3 Jakarta-RS JSON provider - imported by the sensinact northbound REST
-# bundle (tools.jackson.jakarta.rs.json) in the docker runtime.
+# Dropwizard metrics - the sensinact gateway core's metrics support. cnf/ext/sensinact.maven
+# also pins it, but the Eclipse SensiNact repos do not serve third-party artifacts, so it has
+# to be declared here to be fetchable on a clean CI runner.
+io.dropwizard.metrics:metrics-core:4.2.37
+
+# Jackson 3 - the whole northbound chain (sensinact rest, sensorthings rest.gateway +
+# mqtt, query-handler, resource.selector, the Model Atlas rest client) imports
+# tools.jackson.core / tools.jackson.databind [3.1,4), and the REST layer additionally
+# the Jakarta-RS JSON provider. Keep all four artifacts on the same 3.1.x version.
+tools.jackson.core:jackson-core:3.1.0
+tools.jackson.core:jackson-databind:3.1.0
 tools.jackson.jakarta.rs:jackson-jakarta-rs-base:3.1.0
 tools.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:3.1.0
 # ... and the xmlbind annotations module the provider's JacksonXmlBindJsonProvider
 # instantiates reflectively (optional import, so it must be required explicitly).
 tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.1.0
 
-# Jackson 2 core - imported by sensinact's esri.geometry, which resource.selector.impl
-# (the query handler's filter factory) drags into the docker runtime.
+# Jackson 2 leftovers. jackson-core is imported by sensinact's esri.geometry ([2.9,3)),
+# which resource.selector.impl (the query handler's filter factory) drags into the docker
+# runtime. jackson-annotations is separate: Jackson 3 kept the com.fasterxml.jackson.annotation
+# package at 2.x, and every sensinact DTO bundle imports it as [2.21,3) - so 2.21 is a floor,
+# not a preference, and this artifact does NOT track the jackson-core version above.
 com.fasterxml.jackson.core:jackson-core:2.19.2
+com.fasterxml.jackson.core:jackson-annotations:2.21
 
-# Model Atlas client bundles used by the eobject.provider workspace project and the
-# mapping.runtime launch bndrun.
+# Model Atlas client bundles (incl. the eobject.provider, which moved out of this workspace)
+# used by the docker runtime and the mapping.runtime launch bndrun.
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.api:0.1.0-SNAPSHOT
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.impl:0.1.0-SNAPSHOT
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.osgi:0.1.0-SNAPSHOT
