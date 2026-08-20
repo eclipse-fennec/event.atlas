@@ -85,7 +85,30 @@
 	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
 	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
-	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)'
+	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)',\
+	com.fasterxml.jackson.core.jackson-core;version='[2.19.2,2.19.3)',\
+	io.netty.buffer;version='[4.1.133,4.1.134)',\
+	io.netty.codec;version='[4.1.133,4.1.134)',\
+	io.netty.codec-http;version='[4.1.133,4.1.134)',\
+	io.netty.codec-mqtt;version='[4.1.133,4.1.134)',\
+	io.netty.common;version='[4.1.133,4.1.134)',\
+	io.netty.handler;version='[4.1.133,4.1.134)',\
+	io.netty.resolver;version='[4.1.133,4.1.134)',\
+	io.netty.transport;version='[4.1.133,4.1.134)',\
+	io.netty.transport-classes-epoll;version='[4.1.133,4.1.134)',\
+	io.netty.transport-native-unix-common;version='[4.1.133,4.1.134)',\
+	org.antlr.antlr4-runtime;version='[4.13.2,4.13.3)',\
+	org.eclipse.sensinact.gateway.filters.esri.geometry;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.filters.filters.core;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.sensorthings.dto;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.sensorthings.filter;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.sensorthings.rest.api;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.sensorthings.rest.gateway;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.southbound.history.history-api;version='[0.0.2,0.0.3)',\
+	tools.jackson.jakarta.rs.jackson-jakarta-rs-base;version='[3.1.0,3.1.1)',\
+	tools.jackson.jakarta.rs.jackson-jakarta-rs-json-provider;version='[3.1.0,3.1.1)',\
+	org.apache.felix.configadmin.plugin.interpolation;version='[1.2.8,1.2.9)'
 
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
@@ -102,13 +125,19 @@
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.gogo-shell',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.session.session-impl',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
-	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter'
+	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
+	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt',\
+	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.sensorthings.rest.gateway',\
+	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation'
 
 -runee: JavaSE-21
 -runfw: org.apache.felix.framework;version='[7.0.5,7.0.5]'
 
 -runproperties: \
-	org.osgi.service.http.port=8080
+    osgi.console=,\
+    org.osgi.service.http.port=-1,\
+    osgi.console.enable.builtin=false,\
+    felix.cm.config.plugins=org.apache.felix.configadmin.plugin.interpolation
 
 # The spifly framework-extension variant breaks the typedevent bus at startup
 # ("Weaving hook failed"); force the classic spifly dynamic bundle instead.

@@ -41,8 +41,10 @@
 	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation'
 
 -runproperties: \
-	org.osgi.service.http.port=8080,\
-	felix.cm.config.plugins=org.apache.felix.configadmin.plugin.interpolation
+    osgi.console=,\
+    org.osgi.service.http.port=-1,\
+    osgi.console.enable.builtin=false,\
+    felix.cm.config.plugins=org.apache.felix.configadmin.plugin.interpolation
 
 -runee: JavaSE-21
 -runfw: org.apache.felix.framework;version='[7.0.5,7.0.5]'

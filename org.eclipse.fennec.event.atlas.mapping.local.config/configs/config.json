@@ -28,10 +28,6 @@
     "refresh.interval.ms": 60000
   },
 
-  "sensinact.session.manager": {
-    "auth.policy": "ALLOW_ALL"
-  },
-  
   "sensinact.southbound.mqtt~local": {
     "id": "local-broker",
     "protocol": "tcp",
@@ -46,10 +42,5 @@
     "format": "xmi",
     "name": "weather-mqtt"
   },
-  
-  "JakartarsServletWhiteboardRuntimeComponent": {
-    "osgi.jakartars.name": "eventatlas.rest"
-  }
-  
   
 }

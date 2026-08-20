@@ -52,18 +52,6 @@
     "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
   },
 
-  "sensinact.session.manager": {
-    "auth.policy": "ALLOW_ALL"
-  },
-
-  "JakartarsServletWhiteboardRuntimeComponent": {
-    "osgi.jakartars.name": "sensiNact.rest"
-  },
-
-  "sensinact.northbound.rest": {
-    "allow.anonymous": true
-  },
-
   /* MQTT: the sensiNact client is the transport only (connection + subscription); all mapping
    * and ingest happens in event.atlas's MqttPayloadListener, which binds this handler by id. */
   "sensinact.southbound.mqtt~broker": {
