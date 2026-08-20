@@ -84,7 +84,6 @@
 	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
 	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
 	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
-	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)'
 

@@ -26,7 +26,6 @@ Gradle graph automatically):
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload, pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, …) |
 | `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
 | `…event.atlas.rest.southbound.adapter` | `PayloadIngestResource` — `POST <whiteboard base>/ingest/{channel}`; the HTTP status mirrors the `IngestResult` outcome |
-| `org.eclipse.fennec.model.atlas.eobject.provider` | note the *different* namespace: a generic **Model Atlas** content source for the emf.osgi EObject registry, not mapping-specific |
 
 `docker/eventatlas/` (not a bnd project, in `bnd_exclude`) holds the Dockerfile; its
 `content/` staging dir is git-ignored (see `docker/eventatlas/README.md`).
@@ -203,14 +202,22 @@ EPackages a runtime maps must be registered in that runtime.
 - SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
   `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots);
   `central.mvn` additionally carries the Model Atlas client bundles
-  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api`) and the Jackson 2/3
-  pieces the northbound REST chain needs (`jackson-jakarta-rs-*`,
+  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / eobject.provider`) and the
+  Jackson 2/3 pieces the northbound REST chain needs (`jackson-jakarta-rs-*`,
   `jackson-module-jakarta-xmlbind-annotations`, jackson 2 `jackson-core` for
-  esri.geometry). The atlas eobject.provider is a workspace project (see table above),
-  no longer consumed from Maven.
+  esri.geometry). `…model.atlas.eobject.provider` — the generic Model Atlas content source for
+  the emf.osgi EObject registry — used to be a workspace project here; since 2026-08-19 it lives
+  in `eclipse-fennec/model.atlas` and both bndruns list it with a version range
+  (`[0.1.0,0.1.1)`), *not* `version=snapshot`.
 - **A new bundle is a new top-level directory with a `bnd.bnd`** — the bnd workspace plugin
   sweeps it into the Gradle graph automatically; the root build applies `java` + `jacoco` to
   every subproject.
+- **`cnf/ext/sensinact.maven` indexes third-party artifacts that only exist on Maven Central**
+  (the netty 4.1.93 set, for the sensorthings MQTT northbound). The Eclipse SensiNact repos do
+  not serve them, so a resolve that picks such a coordinate succeeds locally — the jar is already
+  in `~/.m2` from some other build — and then fails the CI export with "Not found in […]". Pin
+  what a bndrun actually needs in `central.mvn` instead, at the version the rest of that library
+  family already uses.
 - After bumping a library version in `central.mvn`, clear `cnf/cache/<bndversion>/expanded` so
   the new library content is unpacked.
 - A resource-only config bundle is `-resourceonly: true` + `-includeresource:
