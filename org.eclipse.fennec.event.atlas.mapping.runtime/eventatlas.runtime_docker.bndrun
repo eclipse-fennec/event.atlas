@@ -164,4 +164,4 @@
 	io.netty.transport-classes-epoll;version='[4.1.93,4.1.94)',\
 	io.netty.transport-native-unix-common;version='[4.1.133,4.1.134)',\
 	org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt;version='[0.0.2,0.0.3)',\
-	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot
+	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)'
