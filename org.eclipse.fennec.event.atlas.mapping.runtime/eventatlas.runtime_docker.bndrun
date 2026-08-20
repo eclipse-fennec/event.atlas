@@ -140,7 +140,6 @@
 	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
-	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot,\
 	org.eclipse.fennec.model.atlas.rest.client.api;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.model.atlas.rest.client.impl;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.model.atlas.rest.client.osgi;version='[0.1.0,0.1.1)',\
@@ -164,4 +163,5 @@
 	io.netty.transport;version='[4.1.133,4.1.134)',\
 	io.netty.transport-classes-epoll;version='[4.1.93,4.1.94)',\
 	io.netty.transport-native-unix-common;version='[4.1.133,4.1.134)',\
-	org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt;version='[0.0.2,0.0.3)'
+	org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt;version='[0.0.2,0.0.3)',\
+	org.eclipse.fennec.model.atlas.eobject.provider;version=snapshot
