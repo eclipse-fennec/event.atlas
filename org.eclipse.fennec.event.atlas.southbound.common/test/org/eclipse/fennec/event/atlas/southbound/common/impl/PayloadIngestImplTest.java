@@ -200,6 +200,74 @@ public class PayloadIngestImplTest {
 		return ePackage;
 	}
 
+	@Test
+	@DisplayName("FORMAT_AUTO reads a payload starting with '<' as XMI")
+	// AUTO exists so one channel can carry both encodings -- a broker topic tree where some
+	// publishers send XMI and others JSON.
+	void ingest_withAutoFormat_detectsXmiFromTheLeadingAngleBracket() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+
+		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_AUTO, "sensors/test");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+		assertEquals(1, result.roots());
+	}
+
+	@Test
+	@DisplayName("FORMAT_AUTO looks past a UTF-8 BOM")
+	// Publishers emit a BOM, and XML permits it before the declaration.
+	void ingest_withAutoFormat_skipsAByteOrderMark() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		byte[] xmi = sensorXmi();
+		byte[] prefixed = new byte[xmi.length + 3];
+		prefixed[0] = (byte) 0xEF;
+		prefixed[1] = (byte) 0xBB;
+		prefixed[2] = (byte) 0xBF;
+		System.arraycopy(xmi, 0, prefixed, 3, xmi.length);
+
+		IngestResult result = ingest.ingest(prefixed, PayloadIngest.FORMAT_AUTO, "sensors/test");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+	}
+
+	@Test
+	@DisplayName("FORMAT_AUTO looks past leading whitespace")
+	// Whitespace is legal before a root element (though NOT before an XML declaration, which is
+	// why this payload carries none) and before a pretty-printed JSON document.
+	void ingest_withAutoFormat_skipsLeadingWhitespace() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		byte[] payload = ("\n  <test:Sensor xmlns:test=\"" + KNOWN_NS_URI + "\" value=\"21.5\"/>")
+				.getBytes(StandardCharsets.UTF_8);
+
+		IngestResult result = ingest.ingest(payload, PayloadIngest.FORMAT_AUTO, "sensors/test");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+	}
+
+	@Test
+	@DisplayName("FORMAT_AUTO does not read a JSON payload as XMI")
+	// The model is deliberately unresolvable, so this asserts WHICH codec ran rather than the
+	// end result: reading `{...}` as XMI fails as a PARSE_ERROR, whereas the JSON codec gets far
+	// enough to recognise that the model is unknown.
+	void ingest_withAutoFormat_routesJsonToTheJsonCodec() {
+		IngestResult result = ingest.ingest(
+				("{\"eClass\":\"" + UNKNOWN_NS_URI + "#//Sensor\"}").getBytes(StandardCharsets.UTF_8),
+				PayloadIngest.FORMAT_AUTO, "sensors/test");
+
+		assertNotNull(result);
+		assertTrue(result.outcome() != Outcome.APPLIED, "an unresolvable model must not report APPLIED");
+	}
+
+	@Test
+	@DisplayName("An explicit format hint still wins over detection")
+	void ingest_withExplicitFormat_stillHonoursTheHint() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+
+		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+	}
+
 	private static byte[] sensorXmi() {
 		return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 				+ "<test:Sensor xmlns:test=\"" + KNOWN_NS_URI + "\" value=\"21.5\"/>")

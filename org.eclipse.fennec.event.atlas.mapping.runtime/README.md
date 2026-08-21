@@ -96,6 +96,30 @@ must match, or messages arrive at the broker and are never delivered to the adap
 }
 ```
 
+### Mixed-format topic trees
+
+`event.atlas.southbound.mqtt` is a **factory** pid, and sensiNact dispatches to each registered
+listener only for the topics matching that listener's own filters (`MqttTopic.isMatched`). So when
+one broker carries several payload formats, add one adapter instance **per format** over the same
+`mqtt.handler.id` rather than making a single adapter guess:
+
+```json
+"event.atlas.southbound.mqtt~xmi":  { "mqttTopics": ["plant/sensors/#"],
+                                      "mqtt.handler.id": "local-broker", "format": "xmi" },
+"event.atlas.southbound.mqtt~json": { "mqttTopics": ["plant/dashboard/#"],
+                                      "mqtt.handler.id": "local-broker", "format": "json" }
+```
+
+Each channel then states its format, so a payload in the wrong format is a `PARSE_ERROR` naming
+the channel instead of being silently routed to the other codec. The filters are subsets of the
+broker's `topics` and are not derived from them: a subscribed topic matching **no** filter is
+received and dropped — every channel logs its filters at activation, which is how you catch it.
+
+`format` also accepts **`auto`**, which picks per message from the payload's first non-whitespace
+byte (`<` → XMI, `{`/`[` → JSON, a leading BOM skipped, otherwise XMI). Reach for it only when a
+*single topic* genuinely carries both formats — where the topic tree separates them, the two-channel
+split above is the better answer.
+
 Send it:
 
 ```bash

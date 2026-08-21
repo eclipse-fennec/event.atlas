@@ -92,8 +92,9 @@ every environment. Every placeholder has a default — the image starts standalo
 | `EVENTATLAS_ATLAS_REFRESH_INTERVAL_MS` | `60000` | full re-sync interval |
 | `EVENTATLAS_MQTT_PROTOCOL` / `_HOST` / `_PORT` | `tcp` / `localhost` / `1883` | southbound broker the runtime *connects to* (not the SensorThings broker it hosts) |
 | `EVENTATLAS_MQTT_USER` / `_PASSWORD` | empty | southbound broker credentials |
-| `EVENTATLAS_MQTT_TOPICS` | `eventatlas/#` | comma-separated topic filters |
-| `EVENTATLAS_MQTT_FORMAT` | `xmi` | payload format hint for `PayloadIngest` |
+| `EVENTATLAS_MQTT_TOPICS` | `eventatlas/#` | comma-separated topics **subscribed at the broker** |
+| `EVENTATLAS_MQTT_XMI_TOPICS` | `eventatlas/#` | which of those the **XMI** ingest channel handles |
+| `EVENTATLAS_MQTT_JSON_TOPICS` | `eventatlas/json/#` | which of those the **JSON** ingest channel handles |
 | `SENSORTHINGS_MQTT_PORT` / `_SECURE_PORT` | `1883` / `8883` | hosted SensorThings broker, TCP / TLS |
 | `SENSORTHINGS_MQTT_WS_PORT` / `_WSS_PORT` | `8885` / `8886` | hosted SensorThings broker, WebSocket / WSS |
 | `SENSORTHINGS_MQTT_KEYSTORE_FILE` / `_TYPE` | empty / `jks` | keystore for the TLS listeners; without a file the TLS ports stay closed |

@@ -53,7 +53,10 @@
   },
 
   /* MQTT: the sensiNact client is the transport only (connection + subscription); all mapping
-   * and ingest happens in event.atlas's MqttPayloadListener, which binds this handler by id. */
+   * and ingest happens in event.atlas's MqttPayloadListener, which binds this handler by id.
+   *
+   * `topics` here is what is SUBSCRIBED at the broker. Which of those messages each ingest
+   * channel handles is a separate, per-channel filter — see the two adapter instances below. */
   "sensinact.southbound.mqtt~broker": {
     "id": "eventatlas-broker",
     "protocol": "$[env:EVENTATLAS_MQTT_PROTOCOL;default=tcp]",
@@ -64,10 +67,28 @@
     "topics": "$[env:EVENTATLAS_MQTT_TOPICS;default=eventatlas/#;delimiter=,]"
   },
 
-  "event.atlas.southbound.mqtt~ingest": {
-    "mqttTopics": "$[env:EVENTATLAS_MQTT_TOPICS;default=eventatlas/#;delimiter=,]",
+  /* Two ingest channels on the ONE broker connection above, split by payload format.
+   * MqttPayloadListener is a factory pid, and sensiNact dispatches to each registered listener
+   * only for the topics matching its own filters (MqttTopic.isMatched), so a message is handled
+   * by whichever channel's filter it matches — with the format stated, not guessed.
+   *
+   * The filters are subsets of the broker's `topics` and are NOT derived from it: a topic that
+   * is subscribed but matches neither filter is received and silently dropped. Each channel logs
+   * its filters at activation ("MQTT southbound adapter '...' listening on [...]"), which is the
+   * quickest way to spot that. Keep the union of the two covering `topics`.
+   *
+   * A filter that matches nothing is harmless — it costs no subscription — so the JSON channel's
+   * default is inert rather than empty (empty topics is a hard activation failure by design). */
+  "event.atlas.southbound.mqtt~xmi": {
+    "mqttTopics": "$[env:EVENTATLAS_MQTT_XMI_TOPICS;default=eventatlas/#;delimiter=,]",
     "mqtt.handler.id": "eventatlas-broker",
-    "format": "$[env:EVENTATLAS_MQTT_FORMAT;default=xmi]",
-    "name": "eventatlas-mqtt"
+    "format": "xmi",
+    "name": "eventatlas-mqtt-xmi"
+  },
+  "event.atlas.southbound.mqtt~json": {
+    "mqttTopics": "$[env:EVENTATLAS_MQTT_JSON_TOPICS;default=eventatlas/json/#;delimiter=,]",
+    "mqtt.handler.id": "eventatlas-broker",
+    "format": "json",
+    "name": "eventatlas-mqtt-json"
   }
 }

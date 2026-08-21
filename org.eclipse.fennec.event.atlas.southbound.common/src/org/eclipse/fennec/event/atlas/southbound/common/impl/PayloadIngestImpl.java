@@ -67,7 +67,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 	public IngestResult ingest(byte[] payload, String formatHint, String source) {
 		requireNonNull(payload, "Payload must not be null");
 		String origin = source == null || source.isBlank() ? "<unknown source>" : source;
-		String format = resolveFormat(formatHint);
+		String format = resolveFormat(formatHint, payload);
 
 		List<EObject> roots;
 		try {
@@ -160,11 +160,14 @@ public class PayloadIngestImpl implements PayloadIngest {
 	 * extension that selects the resource factory. Unrecognized hints fall back to XMI,
 	 * which is the format in which a payload names its own model.
 	 */
-	private static String resolveFormat(String formatHint) {
+	private static String resolveFormat(String formatHint, byte[] payload) {
 		if (formatHint == null || formatHint.isBlank()) {
 			return FORMAT_XMI;
 		}
 		String hint = formatHint.trim().toLowerCase(Locale.ROOT);
+		if (FORMAT_AUTO.equals(hint)) {
+			return detectFormat(payload);
+		}
 		// tolerate a full media type with parameters, e.g. "application/json; charset=utf-8"
 		int parameters = hint.indexOf(';');
 		if (parameters >= 0) {
@@ -181,6 +184,45 @@ public class PayloadIngestImpl implements PayloadIngest {
 		}
 		logger.fine(String.format("Unrecognized payload format hint '%s' - falling back to %s", formatHint,
 				FORMAT_XMI));
+		return FORMAT_XMI;
+	}
+
+	/**
+	 * Guesses the format from the payload's first non-whitespace byte: <code>&lt;</code> is XMI,
+	 * <code>{</code> and <code>[</code> are JSON.
+	 * <p>
+	 * Only the leading byte is inspected on purpose. Anything deeper would mean parsing the
+	 * payload twice, and the codec is about to parse it properly anyway - a wrong guess surfaces
+	 * as a parse error naming the format that was tried, which is a better diagnostic than a
+	 * silent reinterpretation. Whitespace is skipped because an XML declaration or a pretty-printed
+	 * JSON document may be preceded by newlines, and a UTF-8 BOM is skipped because publishers
+	 * emit one.
+	 * <p>
+	 * A payload that begins with neither falls back to XMI, matching the behaviour of an
+	 * unrecognized hint.
+	 */
+	private static String detectFormat(byte[] payload) {
+		int i = 0;
+		// UTF-8 BOM
+		if (payload.length >= 3 && (payload[0] & 0xFF) == 0xEF && (payload[1] & 0xFF) == 0xBB
+				&& (payload[2] & 0xFF) == 0xBF) {
+			i = 3;
+		}
+		while (i < payload.length) {
+			byte b = payload[i];
+			if (b == ' ' || b == '\t' || b == '\n' || b == '\r') {
+				i++;
+				continue;
+			}
+			if (b == '{' || b == '[') {
+				return FORMAT_JSON;
+			}
+			if (b == '<') {
+				return FORMAT_XMI;
+			}
+			break;
+		}
+		logger.fine("Could not detect the payload format from its first byte - falling back to " + FORMAT_XMI);
 		return FORMAT_XMI;
 	}
 

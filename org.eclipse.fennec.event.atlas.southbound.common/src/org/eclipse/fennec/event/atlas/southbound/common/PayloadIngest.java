@@ -44,6 +44,20 @@ public interface PayloadIngest {
 	String FORMAT_JSON = "json";
 
 	/**
+	 * Format hint asking for the format to be detected from the payload itself, per message.
+	 * <p>
+	 * Use it when one channel carries more than one encoding - a broker topic tree where some
+	 * publishers send XMI and others JSON, for instance. Detection looks at the first
+	 * non-whitespace character only: <code>&lt;</code> means XMI, <code>{</code> or
+	 * <code>[</code> mean JSON. It is a cheap structural check, not a validation; a payload that
+	 * is neither still fails in the codec and is reported as a parse error.
+	 * <p>
+	 * An explicit {@link #FORMAT_XMI} or {@link #FORMAT_JSON} always wins over detection, so a
+	 * single-format channel can keep saying exactly what it sends.
+	 */
+	String FORMAT_AUTO = "auto";
+
+	/**
 	 * Deserializes a payload and pushes every resulting root object into the digital twin
 	 * through all provider mappings registered for its EClass.
 	 * @param payload the raw payload bytes. Parameter must not be <code>null</code>
