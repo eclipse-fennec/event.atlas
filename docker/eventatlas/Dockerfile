@@ -52,7 +52,10 @@ ENV APP_HOME=${APP_HOME} \
 COPY --from=builder ${APP_HOME} ${APP_HOME}
 COPY --from=builder --chown=65532:65532 ${TMPDIR} ${TMPDIR}
 
-EXPOSE 8080
+# 8080 HTTP (all REST, under the event/ context path), 1883 + 8885 SensorThings MQTT
+# broker (TCP + WebSocket). The TLS listeners 8883/8886 only bind when a keystore is
+# configured, so they are not declared here.
+EXPOSE 8080 1883 8885
 WORKDIR ${APP_HOME}
 
 ENTRYPOINT ["java", \
