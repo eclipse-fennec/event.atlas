@@ -100,6 +100,22 @@ every environment. Every placeholder has a default — the image starts standalo
 | `SENSORTHINGS_MQTT_KEYSTORE_FILE` / `_TYPE` | empty / `jks` | keystore for the TLS listeners; without a file the TLS ports stay closed |
 | `SENSORTHINGS_MQTT_KEYSTORE_PASSWORD` / `_KEYMANAGER_PASSWORD` | empty | keystore secrets (`.`-prefixed properties, so ConfigAdmin treats them as private) |
 
+### List-valued variables
+
+`EVENTATLAS_MQTT_TOPICS`, `_XMI_TOPICS` and `_JSON_TOPICS` are comma-separated. In the baked
+`config.json` each is declared `$[env:NAME;default=...;delimiter=,;type=String[]]`.
+
+**`type=String[]` is mandatory, not decoration.** The interpolation plugin only converts a value
+when the `type` directive is present, so `delimiter=,` on its own is silently ignored and the
+property arrives as one comma-joined String. sensiNact passes that straight to paho, which fails
+activation with:
+
+```
+java.lang.IllegalArgumentException: Invalid usage of multi-level wildcard in topic string: eventatlas/#,waterpark/#
+```
+
+Add both directives to any new list property.
+
 ### Working directory
 
 The container's `WORKDIR` is `/opt/eventatlas/work` — a directory owned by the runtime user

@@ -52,7 +52,14 @@
     "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
   },
 
-  /* MQTT: the sensiNact client is the transport only (connection + subscription); all mapping
+  /* `;type=String[]` is REQUIRED on every list property, not optional next to `delimiter`: the
+   * interpolation plugin only converts a value when the `type` directive is present
+   * (InterpolationConfigurationPlugin:196 -> convertType), so `delimiter=,` ALONE is silently
+   * ignored and the property stays one comma-joined String. sensiNact then hands that whole
+   * string to paho, which rejects it with
+   *   IllegalArgumentException: Invalid usage of multi-level wildcard in topic string: a/#,b/#
+   *
+   * MQTT: the sensiNact client is the transport only (connection + subscription); all mapping
    * and ingest happens in event.atlas's MqttPayloadListener, which binds this handler by id.
    *
    * `topics` here is what is SUBSCRIBED at the broker. Which of those messages each ingest
@@ -64,7 +71,7 @@
     "port": "$[env:EVENTATLAS_MQTT_PORT;default=1883;type=Integer]",
     "user": "$[env:EVENTATLAS_MQTT_USER;default=]",
     ".password": "$[env:EVENTATLAS_MQTT_PASSWORD;default=]",
-    "topics": "$[env:EVENTATLAS_MQTT_TOPICS;default=eventatlas/#;delimiter=,]"
+    "topics": "$[env:EVENTATLAS_MQTT_TOPICS;default=eventatlas/#;delimiter=,;type=String[]]"
   },
 
   /* Two ingest channels on the ONE broker connection above, split by payload format.
@@ -80,13 +87,13 @@
    * A filter that matches nothing is harmless — it costs no subscription — so the JSON channel's
    * default is inert rather than empty (empty topics is a hard activation failure by design). */
   "event.atlas.southbound.mqtt~xmi": {
-    "mqttTopics": "$[env:EVENTATLAS_MQTT_XMI_TOPICS;default=eventatlas/#;delimiter=,]",
+    "mqttTopics": "$[env:EVENTATLAS_MQTT_XMI_TOPICS;default=eventatlas/#;delimiter=,;type=String[]]",
     "mqtt.handler.id": "eventatlas-broker",
     "format": "xmi",
     "name": "eventatlas-mqtt-xmi"
   },
   "event.atlas.southbound.mqtt~json": {
-    "mqttTopics": "$[env:EVENTATLAS_MQTT_JSON_TOPICS;default=eventatlas/json/#;delimiter=,]",
+    "mqttTopics": "$[env:EVENTATLAS_MQTT_JSON_TOPICS;default=eventatlas/json/#;delimiter=,;type=String[]]",
     "mqtt.handler.id": "eventatlas-broker",
     "format": "json",
     "name": "eventatlas-mqtt-json"

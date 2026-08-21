@@ -96,6 +96,21 @@ must match, or messages arrive at the broker and are never delivered to the adap
 }
 ```
 
+### List properties under the interpolation plugin
+
+`topics` and `mqttTopics` are OSGi `String[]` properties. Written literally in a cm.json file they
+are JSON arrays, as above. Written as an interpolated environment variable they need **both**
+directives:
+
+```json
+"topics": "$[env:MY_TOPICS;default=eventatlas/#;delimiter=,;type=String[]]"
+```
+
+`delimiter` alone does nothing — the plugin converts only when `type` is present — and the property
+then reaches paho as a single comma-joined string, which fails activation with
+`IllegalArgumentException: Invalid usage of multi-level wildcard in topic string`. (The `]` inside
+`String[]` is safe: the placeholder parser counts brackets.)
+
 ### Mixed-format topic trees
 
 `event.atlas.southbound.mqtt` is a **factory** pid, and sensiNact dispatches to each registered
