@@ -1,15 +1,18 @@
-# Self-contained docker runtime: the SensiNact mapping engine + gateway + northbound
-# REST API. Provider mappings and mapping profiles are loaded from XMI files below
-# /opt/eventatlas/runtime, wired by the docker.config configurator bundle - no Model
-# Atlas connection, no test simulator. (configurator.initial is NOT used: the initial-
-# config pass runs before the JSON provider is wired and fails with "Invalid JSON".)
+# Self-contained docker runtime: the SensiNact mapping engine + gateway, the northbound
+# REST API, the SensorThings v1.1 REST gateway and the SensorThings MQTT broker. Provider
+# mappings and mapping profiles are loaded from XMI files below /opt/eventatlas/runtime and
+# optionally from a Model Atlas; no test simulator. Everything is wired by the docker.config
+# configurator bundle - see docker/eventatlas/README.md for ports, REST bases and the
+# environment variables. (configurator.initial is NOT used: the initial-config pass runs
+# before the JSON provider is wired and fails with "Invalid JSON".)
 -runprovidedcapabilities: ${native_capability}
 
 -resolve.effective: active
 
-# Deployment-specific values (broker host/credentials, Model Atlas base.uri) are NOT baked
-# in: the ConfigAdmin interpolation plugin resolves $[env:...] / $[secret:...] placeholders
-# in config.json at delivery time, so one published image serves every environment.
+# Deployment-specific values (broker host/credentials, Model Atlas base.uri, the
+# SensorThings MQTT ports) are NOT baked in: the ConfigAdmin interpolation plugin resolves
+# $[env:...] / $[secret:...] placeholders in config.json and sensinact.json at delivery
+# time, so one published image serves every environment.
 #
 # Kept in sync with launch.bndrun: the Model Atlas REST client + Atlas-backed EObject
 # provider (mappings come from the Model Atlas service, not only local XMI files) and the
@@ -40,6 +43,9 @@
 	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
 	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation'
 
+# http.port=-1 switches OFF the framework's default HTTP service: the whiteboard that
+# serves 8080 is the named org.apache.felix.http~eventHttp instance from sensinact.json
+# (context path event/), so the port belongs to the config, not to this file.
 -runproperties: \
     osgi.console=,\
     org.osgi.service.http.port=-1,\

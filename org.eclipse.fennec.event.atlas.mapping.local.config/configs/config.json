@@ -1,6 +1,6 @@
 {
   ":configurator:resource-version": 1,
-  ":configurator:symbolicname": "org.eclipse.fennec.event.atlas.mapping.local.config",
+  ":configurator:symbolic-name": "org.eclipse.fennec.event.atlas.mapping.local.config",
   ":configurator:version": "1.0.0",
 
   "org.eclipse.fennec.model.atlas.rest.client~jena": {

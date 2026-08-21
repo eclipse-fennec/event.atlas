@@ -8,9 +8,6 @@
 	  "auth.policy": "ALLOW_ALL"
 	},
 
-	"sensinact.northbound.rest": {
-	  "allow.anonymous": true
-	},
 	"org.apache.felix.http~eventHttp": {
 	    "org.osgi.service.http.port": "8080",
 	    "org.osgi.service.http.host": "0.0.0.0",
@@ -42,7 +39,7 @@
         "websocket.port": "$[env:SENSORTHINGS_MQTT_WS_PORT;default=$[prop:SENSORTHINGS_MQTT_WS_PORT;default=8885]]",
         "websocket.secure.port": "$[env:SENSORTHINGS_MQTT_WSS_PORT;default=$[prop:SENSORTHINGS_MQTT_WSS_PORT;default=8886]]",
         "keystore.file": "$[env:SENSORTHINGS_MQTT_KEYSTORE_FILE;default=$[prop:SENSORTHINGS_MQTT_KEYSTORE_FILE;default=]]",
-        "keystore.type": "$[env:SENSORTHINGS_MQTT_KEYSTORE_TYPE;default=$[prop:SENSORTHINGS_MQTT_WSS_KEYSTORE_TYPE;default=jks]]",
+        "keystore.type": "$[env:SENSORTHINGS_MQTT_KEYSTORE_TYPE;default=$[prop:SENSORTHINGS_MQTT_KEYSTORE_TYPE;default=jks]]",
         ".keystore.password": "$[env:SENSORTHINGS_MQTT_KEYSTORE_PASSWORD;default=$[prop:SENSORTHINGS_MQTT_KEYSTORE_PASSWORD;default=]]",
         ".keymanager.password": "$[env:SENSORTHINGS_MQTT_KEYMANAGER_PASSWORD;default=$[prop:SENSORTHINGS_MQTT_KEYMANAGER_PASSWORD;default=]]"
     }
