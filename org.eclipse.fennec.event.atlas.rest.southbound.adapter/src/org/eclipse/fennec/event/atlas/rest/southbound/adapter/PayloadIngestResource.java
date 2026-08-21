@@ -21,6 +21,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ServiceScope;
 import org.osgi.service.jakartars.whiteboard.annotations.RequireJakartarsWhiteboard;
+import org.osgi.service.jakartars.whiteboard.propertytypes.JakartarsApplicationSelect;
 import org.osgi.service.jakartars.whiteboard.propertytypes.JakartarsName;
 import org.osgi.service.jakartars.whiteboard.propertytypes.JakartarsResource;
 
@@ -43,6 +44,9 @@ import jakarta.ws.rs.core.Response.Status;
  * POST &lt;whiteboard base&gt;/ingest/{channel}
  * </pre>
  *
+ * The {@code ingest} segment is the base URI of {@link PayloadIngestApplication} rather than
+ * a resource path - see there for why this endpoint needs an application of its own.
+ *
  * The {@code channel} segment is free-form and used only to identify the sender in log
  * messages - the model comes from the payload itself, not from the path. The request's
  * {@code Content-Type} selects the payload format, so an XMI payload should be posted as
@@ -63,9 +67,10 @@ import jakarta.ws.rs.core.Response.Status;
  */
 @RequireJakartarsWhiteboard
 @JakartarsResource
-@JakartarsName("event-atlas-ingest")
+@JakartarsName("event-atlas-ingest-resource")
+@JakartarsApplicationSelect("(osgi.jakartars.name=" + PayloadIngestApplication.NAME + ")")
 @Component(service = PayloadIngestResource.class, scope = ServiceScope.PROTOTYPE)
-@Path("ingest")
+@Path("/")
 public class PayloadIngestResource {
 
 	private static final Logger logger = Logger.getLogger(PayloadIngestResource.class.getName());

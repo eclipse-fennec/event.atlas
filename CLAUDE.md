@@ -21,7 +21,7 @@ Gradle graph automatically):
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
 | `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles}` mount-point skeleton |
 | `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring) |
-| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image (file providers + northbound REST) |
+| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — two resources: `config.json` (file providers + Model Atlas client + MQTT southbound) and `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload, pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, …) |
 | `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
@@ -95,10 +95,27 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
 
 - `launch.bndrun` — dev playground: mapping engine + SensiNact gateway + Gogo shell + the
   **test simulator** + the Model Atlas client (`local.config` points it at
-  `http://localhost:8086/atlas/rest`, scope `jena`).
+  `http://localhost:8086/atlas/rest`, scope `jena`). Its `configs/sensinact.json` is the same
+  file as the docker one except that the hosted SensorThings MQTT broker defaults to **2883**,
+  so it does not fight a local broker on 1883 — same `/event/rest/{sensinact,v1.1}` bases.
 - `eventatlas.runtime_docker.bndrun` — self-contained image runtime: engine + gateway +
-  northbound REST on 8080, mappings/profiles read from XMI files under
-  `/opt/eventatlas/runtime`, **no** Model Atlas and no simulator.
+  northbound REST + the SensorThings v1.1 REST gateway and MQTT broker; mappings/profiles read
+  from XMI files under `/opt/eventatlas/runtime` **and** optionally from a Model Atlas; no
+  simulator. All REST bases live under `/event/rest` (`…/sensinact`, `…/v1.1`) because
+  `sensinact.json` configures a named Felix HTTP whiteboard on context path `event/` plus a
+  Jersey whiteboard at `rest`; the bndrun sets `org.osgi.service.http.port=-1` so the default
+  HTTP service does not compete for 8080. Ports, endpoints and the `$[env:…]` variables are
+  documented in `docker/eventatlas/README.md`.
+- **The SensorThings REST application owns the Jakarta-RS whiteboard root.** It declares no
+  application base (its resources carry `@Path("/v1.1/…")` themselves), so it sits at
+  `/event/rest` and every path there that no other application claims becomes a SensorThings
+  404 which cannot serialize its own `ErrorResponse` → HTTP 500 "Request failed." rather than a
+  404. **A new `@JakartarsResource` therefore needs its own application**: without an
+  `osgi.jakartars.application.select` it joins the whiteboard's default application, which the
+  SensorThings application shadows, and is never invoked. `PayloadIngestApplication`
+  (`…rest.southbound.adapter`, base `ingest`, name `event-atlas-ingest`, config pid
+  `event.atlas.southbound.rest`) is the pattern to copy — it is what keeps
+  `POST <whiteboard base>/ingest/{channel}` reachable.
 - Gradle does **not** forward stdin to the launcher; for an interactive Gogo shell use
   `export.launch` and run the resulting `generated/distributions/executable/launch.jar` directly.
 - **The bnd resolver only sees package requirements, not DS service references** — that is why
@@ -202,22 +219,32 @@ EPackages a runtime maps must be registered in that runtime.
 - SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
   `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots);
   `central.mvn` additionally carries the Model Atlas client bundles
-  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / eobject.provider`) and the
-  Jackson 2/3 pieces the northbound REST chain needs (`jackson-jakarta-rs-*`,
-  `jackson-module-jakarta-xmlbind-annotations`, jackson 2 `jackson-core` for
-  esri.geometry). `…model.atlas.eobject.provider` — the generic Model Atlas content source for
-  the emf.osgi EObject registry — used to be a workspace project here; since 2026-08-19 it lives
-  in `eclipse-fennec/model.atlas` and both bndruns list it with a version range
-  (`[0.1.0,0.1.1)`), *not* `version=snapshot`.
+  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / eobject.provider`) and every
+  third-party bundle the northbound chain drags in: Jackson 3 (`tools.jackson.core:jackson-core`
+  + `jackson-databind`, `jackson-jakarta-rs-*`, `jackson-module-jakarta-xmlbind-annotations`, all
+  on one 3.1.x version), Jackson 2 `jackson-core` for esri.geometry, Jackson 2
+  `jackson-annotations` **2.21** (Jackson 3 left `com.fasterxml.jackson.annotation` at 2.x and the
+  sensinact DTO bundles import it as `[2.21,3)`, so it does not track jackson-core's version),
+  netty, and dropwizard `metrics-core`. `…model.atlas.eobject.provider` — the generic Model Atlas
+  content source for the emf.osgi EObject registry — used to be a workspace project here; since
+  2026-08-19 it lives in `eclipse-fennec/model.atlas` and both bndruns list it with a version
+  range (`[0.1.0,0.1.1)`), *not* `version=snapshot`.
 - **A new bundle is a new top-level directory with a `bnd.bnd`** — the bnd workspace plugin
   sweeps it into the Gradle graph automatically; the root build applies `java` + `jacoco` to
   every subproject.
-- **`cnf/ext/sensinact.maven` indexes third-party artifacts that only exist on Maven Central**
-  (the netty 4.1.93 set, for the sensorthings MQTT northbound). The Eclipse SensiNact repos do
-  not serve them, so a resolve that picks such a coordinate succeeds locally — the jar is already
-  in `~/.m2` from some other build — and then fails the CI export with "Not found in […]". Pin
-  what a bndrun actually needs in `central.mvn` instead, at the version the rest of that library
-  family already uses.
+- **A `-runbundles` entry only survives CI if some index can actually *fetch* it.** Two ways to
+  get this wrong, both of which resolve fine locally (bnd uses `~/.m2` as a cache, and a
+  developer machine has half of Maven Central in there) and then fail the CI export with
+  "Not found in […]":
+  1. the bsn is in **no index at all** — it resolved purely out of `~/.m2` (this is how the
+     Jackson 3 core/databind and `jackson-annotations` entries slipped in);
+  2. the coordinate is indexed in **`cnf/ext/sensinact.maven`, which pins third-party artifacts
+     the Eclipse SensiNact repos do not host** (netty 4.1.9x, `metrics-core`, postgresql,
+     tx-control) — `repo.eclipse.org/…/sensinact-{releases,snapshots}` 404s them.
+
+  Either way the fix is the same: declare it in `central.mvn`, at the version the rest of that
+  library family already uses. After changing a bndrun's `-runbundles`, cross-check every entry
+  against the indexes rather than trusting a green local resolve.
 - After bumping a library version in `central.mvn`, clear `cnf/cache/<bndversion>/expanded` so
   the new library content is unpacked.
 - A resource-only config bundle is `-resourceonly: true` + `-includeresource:
