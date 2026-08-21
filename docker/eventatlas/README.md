@@ -100,6 +100,17 @@ every environment. Every placeholder has a default — the image starts standalo
 | `SENSORTHINGS_MQTT_KEYSTORE_FILE` / `_TYPE` | empty / `jks` | keystore for the TLS listeners; without a file the TLS ports stay closed |
 | `SENSORTHINGS_MQTT_KEYSTORE_PASSWORD` / `_KEYMANAGER_PASSWORD` | empty | keystore secrets (`.`-prefixed properties, so ConfigAdmin treats them as private) |
 
+### Working directory
+
+The container's `WORKDIR` is `/opt/eventatlas/work` — a directory owned by the runtime user
+(65532), deliberately **not** `/opt/eventatlas`, whose contents stay root-owned and read-only.
+It has to be writable: libraries that take a default path resolve it against `user.dir`, and
+paho's `MqttDefaultFilePersistence` — which sensiNact's `MqttClientHandler` gets from
+`new MqttClient(uri, id)`, with no way to configure a directory — throws
+`MqttException (0)` from `open()` if it cannot write there, killing the southbound MQTT client at
+activation. If you override the working directory when running the image, point it at a writable
+path.
+
 ## Building locally
 
 ```bash
