@@ -29,7 +29,8 @@ src=${^src},src-gen
 	org.gecko.weather.model;version=latest,\
 	org.eclipse.fennec.emf.osgi.component.minimal;version=latest,\
 	org.eclipse.fennec.emf.osgi.eobject.registry;version=latest,\
-	org.eclipse.fennec.event.atlas.mapping;version=snapshot
+	org.eclipse.fennec.event.atlas.mapping;version=snapshot,\
+	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot
 
 -includeresource: \
 	data=data,\

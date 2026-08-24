@@ -28,6 +28,12 @@ A payload only reaches the digital twin if **both** halves are resolvable:
 2. **A `ProviderMapping`** for the payload's `EClass`, reaching the `sensinact-mappings`
    EObject registry — from the Model Atlas (registry `sensinactmapping`, scope `jena`,
    re-synced every `refresh.interval.ms`, 60 s by default) or from local XMI files.
+3. **A codec for the payload format.** XMI needs nothing; JSON is read by the EMF resource
+   factory that `org.eclipse.fennec.codec` contributes for the `json` file extension. Both
+   bndruns require that bundle by identity, so a runtime that could not honour a JSON channel
+   fails to resolve. Without it an ingest reports `FORMAT_UNSUPPORTED` — EMF would otherwise
+   answer the unknown extension with its wildcard factory, XMI, and the payload would die in
+   a SAX parser (`Content is not allowed in prolog`).
 
 > **The mapping's own nsURI is load-bearing.** A `ProviderMapping` XMI must declare
 > `https://fennec.eclipse.org/event.atlas/mapping/1.0`. An XMI still carrying the pre-rename
@@ -93,6 +99,12 @@ must match, or messages arrive at the broker and are never delivered to the adap
   "mqtt.handler.id": "local-broker",
   "format": "xmi",
   "name": "weather-mqtt"
+},
+"event.atlas.southbound.mqtt~json": {
+  "mqttTopics": ["eventatlas/json/#"],             // the JSON half of the same subscription
+  "mqtt.handler.id": "local-broker",
+  "format": "json",
+  "name": "local-mqtt-json"
 }
 ```
 
@@ -208,6 +220,8 @@ Both adapters share one ingest, so the outcomes are the same; only the reporting
 | `no provider mapping is registered for it` | 202 | model resolved, no mapping for that `EClass` — check the mapping's nsURI and that it reached the registry |
 | `model '<nsURI>' is not available` | 422 | neither deployed nor resolvable via the Model Atlas |
 | `Cannot deserialize … dropping payload` | 400 | malformed payload |
+| `was read as <format> but contained no objects` | 400 | read, but nothing came out — the message carries the codec's own diagnostic; for JSON an unresolvable `_type` lands here rather than on 422, because the codec records a diagnostic where the XMI parser throws |
+| `no EMF resource factory is registered for extension …` | 501 | this runtime has no codec for that format — for `json`, `org.eclipse.fennec.codec` is missing from the runbundles |
 | `Failed pushing payload … into sensinact` | 503 | gateway unavailable — retryable |
 | — | 404 | Jakarta-RS whiteboard not configured, or wrong path |
 

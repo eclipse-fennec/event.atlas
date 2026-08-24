@@ -19,7 +19,8 @@ package org.eclipse.fennec.event.atlas.southbound.common;
  * Every ingest ends in exactly one {@link Outcome}. Southbound adapters use it to decide
  * what to report back to their transport (an HTTP status, a log level, a metric); the
  * {@link #detail()} carries the one piece of context that makes the outcome actionable -
- * the unresolvable nsURI, the EClass without a mapping, the parse failure message.
+ * the unresolvable nsURI, the EClass without a mapping, the parse failure message, the
+ * format no codec is deployed for.
  * @param outcome what happened. Never <code>null</code>
  * @param roots the number of root {@link org.eclipse.emf.ecore.EObject}s deserialized from
  * the payload; 0 unless the payload was deserialized
@@ -54,6 +55,13 @@ public record IngestResult(Outcome outcome, int roots, int mappingsApplied, Stri
 		/** The payload is not readable in the requested format. */
 		PARSE_ERROR,
 		/**
+		 * The runtime has no EMF {@link org.eclipse.emf.ecore.resource.Resource.Factory}
+		 * registered for the payload's format, so it cannot be read at all - a deployment
+		 * gap, not a payload problem. A JSON channel in a runtime without the EMF JSON
+		 * codec bundle is the case this exists for.
+		 */
+		FORMAT_UNSUPPORTED,
+		/**
 		 * The payload was deserialized and a mapping matched, but pushing it into the
 		 * digital twin failed as a whole (for example the sensinact gateway thread is
 		 * unavailable). Unlike the other outcomes this one is worth retrying.
@@ -77,7 +85,11 @@ public record IngestResult(Outcome outcome, int roots, int mappingsApplied, Stri
 	}
 
 	public static IngestResult empty() {
-		return new IngestResult(Outcome.EMPTY, 0, 0, null);
+		return empty(null);
+	}
+
+	public static IngestResult empty(String detail) {
+		return new IngestResult(Outcome.EMPTY, 0, 0, detail);
 	}
 
 	public static IngestResult modelUnknown(String nsUri) {
@@ -86,6 +98,10 @@ public record IngestResult(Outcome outcome, int roots, int mappingsApplied, Stri
 
 	public static IngestResult parseError(String detail) {
 		return new IngestResult(Outcome.PARSE_ERROR, 0, 0, detail);
+	}
+
+	public static IngestResult formatUnsupported(String detail) {
+		return new IngestResult(Outcome.FORMAT_UNSUPPORTED, 0, 0, detail);
 	}
 
 	public static IngestResult pushFailed(int roots, String detail) {

@@ -108,6 +108,17 @@ public class PayloadIngestResourceTest {
 	}
 
 	@Test
+	@DisplayName("A format this runtime has no codec for answers 501, not 400 - the request was fine")
+	void ingest_formatUnsupported_answersNotImplemented() {
+		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.formatUnsupported("json"));
+
+		Response response = resource.ingest("weather", "application/json", PAYLOAD);
+
+		assertEquals(501, response.getStatus());
+		assertTrue(response.getEntity().toString().contains("json"));
+	}
+
+	@Test
 	@DisplayName("A twin write failure answers 503, so the sender knows to retry")
 	void ingest_pushFailed_answersServiceUnavailable() {
 		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.pushFailed(1, "gateway down"));

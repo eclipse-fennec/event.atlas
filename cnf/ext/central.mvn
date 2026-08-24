@@ -200,22 +200,25 @@ io.dropwizard.metrics:metrics-core:4.2.37
 # Jackson 3 - the whole northbound chain (sensinact rest, sensorthings rest.gateway +
 # mqtt, query-handler, resource.selector, the Model Atlas rest client) imports
 # tools.jackson.core / tools.jackson.databind [3.1,4), and the REST layer additionally
-# the Jakarta-RS JSON provider. Keep all four artifacts on the same 3.1.x version.
-tools.jackson.core:jackson-core:3.1.0
-tools.jackson.core:jackson-databind:3.1.0
-tools.jackson.jakarta.rs:jackson-jakarta-rs-base:3.1.0
-tools.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:3.1.0
+# the Jakarta-RS JSON provider. Keep all four artifacts on the same 3.2.x version.
+# 3.2 (not 3.1) is a floor since the EMF JSON codec landed: org.eclipse.fennec.codec
+# and .codec.api import tools.jackson.core / .databind as [3.2,4).
+tools.jackson.core:jackson-core:3.2.2
+tools.jackson.core:jackson-databind:3.2.2
+tools.jackson.jakarta.rs:jackson-jakarta-rs-base:3.2.2
+tools.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:3.2.2
 # ... and the xmlbind annotations module the provider's JacksonXmlBindJsonProvider
 # instantiates reflectively (optional import, so it must be required explicitly).
-tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.1.0
+tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.2.2
 
 # Jackson 2 leftovers. jackson-core is imported by sensinact's esri.geometry ([2.9,3)),
 # which resource.selector.impl (the query handler's filter factory) drags into the docker
 # runtime. jackson-annotations is separate: Jackson 3 kept the com.fasterxml.jackson.annotation
-# package at 2.x, and every sensinact DTO bundle imports it as [2.21,3) - so 2.21 is a floor,
-# not a preference, and this artifact does NOT track the jackson-core version above.
+# package at 2.x. Every sensinact DTO bundle imports it as [2.21,3) and the EMF JSON codec
+# (org.eclipse.fennec.codec) as [2.22,3) - so 2.22 is a floor, not a preference, and this
+# artifact does NOT track the jackson-core version above.
 com.fasterxml.jackson.core:jackson-core:2.19.2
-com.fasterxml.jackson.core:jackson-annotations:2.21
+com.fasterxml.jackson.core:jackson-annotations:2.22
 
 # Model Atlas client bundles (incl. the eobject.provider, which moved out of this workspace)
 # used by the docker runtime and the mapping.runtime launch bndrun.

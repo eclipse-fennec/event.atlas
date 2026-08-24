@@ -47,6 +47,8 @@ One Felix HTTP whiteboard instance serves context path `event/`, and one Jersey
 | `/event/rest/ingest/{channel}` | `POST` a payload into the twin (the REST southbound adapter) |
 | `/event/rest` | the whiteboard root — **not** an endpoint; answers 500, see below |
 
+See [Payload formats](#payload-formats) for what a channel may post.
+
 The framework's default HTTP service is switched off (`org.osgi.service.http.port=-1` in
 the bndrun) so that the named whiteboard from `sensinact.json` is the only one binding
 8080. Changing the context path, the port or the Jersey path means editing that file, not
@@ -64,6 +66,34 @@ the bndrun.
 > Jakarta-RS resource with no `osgi.jakartars.application.select` joins the whiteboard's
 > default application, which the SensorThings application shadows — so it would never be
 > invoked. Any further REST resource added to this runtime needs the same treatment.
+
+## Payload formats
+
+Both southbound adapters accept **XMI** and **JSON**, and both formats go through the same
+`PayloadIngest`: the format selects an EMF resource factory by file extension, the payload is
+deserialized into EObjects and pushed into the twin. The MQTT side picks the format per channel
+(`_XMI_TOPICS` / `_JSON_TOPICS`), the REST side from the request's `Content-Type`.
+
+**JSON needs a codec bundle.** The runtime carries `org.eclipse.fennec.codec` (plus
+`…codec.api`, `…codec.metadata` and `org.eclipse.fennec.emf.osgi.metadata`) for exactly this:
+it registers the resource factory for the `json` extension. It is pinned in the bndrun's
+`-runrequires`, so a runtime that could not honour a JSON channel fails to resolve rather than
+starting and dropping every message. If the codec is ever missing anyway, an ingest answers
+`FORMAT_UNSUPPORTED` (HTTP 501) and logs
+
+```
+no EMF resource factory is registered for extension 'json' - the runtime is missing the codec
+bundle for that format (JSON needs org.eclipse.fennec.codec)
+```
+
+rather than handing the payload to EMF's wildcard factory — which is XMI, and used to fail with
+the misleading `Content is not allowed in prolog` (a SAX error) instead.
+
+A payload names its own model: the root object carries `_type` with the nsURI of its EClass
+(`{"_type": "https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink", …}`), the XMI
+equivalent being the root element's namespace. That model has to be resolvable in the runtime -
+deployed as a bundle or reachable through the Model Atlas - or the ingest reports
+`MODEL_UNKNOWN`.
 
 ## Configuration
 
@@ -162,8 +192,11 @@ curl http://localhost:8080/event/rest/sensinact/providers   # SensiNact provider
 curl http://localhost:8080/event/rest/v1.1                 # SensorThings serverSettings
 curl http://localhost:8080/event/rest/v1.1/Things          # {"value":[…]}
 
-# ingest: 200 pushed, 202 no mapping, 400 unreadable, 422 unknown model, 503 twin down
+# ingest: 200 pushed, 202 no mapping, 400 unreadable, 422 unknown model,
+#         501 no codec for that format, 503 twin down
 curl -i -X POST -H 'Content-Type: application/xml' --data-binary @payload.xmi \
+     http://localhost:8080/event/rest/ingest/my-device
+curl -i -X POST -H 'Content-Type: application/json' --data-binary @payload.json \
      http://localhost:8080/event/rest/ingest/my-device
 ```
 
