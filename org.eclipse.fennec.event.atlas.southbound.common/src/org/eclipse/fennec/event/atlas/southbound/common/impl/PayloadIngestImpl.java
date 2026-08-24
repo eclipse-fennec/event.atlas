@@ -69,9 +69,9 @@ public class PayloadIngestImpl implements PayloadIngest {
 		String origin = source == null || source.isBlank() ? "<unknown source>" : source;
 		String format = resolveFormat(formatHint, payload);
 
-		List<EObject> roots;
+		Resource resource;
 		try {
-			roots = deserialize(payload, format, origin);
+			resource = deserialize(payload, format);
 		} catch (PackageNotFoundException e) {
 			// The model is neither deployed nor resolvable through the Model Atlas. Not an
 			// error on our side - the payload simply cannot be understood yet.
@@ -80,17 +80,30 @@ public class PayloadIngestImpl implements PayloadIngest {
 							+ "(neither deployed nor resolvable via the Model Atlas) - dropping payload",
 					origin, e.uri()));
 			return IngestResult.modelUnknown(e.uri());
+		} catch (UnsupportedFormatException e) {
+			// A deployment gap, not a payload problem: without this the payload would be
+			// handed to the wildcard XMI factory and fail as an XML parse error, which reads
+			// like malformed data instead of a missing bundle.
+			logger.severe(String.format("Cannot deserialize %s payload from '%s' - dropping payload: %s", format,
+					origin, e.getMessage()));
+			return IngestResult.formatUnsupported(format);
 		} catch (Exception e) {
 			logger.warning(String.format("Cannot deserialize %s payload from '%s' - dropping payload: %s", format,
-					origin, e.getMessage()));
+					origin, describe(e)));
 			logger.log(Level.FINE, "Payload deserialization failure for " + origin, e);
-			return IngestResult.parseError(e.getMessage());
+			return IngestResult.parseError(describe(e));
 		}
 
+		List<EObject> roots = List.copyOf(resource.getContents());
 		if (roots.isEmpty()) {
-			logger.warning(String.format("Payload from '%s' was read as %s but contained no objects - dropping payload",
-					origin, format));
-			return IngestResult.empty();
+			// The JSON codec does not throw on a payload it cannot make objects from - it
+			// records a diagnostic and returns an empty resource. Passing that on is the
+			// difference between "contained no objects" and knowing why.
+			String reason = firstError(resource);
+			logger.warning(String.format(
+					"Payload from '%s' was read as %s but contained no objects - dropping payload%s", origin, format,
+					reason == null ? "" : ": " + reason));
+			return IngestResult.empty(reason);
 		}
 
 		int applied = 0;
@@ -129,8 +142,9 @@ public class PayloadIngestImpl implements PayloadIngest {
 	 * {@link Resource#load(java.io.InputStream, java.util.Map)} directly - it only carries
 	 * the file extension that selects the resource factory (XMI, or the codec's for JSON).
 	 */
-	private List<EObject> deserialize(byte[] payload, String format, String origin) throws Exception {
+	private Resource deserialize(byte[] payload, String format) throws Exception {
 		ResourceSet resourceSet = resourceSetFactory.createResourceSet();
+		requireResourceFactory(resourceSet, format);
 		Resource resource = resourceSet
 				.createResource(URI.createURI("eventatlas-ingest/" + sequence.incrementAndGet() + "." + format));
 		try {
@@ -139,7 +153,56 @@ public class PayloadIngestImpl implements PayloadIngest {
 			PackageNotFoundException notFound = findPackageNotFound(e);
 			throw notFound == null ? e : notFound;
 		}
-		return List.copyOf(resource.getContents());
+		return resource;
+	}
+
+	/**
+	 * @return the first load diagnostic the codec recorded, or <code>null</code> if it
+	 * recorded none
+	 */
+	private static String firstError(Resource resource) {
+		return resource.getErrors().stream().map(Resource.Diagnostic::getMessage).findFirst().orElse(null);
+	}
+
+	/**
+	 * A codec failure does not always carry a message - EMF wraps whatever the parser threw,
+	 * and some of those (an {@code ArrayStoreException} from a value that does not fit its
+	 * feature, say) have none at all. Naming the exception type then beats reporting "null".
+	 */
+	private static String describe(Throwable e) {
+		return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+	}
+
+	/**
+	 * Asserts that the resource set really has a resource factory for <code>format</code>.
+	 * <p>
+	 * EMF's factory registry answers an unknown file extension with the wildcard
+	 * (<code>"*"</code>) entry, which in a Fennec runtime is the XMI factory. A JSON payload
+	 * in a runtime without the EMF JSON codec would therefore be handed to a SAX parser and
+	 * die with "Content is not allowed in prolog" - a message that blames the payload for a
+	 * missing bundle. Checking the extension map first lets us name the real cause.
+	 */
+	private static void requireResourceFactory(ResourceSet resourceSet, String format)
+			throws UnsupportedFormatException {
+		if (!resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().containsKey(format)) {
+			throw new UnsupportedFormatException(format);
+		}
+	}
+
+	/**
+	 * No {@link Resource.Factory} is registered for a payload format the runtime was asked
+	 * to read.
+	 */
+	private static class UnsupportedFormatException extends Exception {
+
+		private static final long serialVersionUID = 1L;
+
+		UnsupportedFormatException(String format) {
+			super(String.format(
+					"no EMF resource factory is registered for extension '%s' - the runtime is missing the "
+							+ "codec bundle for that format (JSON needs org.eclipse.fennec.codec)",
+					format));
+		}
 	}
 
 	/**

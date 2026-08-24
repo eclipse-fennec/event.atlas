@@ -17,6 +17,11 @@
 # Kept in sync with launch.bndrun: the Model Atlas REST client + Atlas-backed EObject
 # provider (mappings come from the Model Atlas service, not only local XMI files) and the
 # MQTT/REST southbound adapters that feed payloads in.
+#
+# org.eclipse.fennec.codec is the EMF JSON codec: it registers the Resource.Factory for the
+# `json` file extension that PayloadIngest selects for a JSON channel. Without it EMF falls
+# back to the XMI factory and every JSON payload dies in a SAX parser, so requiring it here
+# is also the resolve-time guarantee that a `format: json` channel can be honoured.
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.command)',\
@@ -41,7 +46,8 @@
 	bnd.identity;id='org.eclipse.fennec.model.atlas.eobject.provider',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
-	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation'
+	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation',\
+	bnd.identity;id='org.eclipse.fennec.codec'
 
 # http.port=-1 switches OFF the framework's default HTTP service: the whiteboard that
 # serves 8080 is the named org.apache.felix.http~eventHttp instance from sensinact.json
@@ -61,7 +67,6 @@
 	bnd.identity;id='org.apache.aries.spifly.dynamic.framework.extension'
 
 -runbundles: \
-	com.fasterxml.jackson.core.jackson-annotations;version='[2.21.0,2.21.1)',\
 	com.fasterxml.jackson.core.jackson-core;version='[2.19.2,2.19.3)',\
 	io.dropwizard.metrics.core;version='[4.2.37,4.2.38)',\
 	jakarta.activation-api;version='[2.1.3,2.1.4)',\
@@ -139,12 +144,7 @@
 	org.osgi.util.pushstream;version='[1.1.0,1.1.1)',\
 	slf4j.api;version='[2.0.17,2.0.18)',\
 	slf4j.simple;version='[2.0.17,2.0.18)',\
-	tools.jackson.core.jackson-core;version='[3.1.0,3.1.1)',\
-	tools.jackson.core.jackson-databind;version='[3.1.0,3.1.1)',\
-	tools.jackson.jakarta.rs.jackson-jakarta-rs-base;version='[3.1.0,3.1.1)',\
-	tools.jackson.jakarta.rs.jackson-jakarta-rs-json-provider;version='[3.1.0,3.1.1)',\
 	org.eclipse.fennec.event.atlas.mapping.docker.config;version=snapshot,\
-	tools.jackson.module.jackson-module-jakarta-xmlbind-annotations;version='[3.1.0,3.1.1)',\
 	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
@@ -172,4 +172,14 @@
 	org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt;version='[0.0.2,0.0.3)',\
 	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)',\
 	io.netty.codec-mqtt;version='[4.1.133,4.1.134)',\
-	io.netty.transport-classes-epoll;version='[4.1.133,4.1.134)'
+	io.netty.transport-classes-epoll;version='[4.1.133,4.1.134)',\
+	com.fasterxml.jackson.core.jackson-annotations;version='[2.22.0,2.22.1)',\
+	org.eclipse.fennec.codec;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.codec.api;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.codec.metadata;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.emf.osgi.metadata;version='[1.1.0,1.1.1)',\
+	tools.jackson.core.jackson-core;version='[3.2.2,3.2.3)',\
+	tools.jackson.core.jackson-databind;version='[3.2.2,3.2.3)',\
+	tools.jackson.jakarta.rs.jackson-jakarta-rs-base;version='[3.2.2,3.2.3)',\
+	tools.jackson.jakarta.rs.jackson-jakarta-rs-json-provider;version='[3.2.2,3.2.3)',\
+	tools.jackson.module.jackson-module-jakarta-xmlbind-annotations;version='[3.2.2,3.2.3)'

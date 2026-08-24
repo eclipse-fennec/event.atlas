@@ -1,8 +1,13 @@
 -library: enableOSGi-Test
 
+# org.eclipse.fennec.codec is the EMF JSON codec: it contributes the Resource.Factory for the
+# `json` file extension, without which JsonPayloadIngestTest's payloads would be handed to the
+# XMI parser - which is what issue #17 was about.
 -runrequires: \
 	bnd.identity;id='org.eclipse.sensinact.gateway.core.impl',\
 	bnd.identity;id='org.eclipse.fennec.emf.osgi.component',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.southbound.common',\
+	bnd.identity;id='org.eclipse.fennec.codec',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.mapping.tests'
 	
 -runbundles.test: \

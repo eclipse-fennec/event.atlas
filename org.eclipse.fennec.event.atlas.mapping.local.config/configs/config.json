@@ -42,5 +42,14 @@
     "format": "xmi",
     "name": "weather-mqtt"
   },
-  
+
+  /* A JSON channel next to the XMI one, as in the docker config: the same broker connection,
+   * split by topic. A message on a subscribed topic that matches neither filter is received and
+   * silently dropped, so keep the union covering the broker's `topics`. */
+  "event.atlas.southbound.mqtt~json": {
+    "mqttTopics": ["eventatlas/json/#"],
+    "mqtt.handler.id": "local-broker",
+    "format": "json",
+    "name": "local-mqtt-json"
+  }
 }

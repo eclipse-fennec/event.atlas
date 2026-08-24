@@ -61,6 +61,7 @@ import jakarta.ws.rs.core.Response.Status;
  * <tr><td>202 Accepted</td><td>understood, but no provider mapping is registered for it</td></tr>
  * <tr><td>400 Bad Request</td><td>unreadable, or read but empty</td></tr>
  * <tr><td>422 Unprocessable Content</td><td>names a model that cannot be resolved</td></tr>
+ * <tr><td>501 Not Implemented</td><td>this runtime has no codec for the posted format</td></tr>
  * <tr><td>503 Service Unavailable</td><td>the twin could not be written - worth retrying</td></tr>
  * </table>
  * @author Ilenia Salvadori
@@ -111,6 +112,9 @@ public class PayloadIngestResource {
 			case NO_MAPPING -> Status.ACCEPTED.getStatusCode();
 			case EMPTY, PARSE_ERROR -> Status.BAD_REQUEST.getStatusCode();
 			case MODEL_UNKNOWN -> UNPROCESSABLE_CONTENT;
+			// a deployment gap of this runtime, not a bad request: the format is well-formed
+			// REST-wise, this deployment just cannot read it
+			case FORMAT_UNSUPPORTED -> Status.NOT_IMPLEMENTED.getStatusCode();
 			case PUSH_FAILED -> Status.SERVICE_UNAVAILABLE.getStatusCode();
 		};
 	}
@@ -120,9 +124,11 @@ public class PayloadIngestResource {
 			case APPLIED -> "Applied %d mapping(s) to %d object(s)".formatted(result.mappingsApplied(),
 					result.roots());
 			case NO_MAPPING -> "No provider mapping registered for %s".formatted(result.detail());
-			case EMPTY -> "Payload contained no objects";
+			case EMPTY -> result.detail() == null ? "Payload contained no objects"
+					: "Payload contained no objects: %s".formatted(result.detail());
 			case PARSE_ERROR -> "Payload could not be parsed: %s".formatted(result.detail());
 			case MODEL_UNKNOWN -> "Model '%s' is not available".formatted(result.detail());
+			case FORMAT_UNSUPPORTED -> "No codec deployed for format '%s'".formatted(result.detail());
 			case PUSH_FAILED -> "Could not write to the digital twin: %s".formatted(result.detail());
 		};
 	}

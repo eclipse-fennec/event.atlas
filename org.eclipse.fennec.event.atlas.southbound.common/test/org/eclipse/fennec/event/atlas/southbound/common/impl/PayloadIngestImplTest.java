@@ -33,6 +33,8 @@ import org.eclipse.emf.ecore.EcorePackage;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
+import org.eclipse.emf.ecore.util.EcoreUtil;
+import org.eclipse.emf.ecore.xmi.XMIException;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceImpl;
 import org.eclipse.fennec.emf.osgi.ResourceSetFactory;
@@ -246,16 +248,60 @@ public class PayloadIngestImplTest {
 
 	@Test
 	@DisplayName("FORMAT_AUTO does not read a JSON payload as XMI")
-	// The model is deliberately unresolvable, so this asserts WHICH codec ran rather than the
-	// end result: reading `{...}` as XMI fails as a PARSE_ERROR, whereas the JSON codec gets far
-	// enough to recognise that the model is unknown.
+	// The stubbed resource set registers XMI only - the same situation as a runtime deployed
+	// without the JSON codec bundle. What is asserted is WHICH factory was asked for: JSON must
+	// never be quietly handed to the XMI one, which would report a misleading PARSE_ERROR.
 	void ingest_withAutoFormat_routesJsonToTheJsonCodec() {
-		IngestResult result = ingest.ingest(
-				("{\"eClass\":\"" + UNKNOWN_NS_URI + "#//Sensor\"}").getBytes(StandardCharsets.UTF_8),
-				PayloadIngest.FORMAT_AUTO, "sensors/test");
+		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_AUTO, "sensors/test");
 
-		assertNotNull(result);
-		assertTrue(result.outcome() != Outcome.APPLIED, "an unresolvable model must not report APPLIED");
+		assertEquals(Outcome.FORMAT_UNSUPPORTED, result.outcome());
+		assertEquals(PayloadIngest.FORMAT_JSON, result.detail(), "The unreadable format must be named");
+		verify(instancePusher, never()).pushInstance(any());
+	}
+
+	@Test
+	@DisplayName("A format without a registered resource factory reports FORMAT_UNSUPPORTED")
+	// Issue #17: EMF answers an unknown extension with its wildcard ("*") factory, so a JSON
+	// payload used to fail in a SAX parser and read like malformed data rather than a missing
+	// bundle.
+	void ingest_withoutACodecForTheFormat_reportsFormatUnsupportedInsteadOfFailingInTheXmiParser() {
+		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
+			ResourceSet resourceSet = createResourceSet();
+			// the wildcard entry a Fennec runtime really has, and the reason this needs checking
+			resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*",
+					new XMIResourceFactoryImpl());
+			return resourceSet;
+		});
+
+		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "sensors/test");
+
+		assertEquals(Outcome.FORMAT_UNSUPPORTED, result.outcome());
+		assertEquals(PayloadIngest.FORMAT_JSON, result.detail());
+		verify(instancePusher, never()).pushInstance(any());
+	}
+
+	@Test
+	@DisplayName("A JSON payload is read by the factory registered for the json extension")
+	void ingest_withJsonCodecRegistered_usesItAndPushes() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
+			ResourceSet resourceSet = createResourceSet();
+			// stands in for org.eclipse.fennec.codec, which registers a Resource.Factory
+			// service with emf.fileExtension=json
+			resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put(PayloadIngest.FORMAT_JSON,
+					(Resource.Factory) uri -> new XMIResourceImpl(uri) {
+						@Override
+						public void doLoad(java.io.InputStream inputStream, java.util.Map<?, ?> options) {
+							getContents().add(EcoreUtil.create(sensorEClass()));
+						}
+					});
+			return resourceSet;
+		});
+
+		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "sensors/test");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+		assertEquals(1, result.roots());
 	}
 
 	@Test
@@ -272,6 +318,14 @@ public class PayloadIngestImplTest {
 		return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 				+ "<test:Sensor xmlns:test=\"" + KNOWN_NS_URI + "\" value=\"21.5\"/>")
 						.getBytes(StandardCharsets.UTF_8);
+	}
+
+	private static byte[] sensorJson() {
+		return "{\"value\":21.5}".getBytes(StandardCharsets.UTF_8);
+	}
+
+	private EClass sensorEClass() {
+		return (EClass) testPackage.getEClassifier("Sensor");
 	}
 
 	private static byte[] unknownModelXmi() {
@@ -311,6 +365,30 @@ public class PayloadIngestImplTest {
 		assertEquals(Outcome.EMPTY, result.outcome());
 		assertEquals(0, result.roots());
 		verify(instancePusher, never()).pushInstance(any());
+	}
+
+	@Test
+	@DisplayName("A codec that records a diagnostic instead of throwing has it reported")
+	// The JSON codec does not throw on a payload it cannot build objects from - it logs a
+	// diagnostic and hands back an empty resource. Without passing that on, the only thing the
+	// operator sees is "contained no objects".
+	void ingest_withEmptyResourceAndLoadDiagnostic_reportsTheDiagnostic() {
+		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
+			ResourceSet resourceSet = new ResourceSetImpl();
+			resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("xmi",
+					(Resource.Factory) uri -> new XMIResourceImpl(uri) {
+						@Override
+						public void doLoad(java.io.InputStream inputStream, java.util.Map<?, ?> options) {
+							getErrors().add(new XMIException("type value 'x' could not be resolved"));
+						}
+					});
+			return resourceSet;
+		});
+
+		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.EMPTY, result.outcome());
+		assertEquals("type value 'x' could not be resolved", result.detail());
 	}
 
 }

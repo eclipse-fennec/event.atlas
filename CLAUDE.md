@@ -23,7 +23,7 @@ Gradle graph automatically):
 | `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring) |
 | `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — two resources: `config.json` (file providers + Model Atlas client + MQTT southbound) and `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
-| `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload, pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, …) |
+| `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload (XMI or JSON), pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, `FORMAT_UNSUPPORTED`, …) |
 | `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
 | `…event.atlas.rest.southbound.adapter` | `PayloadIngestResource` — `POST <whiteboard base>/ingest/{channel}`; the HTTP status mirrors the `IngestResult` outcome |
 
@@ -56,7 +56,7 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-08-14: `./gradlew clean build` is green — **54 OSGi tests, 1 `@Disabled`**
+Baseline as of 2026-08-24: `./gradlew clean build` is green — **58 OSGi tests, 1 `@Disabled`**
 (the known admin-service read gap) — plus the plain-JUnit `ProviderModelMapperTest`.
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
@@ -125,6 +125,15 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   framework-extension spifly variant breaks the typed-event bus at startup ("Weaving hook
   failed") and the SensiNact `GatewayThread` never activates. Keep the classic
   `spifly.dynamic.bundle`.
+- **JSON payloads need the EMF codec in the runbundles.** `PayloadIngest` picks the EMF
+  resource factory by file extension, and EMF answers an unknown extension with its wildcard
+  (`*`) factory — XMI in a Fennec runtime — so before the codec was added every JSON payload
+  died in a SAX parser with `Content is not allowed in prolog` (issue #17). All three bndruns
+  now require `org.eclipse.fennec.codec` by identity (it drags in `…codec.api`,
+  `…codec.metadata` and `org.eclipse.fennec.emf.osgi.metadata`), which is what makes a JSON
+  channel a *resolve-time* guarantee rather than a runtime surprise. `JsonPayloadIngestTest`
+  (OSGi, with `data/dragino-example.json`) is the regression guard; `PayloadIngestImpl` now
+  also reports a missing factory as `FORMAT_UNSUPPORTED` (HTTP 501) instead of parsing on.
 - **Docker config is a bundle, not a mounted file.** The Felix configurator's
   `configurator.initial` pass runs before the runtime's JSON provider is wired and fails with
   "Invalid JSON", so the docker wiring is baked into `…mapping.docker.config`. See
@@ -222,10 +231,12 @@ EPackages a runtime maps must be registered in that runtime.
   (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / eobject.provider`) and every
   third-party bundle the northbound chain drags in: Jackson 3 (`tools.jackson.core:jackson-core`
   + `jackson-databind`, `jackson-jakarta-rs-*`, `jackson-module-jakarta-xmlbind-annotations`, all
-  on one 3.1.x version), Jackson 2 `jackson-core` for esri.geometry, Jackson 2
-  `jackson-annotations` **2.21** (Jackson 3 left `com.fasterxml.jackson.annotation` at 2.x and the
-  sensinact DTO bundles import it as `[2.21,3)`, so it does not track jackson-core's version),
-  netty, and dropwizard `metrics-core`. `…model.atlas.eobject.provider` — the generic Model Atlas
+  on one 3.2.x version — 3.2 is a floor, the Fennec codec imports `tools.jackson.*` as
+  `[3.2,4)`), Jackson 2 `jackson-core` for esri.geometry, Jackson 2 `jackson-annotations`
+  **2.22** (Jackson 3 left `com.fasterxml.jackson.annotation` at 2.x and it is imported as
+  `[2.21,3)` by the sensinact DTO bundles and `[2.22,3)` by the codec, so it does not track
+  jackson-core's version), netty, and dropwizard `metrics-core`.
+  `…model.atlas.eobject.provider` — the generic Model Atlas
   content source for the emf.osgi EObject registry — used to be a workspace project here; since
   2026-08-19 it lives in `eclipse-fennec/model.atlas` and both bndruns list it with a version
   range (`[0.1.0,0.1.1)`), *not* `version=snapshot`.

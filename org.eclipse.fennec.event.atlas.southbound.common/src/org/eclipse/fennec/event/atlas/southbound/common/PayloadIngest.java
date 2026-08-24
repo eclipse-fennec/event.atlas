@@ -40,7 +40,13 @@ public interface PayloadIngest {
 	/** Format hint for EMF XMI payloads, the format in which models describe themselves. */
 	String FORMAT_XMI = "xmi";
 
-	/** Format hint for JSON payloads, deserialized by the Fennec codec. */
+	/**
+	 * Format hint for JSON payloads, deserialized by the Fennec codec.
+	 * <p>
+	 * The codec is a separate bundle ({@code org.eclipse.fennec.codec}): it contributes the
+	 * EMF resource factory for this extension. A runtime without it reports
+	 * {@link IngestResult.Outcome#FORMAT_UNSUPPORTED} for every JSON payload.
+	 */
 	String FORMAT_JSON = "json";
 
 	/**
