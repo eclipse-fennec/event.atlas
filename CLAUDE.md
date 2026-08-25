@@ -56,9 +56,10 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-08-25: `./gradlew clean build` is green — **66 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus 29 plain-JUnit tests (`ProviderModelMapperTest`,
-`ChangeRuleFilterImplTest`, `BindingResolverTest`).
+Baseline as of 2026-08-25: `./gradlew clean build` is green — **68 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus 39 plain-JUnit tests (`ProviderModelMapperTest`,
+`ChangeRuleFilterImplTest`, `BindingResolverTest`, `MappingProfileValidationTest`,
+`GeneratedResourceValidationTest`).
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -201,6 +202,28 @@ important thing to know, and the part that changed most recently:
   validates each entry, indexes it by `providerClasses` and builds the provider model in the
   twin. `MappingProfileRegistryImpl` does the same against **`sensinact-profiles`** (keys =
   `profileId`).
+- **A mapping's `profile` reference is resolved through the profile registry.** `profile` is
+  non-containment, i.e. a reference into another document, which a mapping delivered from a
+  Model Atlas does not have (the atlas hands over standalone roots, and its fallback resolves
+  *EPackages*, not instance documents). Since `MappingProfile.profileId` is an EMF ID, the
+  proxy's URI fragment *is* the profile id, so `ProviderMappingRegistryImpl.validMapping` looks
+  it up in `MappingProfileRegistry` and replaces the reference. A profile that cannot be found
+  **skips the mapping** rather than registering it profile-less — the profile decides provider
+  identity (`providerStrategy` `UNIFIED`), so carrying on would push data to the wrong provider.
+  Storing a `MappingProfile` in a Model Atlas additionally needs its own atlas registry: the
+  `sensinactmapping` registry pins `root.eclass.uri` to `ProviderMapping` (tracked in
+  `eclipse-fennec/model.atlas`).
+- **Resources generated from a `ReferenceMapping` are expanded before anything reads them.**
+  `ProviderModelSensinactMapper.registerModelMapping` runs `generateReferencedResources` first,
+  so profile validation and the twin model both see `temporaryResources`; generation clears
+  before regenerating, and is no longer hidden inside `mapService` (which only runs while the
+  twin provider does not exist yet).
+- **A resource's unit has two sources**, and `MappingAnnotations.effectiveUnit` is the only
+  place that decides between them: the `unit` field first, then the `sensinact.mapping`
+  annotation — which is how a domain `.ecore` supplies units for generated resources, since
+  their annotations are copied off the source attribute. Both the twin metadata and profile
+  validation go through it; reading only the field made every annotation-supplied unit look
+  like a profile mismatch.
 - Content reaches those registries through registry *providers*: emf.osgi's
   `FileEObjectProvider` for local XMI directories, `AtlasEObjectProvider` for a Model Atlas, or
   programmatically via `registerModelMapping` (what the OSGi tests do). See the two
