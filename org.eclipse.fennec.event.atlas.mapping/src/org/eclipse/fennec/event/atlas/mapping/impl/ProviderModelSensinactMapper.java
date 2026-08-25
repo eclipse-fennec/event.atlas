@@ -117,6 +117,14 @@ public class ProviderModelSensinactMapper {
 			return;
 		}
 
+		// Generate the resources of every ReferenceMapping first: profile conformance is
+		// validated below and has to see them, and the twin model is built from them further
+		// down. Doing it here rather than inside mapService also makes it unconditional -
+		// mapService is only reached while the provider does not exist yet, so a mapping
+		// registered against an existing provider used to end up with no generated resources
+		// at all, and pushes through it mapped nothing for those services.
+		generateReferencedResources(providerMapping);
+
 		// Validate against profile if one is referenced
 		if (nonNull(providerMapping.getProfile()) && nonNull(profileRegistry)) {
 			MappingProfileRegistry.ValidationResult validationResult = profileRegistry.validateMapping(providerMapping);
@@ -311,11 +319,6 @@ public class ProviderModelSensinactMapper {
 			service = model.createService(serviceMapping.getMid()).build();
 		}
 
-		// Auto-generate ResourceMappings from ReferenceMapping if configured
-		if (serviceMapping.getReferencedResource() != null) {
-			generateResourcesFromReferenceMapping(serviceMapping);
-		}
-
 		for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
 			mapResource(service, resourceMapping);
 		}
@@ -326,6 +329,22 @@ public class ProviderModelSensinactMapper {
 	}
 
 	/**
+	 * Generates the resources of every service that maps a referenced object.
+	 * <p>
+	 * Package private: the generated resources are what profile validation and the twin model
+	 * are built from, so a test needs to be able to produce them without a digital twin.
+	 * @param providerMapping the mapping whose services to expand. Parameter must not be
+	 * <code>null</code>
+	 */
+	void generateReferencedResources(ProviderMapping providerMapping) {
+		for (ServiceMapping serviceMapping : providerMapping.getServices()) {
+			if (serviceMapping.getReferencedResource() != null) {
+				generateResourcesFromReferenceMapping(serviceMapping);
+			}
+		}
+	}
+
+	/**
 	 * Generates ResourceMapping objects from a ReferenceMapping configuration.
 	 * This auto-generates resources for all attributes of the referenced type.
 	 *
@@ -333,6 +352,10 @@ public class ProviderModelSensinactMapper {
 	 */
 	private void generateResourcesFromReferenceMapping(ServiceMapping serviceMapping) {
 		ReferenceMapping refMapping = serviceMapping.getReferencedResource();
+
+		// Start from empty: the same mapping may be registered more than once, and appending
+		// would give every resource a duplicate.
+		serviceMapping.getTemporaryResources().clear();
 
 		// Determine the target EClass
 		EClass targetClass = null;

@@ -245,7 +245,14 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
     private void validateServiceResources(ServiceMapping mappingService, ProfileService profileService, ValidationResultImpl result) {
         Map<String, ResourceMapping> mappingResources = new ConcurrentHashMap<>();
         
-        // Index mapping resources by ID
+        // Index mapping resources by ID. Resources generated from a ReferenceMapping exist only
+        // in temporaryResources, and leaving them out meant a service built from a reference
+        // was not validated at all: a required resource that *is* generated read as missing,
+        // and no type or unit was ever compared. Explicit resources are indexed second so they
+        // shadow a generated one of the same mid, which is the order the runtime maps them in.
+        for (ResourceMapping resource : mappingService.getTemporaryResources()) {
+            mappingResources.put(resource.getMid(), resource);
+        }
         for (ResourceMapping resource : mappingService.getResources()) {
             mappingResources.put(resource.getMid(), resource);
         }
