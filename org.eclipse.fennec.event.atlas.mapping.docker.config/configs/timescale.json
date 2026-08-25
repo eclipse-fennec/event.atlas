@@ -1,0 +1,34 @@
+{
+    ":configurator:resource-version": 1,
+    ":configurator:symbolic-name": "org.eclipse.sensinact.gateway.history.timescale",
+    ":configurator:version": "1.0.0",
+
+    /*
+     * History for the digital twin: the SensiNact timescale provider subscribes to the twin's
+     * resource updates and writes them into a TimescaleDB (postgres) instance, and exposes them
+     * as the provider named below. sensinact.json points the SensorThings northbound at that
+     * same name ("history.provider": "brokerHistory"), which is what makes Observations return
+     * more than the current value.
+     *
+     * The provider's component is configuration-policy=require, so this file is the on/off
+     * switch: without it the bundles sit inactive and the runtime behaves exactly as before.
+     * With it, the runtime expects a reachable database - see docker/eventatlas/README.md for
+     * the compose example that starts one, and the environment table for the variables.
+     *
+     * Values are $[env:...] placeholders resolved at configuration-delivery time, so one image
+     * serves every environment (same mechanism as config.json).
+     */
+    "sensinact.history.timescale": {
+        "url": "jdbc:postgresql://$[env:TIMESCALE_HOST;default=localhost]:$[env:TIMESCALE_PORT;default=5432]/$[env:TIMESCALE_DB;default=sensinactHistory]",
+        "user": "$[env:TIMESCALE_USER;default=snaHistory]",
+        ".password": "$[env:TIMESCALE_PWD;default=]",
+        "provider": "$[env:TIMESCALE_PROVIDER;default=brokerHistory]",
+
+        /* Values that are not sensible history: the location/area resources a twin carries for
+         * every provider. Written as resource-selector JSON, one filter per entry. */
+        "exclude.resources": [
+            "{\"resource\": {\"value\": \"observedArea\", \"type\": \"EXACT\"}}",
+            "{\"resource\": {\"value\": \"viewport\", \"type\": \"EXACT\"}}"
+        ]
+    }
+}

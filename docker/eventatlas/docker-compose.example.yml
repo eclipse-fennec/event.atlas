@@ -1,0 +1,57 @@
+# Runnable example: the Event Atlas mapping runtime with history enabled.
+#
+# The image already carries the SensiNact timescale history provider and the config that
+# switches it on (configs/timescale.json in the docker.config bundle); all it needs is a
+# database, which is what the timescaledb service below is. See README.md ("History").
+#
+#   docker compose -f docker/eventatlas/docker-compose.example.yml up
+#
+# Build the image first (README.md, "Building locally") or replace the `image:` with
+# `docker.io/eclipsefennec/event.atlas:snapshot` to run the published one.
+services:
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      # The database, user and password the runtime's TIMESCALE_* variables point at. The
+      # history schema itself is created by the runtime on first connect.
+      POSTGRES_DB: sensinactHistory
+      POSTGRES_USER: snaHistory
+      POSTGRES_PASSWORD: test.password
+    ports:
+      # Only needed to inspect the data from the host - the runtime reaches it over the
+      # compose network.
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snaHistory -d sensinactHistory"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - eventatlas-history:/home/postgres/pgdata/data
+
+  eventatlas:
+    image: eventatlas:local
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: "5432"
+      TIMESCALE_DB: sensinactHistory
+      TIMESCALE_USER: snaHistory
+      TIMESCALE_PWD: test.password
+    ports:
+      - "8080:8080"   # /event/rest/{sensinact,v1.1,ingest}
+      - "1883:1883"   # SensorThings MQTT broker
+      - "8885:8885"   # SensorThings MQTT over WebSocket
+    volumes:
+      # The mount points the file providers read. The runtime project's skeleton is used here
+      # so this file runs as-is; drop mapping/profile XMIs in there. Their domain models have
+      # to be resolvable in the runtime too - through a Model Atlas
+      # (EVENTATLAS_ATLAS_BASE_URI) or in a derived image carrying the model bundles.
+      - ../../org.eclipse.fennec.event.atlas.mapping.runtime/runtime/mappings:/opt/eventatlas/runtime/mappings:ro
+      - ../../org.eclipse.fennec.event.atlas.mapping.runtime/runtime/profiles:/opt/eventatlas/runtime/profiles:ro
+
+volumes:
+  eventatlas-history:

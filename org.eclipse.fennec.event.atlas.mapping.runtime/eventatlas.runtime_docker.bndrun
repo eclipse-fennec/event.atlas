@@ -47,7 +47,8 @@
 	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
 	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation',\
-	bnd.identity;id='org.eclipse.fennec.codec'
+	bnd.identity;id='org.eclipse.fennec.codec',\
+	bnd.identity;id='org.eclipse.sensinact.gateway.southbound.history.timescale-provider'
 
 # http.port=-1 switches OFF the framework's default HTTP service: the whiteboard that
 # serves 8080 is the named org.apache.felix.http~eventHttp instance from sensinact.json
@@ -182,4 +183,8 @@
 	tools.jackson.core.jackson-databind;version='[3.2.2,3.2.3)',\
 	tools.jackson.jakarta.rs.jackson-jakarta-rs-base;version='[3.2.2,3.2.3)',\
 	tools.jackson.jakarta.rs.jackson-jakarta-rs-json-provider;version='[3.2.2,3.2.3)',\
-	tools.jackson.module.jackson-module-jakarta-xmlbind-annotations;version='[3.2.2,3.2.3)'
+	tools.jackson.module.jackson-module-jakarta-xmlbind-annotations;version='[3.2.2,3.2.3)',\
+	org.eclipse.sensinact.gateway.southbound.history.timescale-provider;version='[0.0.2,0.0.3)',\
+	org.postgresql.jdbc;version='[42.7.13,42.7.14)',\
+	tx-control-provider-jdbc-local;version='[1.0.1,1.0.2)',\
+	tx-control-service-local;version='[1.0.1,1.0.2)'

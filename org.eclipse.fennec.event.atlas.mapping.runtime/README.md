@@ -4,7 +4,7 @@ Assembly project — it carries no code of its own, only the two runtime definit
 
 | File | Purpose |
 |---|---|
-| `launch.bndrun` | local development runtime: mapping engine + SensiNact gateway + Model Atlas client + both southbound adapters + a Gogo shell |
+| `launch.bndrun` | local development runtime: mapping engine + SensiNact gateway + Model Atlas client + both southbound adapters + the history store + a Gogo shell |
 | `eventatlas.runtime_docker.bndrun` | self-contained image runtime: mappings and profiles read from XMI files under `/opt/eventatlas/runtime`, no Model Atlas |
 
 Configuration comes from the sibling config bundles — `…mapping.local.config` for `launch.bndrun`,
@@ -224,6 +224,45 @@ Both adapters share one ingest, so the outcomes are the same; only the reporting
 | `no EMF resource factory is registered for extension …` | 501 | this runtime has no codec for that format — for `json`, `org.eclipse.fennec.codec` is missing from the runbundles |
 | `Failed pushing payload … into sensinact` | 503 | gateway unavailable — retryable |
 | — | 404 | Jakarta-RS whiteboard not configured, or wrong path |
+
+## History
+
+The twin holds only the current value of a resource. Both runtimes carry the SensiNact
+**timescale** history provider, which records every update into a TimescaleDB and serves the
+recorded values back under the provider name `brokerHistory` - which is what
+`sensinact.json`'s `history.provider` already points the SensorThings gateway at.
+
+`…local.config`'s `configs/timescale.json` is the switch: the store's component is
+`configuration-policy=require`, so with that file present it activates, and without a database
+to talk to it just stays inactive (nothing retries, nothing logs to stdout - the activation
+failure only reaches the OSGi log service, so `scr:list` in the Gogo shell is where an
+unexpectedly empty history shows up).
+
+One to try against:
+
+```bash
+docker run --rm -p 5432:5432 \
+  -e POSTGRES_DB=sensinactHistory -e POSTGRES_USER=snaHistory -e POSTGRES_PASSWORD=test.password \
+  timescale/timescaledb-ha:pg16
+```
+
+The defaults in `timescale.json` match that container except for the password, so:
+
+```bash
+TIMESCALE_PWD=test.password ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:run.launch
+```
+
+`History schema ready (TimescaleDB enabled)` and `Timescale history storage brokerHistory
+registered` in the log mean it is recording. From then on every payload that reaches the twin
+also lands in `sensinact.history`:
+
+```bash
+psql -h localhost -U snaHistory -d sensinactHistory \
+  -c 'select time, provider, service, resource, value_num from sensinact.history order by time desc limit 20;'
+```
+
+`docker/eventatlas/docker-compose.example.yml` is the same thing for the image, with the
+database wired in for you.
 
 ## Housekeeping
 
