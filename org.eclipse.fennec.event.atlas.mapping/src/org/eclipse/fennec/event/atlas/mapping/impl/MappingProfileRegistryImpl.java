@@ -271,11 +271,15 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
                 }
             }
             
-            // Validate unit compatibility
+            // Validate unit compatibility. The unit may come from the mapping's `unit` field or
+            // from a `sensinact.mapping` annotation copied off the source attribute - reading
+            // only the field reported every annotation-supplied unit as a mismatch, while the
+            // twin published it correctly.
             if (profileResource.getExpectedUnit() != null) {
-                if (!profileResource.getExpectedUnit().equals(mappingResource.getUnit())) {
+                String unit = MappingAnnotations.effectiveUnit(mappingResource);
+                if (!profileResource.getExpectedUnit().equals(unit)) {
                     result.addWarning("Resource '" + profileResource.getResourceId() + 
-                                    "' has unit '" + mappingResource.getUnit() + 
+                                    "' has unit '" + unit + 
                                     "' but profile expects '" + profileResource.getExpectedUnit() + "'");
                 }
             }

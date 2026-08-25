@@ -18,7 +18,6 @@ import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -667,11 +666,9 @@ public class ProviderModelSensinactMapper {
 				resourceBuilder = resourceBuilder.withInitialValue(defaultValue);
 			}
 			Map<String, Object> metadata = new HashMap<>();
-			if (nonNull(resourceMapping.getUnit())) {
-				metadata.put("unit", resourceMapping.getUnit());
-			} else {
-				metadata.put("unit", extractAnnotationValue(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE, SensinactMapperConstants.SENSINACT_MAPPING_UNIT));
-			}
+			// Field first, annotation second - the same order MappingProfileRegistryImpl
+			// validates against, so the two cannot disagree about a resource's unit.
+			putIfPresent(metadata, "unit", MappingAnnotations.effectiveUnit(resourceMapping));
 			
 			if (nonNull(resourceMapping.getName()) ) {
 				metadata.put("friendlyName", resourceMapping.getName());
@@ -680,16 +677,17 @@ public class ProviderModelSensinactMapper {
 			if (nonNull(resourceMapping.getDescriptionMapping()) ) {
 				metadata.put("description", resourceMapping.getDescriptionMapping().getName());
 			} else {
-				metadata.put("description", extractAnnotationValue(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE, 
-						SensinactMapperConstants.SENSINACT_MAPPING_DESCRIPTION).isEmpty() ? 
-						extractAnnotationValue(resourceMapping, GENMODEL_ANNOTATION, DOCUMENTATION_KEY) : 
-						extractAnnotationValue(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE, SensinactMapperConstants.SENSINACT_MAPPING_DESCRIPTION));
+				String described = MappingAnnotations.annotationValue(resourceMapping,
+						SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE,
+						SensinactMapperConstants.SENSINACT_MAPPING_DESCRIPTION);
+				putIfPresent(metadata, "description", described != null ? described
+						: MappingAnnotations.annotationValue(resourceMapping, GENMODEL_ANNOTATION, DOCUMENTATION_KEY));
 			}
 			
 			if(!resourceMapping.getExtraMetadata().isEmpty()) {
 				resourceMapping.getExtraMetadata().forEach(e -> metadata.put(e.getKey(), e.getValue()));
 			} else {
-				metadata.putAll(extractAnnotationDetails(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_METADATA_ANNOTATION_SOURCE));
+				metadata.putAll(MappingAnnotations.annotationDetails(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_METADATA_ANNOTATION_SOURCE));
 			}
 			if (!metadata.isEmpty()) {
 				resourceBuilder = resourceBuilder.withDefaultMetadata(metadata);
@@ -699,20 +697,15 @@ public class ProviderModelSensinactMapper {
 		return resource;
 	}
 	
-	private static String extractAnnotationValue(EAttribute eAttribute, String source, String detailKey) {
-		if(eAttribute.getEAnnotation(source) != null) {
-			if(eAttribute.getEAnnotation(source).getDetails().containsKey(detailKey)) {
-				return eAttribute.getEAnnotation(source).getDetails().get(detailKey);
-			}
+	/**
+	 * Adds a metadata entry only when there is a value for it. Publishing an absent one as an
+	 * empty string tells a northbound consumer that the resource has a unit of "", which is a
+	 * different claim from having none.
+	 */
+	private static void putIfPresent(Map<String, Object> metadata, String key, String value) {
+		if (nonNull(value) && !value.isEmpty()) {
+			metadata.put(key, value);
 		}
-		return "";
-	}
-	
-	private static Map<String, String> extractAnnotationDetails(EAttribute eAttribute, String source) {
-		if(eAttribute.getEAnnotation(source) != null) {
-			return eAttribute.getEAnnotation(source).getDetails().map();
-		}
-		return Collections.emptyMap();
 	}
 
 }
