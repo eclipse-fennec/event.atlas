@@ -1,7 +1,12 @@
 # WP-SN-2 — Reusable persistence rules in the SensiNact mapping model (plan)
 
-> **Status:** design agreed, not yet implemented. This is the reference plan; update it as
-> the design evolves. Created 2026-07-15.
+> **Status:** model implemented; change rules enforced at ingest as an interim measure;
+> deletion rules still carried but not enforced. This is the reference plan; update it as the
+> design evolves. Created 2026-07-15, revised 2026-08-25.
+>
+> **Two decisions below were reversed on 2026-08-25** — see *Revision: rules are contained*
+> and *Revision: interim enforcement at ingest*. The superseded reasoning is kept because it
+> documents why the alternatives were rejected at the time.
 
 ## Goal
 
@@ -27,6 +32,33 @@ provider:
 **WP-SN-2 (this plan) is model-only** — the Ecore just has to *carry* the rules. The proxy
 is a later, separate WP. The design investigation below is done; it is the starting point for
 that WP.
+
+### Revision: interim enforcement at ingest (2026-08-25)
+
+**Partly reversed.** Waiting for the history provider left the rules inert, so **change
+rules are now applied on the way *into* the twin**, in the mapping engine:
+`ChangeRuleFilter` (`ChangeRuleFilterImpl`, pid `sensinact.mapping.changerule.filter`) is
+consulted by `ValueMapperImpl.mapSingleResource` immediately before `resource.setValue`, and a
+value its rule rejects is never pushed. It covers every southbound path at once, because they
+all funnel through `InstancePusher`.
+
+The filter is stateful — last accepted value, its timestamp and a notification counter per
+`mappingMid/providerId/serviceMid/resourceMid` — because a `ValueMapperImpl` is built per
+push. Comparisons are against the last *accepted* value, so a slow drift is not filtered away
+one imperceptible step at a time. Time throttling measures the payload's own timestamp, not
+arrival time. `ProviderMappingRegistryImpl` resets a mapping's state when it is updated or
+removed, so an edited rule does not compare against a baseline gathered under the old one.
+
+**The cost, and why this is interim.** A change rule describes what the *history provider*
+should persist. Enforcing it at ingest also freezes the twin's live value at the last accepted
+one: under a time throttle a northbound read returns a value up to one interval old, under a
+count rule one of every *n*. That is acceptable for percentage and absolute rules, where
+"nothing meaningful changed" is the intent, and it is a real behaviour change for the other
+two. Hence the kill switch (`enabled=false`) — when the notification proxy below exists, the
+rules move there and the filter is turned off, ideally deleted.
+
+**Deletion rules remain unimplemented**, and cannot be done here: there is no purge API to
+call (see *Deletion is the tie-breaker*).
 
 ### How SensiNact delivers notifications today (investigated against `org.eclipse.sensinact.gateway`)
 
@@ -134,6 +166,36 @@ Two orthogonal concerns:
 This mirrors the existing `MappingProfile` pattern (separate root, referenced
 non-containment from `ProviderMapping.profile`).
 
+### Revision: rules are contained (2026-08-25)
+
+**Reversed.** `ResourceMapping.changeRule` / `.deletionRule` and the same two features on
+`ReferenceResourceBinding` are **containment** references. A rule is written inline, owned by
+the one resource or binding that uses it, and `PersistenceRule.id` is now optional and no
+longer an EMF ID.
+
+Why the reuse argument lost:
+
+- **A non-containment reference is a document reference, and mappings travel.** A mapping
+  delivered from a Model Atlas arrives as a standalone EObject; there is no sibling document,
+  and the atlas fallback resolves *EPackages* (`AtlasResourceSetConfigurator` swaps the
+  `EPackage.Registry`), not instance documents — there is no URI handler for those. So the
+  href simply never resolved, and the proxy left behind carried the rule's type with none of
+  its parameters, which a naive reader turns into a zero threshold: filtering nothing while
+  appearing to filter. Making rules self-contained removes the failure mode rather than
+  papering over it.
+- **Sharing would have needed a resolution mechanism we do not have.** Keeping it would mean
+  a rules registry facade fed by file and atlas providers, with resources naming rules by id
+  — a real work package, and one that would have to cover `ProviderMapping.profile` too,
+  since that reference has exactly the same hole today (`MappingProfileRegistryImpl` indexes
+  profiles by `profileId`, but every consumer reads the href-resolved `mapping.getProfile()`).
+
+What it costs: changing a threshold means editing every copy. A `ReferenceResourceBinding`
+softens that for generated resources — one binding is still one place to edit, and the engine
+copies its rule onto each resource it covers.
+
+`PersistenceRuleRegistry` is kept as a catalogue container in case a shared rule source is
+wanted later. Nothing reads it.
+
 ## Ecore additions
 
 Added to `model/event-atlas-mapping.ecore` (package
@@ -217,9 +279,15 @@ subtypes; subclass it later if more strategies appear.
 ### Change to `ResourceMapping`
 
 ```
-changeRule   : ChangeRule   [0..1]     (non-containment, resolveProxies=true)
-deletionRule : DeletionRule [0..1]     (non-containment, resolveProxies=true)
+changeRule   : ChangeRule   [0..1]     (containment — revised 2026-08-25)
+deletionRule : DeletionRule [0..1]     (containment — revised 2026-08-25)
 ```
+
+The same pair exists on `ReferenceResourceBinding`, which is how the resources a
+`ReferenceMapping` generates get rules at all — they exist in no XMI, so there is no
+`ResourceMapping` to write a rule on. A binding selects attributes the way `filter` does; an
+empty selection is the default for everything generated at that level; bindings cascade into
+nested reference mappings with the nearest declaration winning.
 
 (`ResourceMapping` already extends `EAttribute`; adding references is fine.)
 
@@ -273,15 +341,18 @@ Deletion rules:
 </mapping:PersistenceRuleRegistry>
 ```
 
-**In a `ProviderMapping`** — resources reference shared rules (non-containment):
+**In a `ProviderMapping`** — each resource carries its own rule (containment, revised
+2026-08-25; `xsi:type` is required because `ChangeRule` is abstract):
 
 ```xml
-<resources mid="temperature" changeRule="persistence-rules.xmi#abs-0.5"
-                             deletionRule="persistence-rules.xmi#keep-90d"> … </resources>
-<resources mid="humidity"    changeRule="persistence-rules.xmi#pct-10"
-                             deletionRule="persistence-rules.xmi#keep-90d"> … </resources>
-<resources mid="water"       changeRule="persistence-rules.xmi#throttle-5m"
-                             deletionRule="persistence-rules.xmi#keep-90d"> … </resources>
+<resources mid="temperature"> …
+  <changeRule xsi:type="mapping:AbsoluteChangeRule" delta="0.5"/>
+  <deletionRule retention="90" retentionUnit="DAYS" cleanupInterval="1" cleanupIntervalUnit="DAYS"/>
+</resources>
+<resources mid="humidity"> …
+  <changeRule xsi:type="mapping:PercentageChangeRule" percentage="10.0"/>
+  <deletionRule retention="90" retentionUnit="DAYS" cleanupInterval="1" cleanupIntervalUnit="DAYS"/>
+</resources>
 ```
 
 ## Implementation steps

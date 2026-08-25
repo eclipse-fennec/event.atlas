@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapperFactory;
@@ -30,6 +31,9 @@ import org.eclipse.sensinact.core.model.SensinactModelManager;
 import org.eclipse.sensinact.core.twin.SensinactDigitalTwin;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
 
@@ -48,6 +52,14 @@ public class InstancePusherImpl implements InstancePusher {
 	private GatewayThread gatewayThread;
 	@Reference
 	private ProviderMappingRegistry mappingRegistry;
+	/**
+	 * Optional so the engine still works in a runtime that does not want the interim
+	 * change-rule enforcement at all; dynamic so switching the filter's configuration does
+	 * not tear this component down.
+	 */
+	@Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC, //
+			policyOption = ReferencePolicyOption.GREEDY)
+	private volatile ChangeRuleFilter changeRuleFilter;
 
 	/*
 	 * (non-Javadoc)
@@ -69,7 +81,7 @@ public class InstancePusherImpl implements InstancePusher {
 				int applied = 0;
 				for (ProviderMapping mapping : mappings) {
 					try {
-						ValueMapperFactory.createValueMapper(twin, mapping).mapInstance(instance);
+						ValueMapperFactory.createValueMapper(twin, mapping, changeRuleFilter).mapInstance(instance);
 						applied++;
 					} catch (Throwable e) {
 						logger.warning(String.format("Failed pushing instance of '%s' via mapping '%s': %s", instance.eClass().getName(), mapping.getMid(), e.getMessage()));

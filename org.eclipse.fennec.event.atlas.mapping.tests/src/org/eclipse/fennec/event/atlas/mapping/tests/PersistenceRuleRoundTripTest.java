@@ -14,6 +14,10 @@
 package org.eclipse.fennec.event.atlas.mapping.tests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,21 +29,27 @@ import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
+import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 import org.eclipse.fennec.event.atlas.model.mapping.DeletionRule;
 import org.eclipse.fennec.event.atlas.model.mapping.DurationUnit;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
+import org.eclipse.fennec.event.atlas.model.mapping.PercentageChangeRule;
 import org.eclipse.fennec.event.atlas.model.mapping.PersistenceRuleRegistry;
+import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimeThrottleChangeRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
  * Verifies the persistence-rule model: durations (amount + {@link DurationUnit}) round-trip
- * through XMI with plain EMF serialization (no custom datatype conversion), and a shared rule
- * referenced by several resources resolves to the same instance.
+ * through XMI with plain EMF serialization (no custom datatype conversion), and rules are
+ * owned by the resource mapping or reference binding that uses them - which is why a rule
+ * handed to a second owner is relocated rather than shared.
  */
 public class PersistenceRuleRoundTripTest {
 
@@ -99,16 +109,28 @@ public class PersistenceRuleRoundTripTest {
 	}
 
 	@Test
-	@DisplayName("A shared rule is referenced (not copied) by multiple resources")
-	void sharedRule_isReferencedByManyResources() {
+	@DisplayName("A rule is owned by the resource that uses it")
+	void rule_isContainedByItsResource() {
 		MappingFactory f = MappingFactory.eINSTANCE;
 
-		PersistenceRuleRegistry registry = f.createPersistenceRuleRegistry();
+		ResourceMapping temperature = f.createResourceMapping();
+		temperature.setMid("temperature");
 		DeletionRule keep90 = f.createDeletionRule();
-		keep90.setId("keep-90d");
 		keep90.setRetention(90);
 		keep90.setRetentionUnit(DurationUnit.DAYS);
-		registry.getDeletionRules().add(keep90);
+		temperature.setDeletionRule(keep90);
+
+		assertSame(temperature, keep90.eContainer(), "the resource owns its rule");
+	}
+
+	@Test
+	@DisplayName("Handing one rule instance to a second resource moves it, so rules must be copied")
+	void rule_setOnASecondResource_isMovedNotShared() {
+		MappingFactory f = MappingFactory.eINSTANCE;
+
+		DeletionRule keep90 = f.createDeletionRule();
+		keep90.setRetention(90);
+		keep90.setRetentionUnit(DurationUnit.DAYS);
 
 		ResourceMapping temperature = f.createResourceMapping();
 		temperature.setMid("temperature");
@@ -118,9 +140,54 @@ public class PersistenceRuleRoundTripTest {
 		humidity.setMid("humidity");
 		humidity.setDeletionRule(keep90);
 
-		// non-containment: both resources point at the same instance, still owned by the registry
-		assertSame(keep90, temperature.getDeletionRule());
-		assertSame(temperature.getDeletionRule(), humidity.getDeletionRule());
-		assertSame(registry, keep90.eContainer());
+		// Containment allows exactly one container, so the second set relocated the rule
+		// instead of sharing it. This is why ProviderModelSensinactMapper copies a binding's
+		// rule onto each generated resource rather than assigning it.
+		assertNull(temperature.getDeletionRule(), "the rule was moved away from the first resource");
+		assertSame(keep90, humidity.getDeletionRule());
+
+		humidity.setDeletionRule(EcoreUtil.copy(keep90));
+		temperature.setDeletionRule(EcoreUtil.copy(keep90));
+		assertNotNull(temperature.getDeletionRule(), "copies let both resources carry the rule");
+		assertNotNull(humidity.getDeletionRule());
+		assertNotSame(temperature.getDeletionRule(), humidity.getDeletionRule());
+		assertEquals(Integer.valueOf(90), temperature.getDeletionRule().getRetention());
+	}
+
+	@Test
+	@DisplayName("A rule contained by a reference binding round-trips through XMI")
+	void ruleInABinding_roundTrips() throws Exception {
+		MappingFactory f = MappingFactory.eINSTANCE;
+
+		PercentageChangeRule percentage = f.createPercentageChangeRule();
+		percentage.setPercentage(5.0d);
+
+		ReferenceResourceBinding binding = f.createReferenceResourceBinding();
+		binding.setChangeRule(percentage);
+		binding.setUnit("kn");
+
+		ReferenceMapping refMapping = f.createReferenceMapping();
+		refMapping.getBindings().add(binding);
+
+		ServiceMapping service = f.createServiceMapping();
+		service.setMid("weather");
+		service.setReferencedResource(refMapping);
+
+		Resource saved = newResourceSet().createResource(URI.createURI("mem://binding.xmi"));
+		saved.getContents().add(service);
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		saved.save(out, Map.of());
+		String xmi = out.toString("UTF-8");
+
+		assertTrue(xmi.contains("percentage=\"5.0\""), () -> "expected an inline rule in:\n" + xmi);
+		assertFalse(xmi.contains("href="), () -> "a contained rule needs no href:\n" + xmi);
+
+		Resource loaded = newResourceSet().createResource(URI.createURI("mem://binding.xmi"));
+		loaded.load(new ByteArrayInputStream(out.toByteArray()), Map.of());
+		ServiceMapping service2 = (ServiceMapping) loaded.getContents().get(0);
+		ReferenceResourceBinding binding2 = service2.getReferencedResource().getBindings().get(0);
+
+		assertEquals("kn", binding2.getUnit());
+		assertEquals(5.0d, ((PercentageChangeRule) binding2.getChangeRule()).getPercentage());
 	}
 }

@@ -30,6 +30,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryListener;
+import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
@@ -42,6 +43,9 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
 
@@ -69,6 +73,10 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	private GatewayThread gatewayThread;
 	@Reference
 	private MappingProfileRegistry profileRegistry;
+	/** Optional: only present when change rules are enforced on the way into the twin. */
+	@Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC, //
+			policyOption = ReferencePolicyOption.GREEDY)
+	private volatile ChangeRuleFilter changeRuleFilter;
 
 	@Activate
 	public void activate() {
@@ -102,6 +110,9 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 		// see a gap - the remove-after-add ordering of the former service whiteboard
 		validMapping(entry, false).ifPresent(this::registerModelMapping);
 		validMapping(oldEntry, true).ifPresent(this::unregisterModelMapping);
+		// The rules themselves may have changed with the entry, and a baseline gathered under
+		// the previous rule applies neither faithfully.
+		validMapping(entry, true).ifPresent(m -> resetChangeRuleState(m.getMid()));
 	}
 
 	/*
@@ -182,6 +193,7 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	 */
 	@Override
 	public void unregisterModelMapping(ProviderMapping mapping) {
+		resetChangeRuleState(mapping.getMid());
 		mapping.getProviderClasses().forEach(ec->{
 			logger.fine(String.format("Un-registering provider mapping for '%s' into registry", mapping.getMid()));
 			registry.getOrDefault(ec, Collections.emptyList()).remove(mapping);
@@ -211,6 +223,17 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	public List<ProviderMapping> getProviderMapping(EClass eclass) {
 		requireNonNull(eclass);
 		return registry.getOrDefault(eclass, Collections.emptyList());
+	}
+
+	/**
+	 * Drops what the change rule filter retained for a mapping, so the next value of each of
+	 * its resources counts as the first one again. A no-op when nothing enforces the rules.
+	 */
+	private void resetChangeRuleState(String mid) {
+		ChangeRuleFilter filter = changeRuleFilter;
+		if (filter != null && mid != null) {
+			filter.reset(mid);
+		}
 	}
 
 }

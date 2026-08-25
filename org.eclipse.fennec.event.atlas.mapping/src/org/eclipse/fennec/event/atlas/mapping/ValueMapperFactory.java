@@ -36,4 +36,21 @@ public class ValueMapperFactory {
     public static ValueMapper createValueMapper(SensinactDigitalTwin twin, ProviderMapping mapping) {
         return new ValueMapperImpl(twin, mapping);
     }
+
+    /**
+     * Creates a new ValueMapper instance that applies the resources' change rules on the way
+     * into the twin.
+     *
+     * @param twin The SensiNact digital twin to update with mapped values
+     * @param mapping The ProviderMapping configuration defining the transformation rules
+     * @param changeRuleFilter Decides per resource whether a mapped value is pushed; may be
+     *        <code>null</code>, which pushes every value and is what
+     *        {@link #createValueMapper(SensinactDigitalTwin, ProviderMapping)} does
+     * @return A configured ValueMapper instance
+     * @throws IllegalArgumentException if twin or mapping is null
+     */
+    public static ValueMapper createValueMapper(SensinactDigitalTwin twin, ProviderMapping mapping,
+            ChangeRuleFilter changeRuleFilter) {
+        return new ValueMapperImpl(twin, mapping, changeRuleFilter);
+    }
 }

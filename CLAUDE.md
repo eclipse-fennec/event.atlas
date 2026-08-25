@@ -56,8 +56,9 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-08-24: `./gradlew clean build` is green — **58 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus the plain-JUnit `ProviderModelMapperTest`.
+Baseline as of 2026-08-25: `./gradlew clean build` is green — **66 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus 29 plain-JUnit tests (`ProviderModelMapperTest`,
+`ChangeRuleFilterImplTest`, `BindingResolverTest`).
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -161,11 +162,29 @@ Core concepts, all expressed as XMI instances of that metamodel:
 - **`MappingProfile`** — a reusable *target* structure several vendor mappings conform to
   (`providerStrategy` `SEPARATE` vs `UNIFIED`), keyed by `profileId`; the profile registry
   validates conformance against `required` / `expectedType` / `expectedUnit`.
-- **Persistence rules** — `PersistenceRuleRegistry` holds reusable `ChangeRule` subtypes
-  (percentage / absolute / count / time-throttle) and `DeletionRule`s that `ResourceMapping`s
-  reference by id. **Model-only today**: the enforcing notification proxy is a planned separate
-  component — design in `docs/WP-SN-2-persistence-rules-plan.md` (it also documents why a
-  transparent interceptor on SensiNact's fan-out typed-event bus cannot work).
+- **Persistence rules** — `ChangeRule` subtypes (percentage / absolute / count / time-throttle)
+  and `DeletionRule`, **contained** by the `ResourceMapping` or `ReferenceResourceBinding` that
+  uses them. Since 2026-08-25 they are written inline, not shared by reference: a mapping
+  carries its rules wherever it travels (a Model Atlas included), at the cost of editing a
+  threshold in every copy. `PersistenceRuleRegistry` survives as a *catalogue* container —
+  nothing reads it, and `model/examples/persistence-rules.xmi` says so; don't put it in a
+  runtime's mappings directory. An old-style `href` to a rule in another document leaves an
+  unresolved proxy whose parameters are all null; `ChangeRuleFilterImpl` detects that and pushes
+  unfiltered with a warning rather than applying a zero threshold.
+  A `ReferenceMapping` gives rules to its auto-generated resources through `bindings`
+  (`ReferenceResourceBinding`: `attributes` — empty means all — plus `changeRule`,
+  `deletionRule`, `unit`), resolved at registration time, nearest declaration winning over an
+  inherited one. **The binding's rule must be `EcoreUtil.copy`-ed onto each generated resource**
+  — containment allows one container, so assigning it would move it out of the binding and
+  leave a single resource with a rule (guarded by `ChangeRuleFilterTest`).
+  **`changeRule` elements need an `xsi:type`** — `ChangeRule` is abstract, so EMF has no class
+  to instantiate without one, exactly like `featurePath`.
+  **Change rules are enforced at ingest, deletion rules are still model-only.** The rules
+  describe what the *history provider* should persist; until it can apply them itself,
+  `ChangeRuleFilter` applies the change rules on the way into the twin — which also freezes the
+  live value at the last accepted one (see below). The intended enforcement point, and why a
+  transparent interceptor on SensiNact's fan-out typed-event bus cannot work, is in
+  `docs/WP-SN-2-persistence-rules-plan.md`.
 
 ## Runtime layering
 
@@ -190,6 +209,20 @@ important thing to know, and the part that changed most recently:
   southbound connectors: receive a payload, deserialize it to an EObject, push. Lookup keys on
   **EClass identity**, so incoming instances must come from the same `EPackage` instance the
   mappings resolved their `providerClasses` against.
+- **`ChangeRuleFilter`** (`ChangeRuleFilterImpl`, config pid
+  `sensinact.mapping.changerule.filter`, `enabled=true` by default) is consulted by
+  `ValueMapperImpl.mapSingleResource` immediately before `resource.setValue`, and drops a value
+  its `ResourceMapping`'s `ChangeRule` rejects. It is *stateful* — last accepted value, its
+  timestamp and a notification counter per `mappingMid/providerId/serviceMid/resourceMid` —
+  because a fresh `ValueMapperImpl` is created per push; comparisons are against the last
+  *accepted* value, so a slow drift is not filtered away one step at a time, and the first value
+  of a resource is always accepted. Time throttling measures the *payload's* timestamp, not
+  arrival time. An inapplicable rule (numeric rule on a non-numeric resource) accepts and warns
+  once rather than dropping. Wired optionally and dynamically into `InstancePusherImpl` (which
+  passes it to `ValueMapperFactory.createValueMapper`) and into `ProviderMappingRegistryImpl`,
+  which calls `reset(mid)` when a mapping is updated or removed so an edited rule starts from a
+  clean baseline. Nothing in it touches sensinact types — the bundle must still resolve without
+  the gateway. `enabled=false` restores unfiltered pushing.
 - `ValueMapper` / `ValueMapperFactory` — the plain-Java engine face: `mapInstance` (update the
   twin), `mapResourceValues` (extract only), `validateInstance`. `ValueMapperImpl` (~1100 lines,
   package `…mapping.impl`) does path navigation, collection handling, type conversion, timestamp

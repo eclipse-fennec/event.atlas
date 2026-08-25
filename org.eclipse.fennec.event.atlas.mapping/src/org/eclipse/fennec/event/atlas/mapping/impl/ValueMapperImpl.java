@@ -39,6 +39,7 @@ import org.eclipse.emf.ecore.EDataType;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.util.EcoreUtil;
+import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapper;
 import org.eclipse.fennec.event.atlas.mapping.ValueMappingException;
 import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
@@ -73,6 +74,7 @@ public class ValueMapperImpl implements ValueMapper {
 	private final SensinactDigitalTwin twin;
 	private final ProviderMapping mapping;
 	private final String providerModel;
+	private final ChangeRuleFilter changeRuleFilter;
 
 	/**
 	 * Creates a new ValueMapper instance with custom function registry.
@@ -82,9 +84,22 @@ public class ValueMapperImpl implements ValueMapper {
 	 * @param functionRegistry Registry of function services keyed by functionId
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping) {
+		this(twin, mapping, null);
+	}
+
+	/**
+	 * Creates a new ValueMapper instance that applies the resources' change rules.
+	 *
+	 * @param twin The SensiNact digital twin to update with mapped values
+	 * @param mapping The ProviderMapping configuration defining the transformation rules
+	 * @param changeRuleFilter Decides per resource whether a mapped value is pushed, or
+	 * <code>null</code> to push every value
+	 */
+	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter) {
 		this.twin = requireNonNull(twin, "Digital twin cannot be null");
 		this.mapping = requireNonNull(mapping, "Provider mapping cannot be null");
 		this.providerModel = determineProviderModel(mapping);
+		this.changeRuleFilter = changeRuleFilter;
 	}
 
 	@Override
@@ -112,7 +127,7 @@ public class ValueMapperImpl implements ValueMapper {
 
 				// Service timestamp takes precedence, fallback to provider timestamp
 				Instant serviceTimestamp = determineTimestamp(serviceSource, serviceMapping, providerTimestamp);
-				mapServiceResources(serviceSource, serviceMapping, provider, serviceTimestamp);
+				mapServiceResources(serviceSource, serviceMapping, provider, serviceTimestamp, providerId);
 			}
 
 			// Map admin service if configured
@@ -361,7 +376,7 @@ public class ValueMapperImpl implements ValueMapper {
 	 * by ProviderModelSensinactMapper and are already present in serviceMapping.getResources().
 	 */
 	private void mapServiceResources(EObject sourceInstance, ServiceMapping serviceMapping,
-			SensinactProvider provider, Instant timestamp) throws ValueMappingException {
+			SensinactProvider provider, Instant timestamp, String providerId) throws ValueMappingException {
 
 		SensinactService service = provider.getServices().get(serviceMapping.getMid());
 		if (service == null) {
@@ -371,11 +386,11 @@ public class ValueMapperImpl implements ValueMapper {
 		// Map all resources (both auto-generated and explicitly defined)
 		// Auto-generated resources are already in the list thanks to ProviderModelSensinactMapper
 		for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
-			mapSingleResource(sourceInstance, resourceMapping, service, timestamp);
+			mapSingleResource(sourceInstance, resourceMapping, service, timestamp, providerId);
 		}
 //		Go over the temporary ResourceMapping. These are the ones automatically created when the referencedResource is set
 		for (ResourceMapping resourceMapping : serviceMapping.getTemporaryResources()) {
-			mapSingleResource(sourceInstance, resourceMapping, service, timestamp);
+			mapSingleResource(sourceInstance, resourceMapping, service, timestamp, providerId);
 		}
 	}
 
@@ -434,7 +449,7 @@ public class ValueMapperImpl implements ValueMapper {
 	 * Maps a single resource value.
 	 */
 	private void mapSingleResource(EObject sourceInstance, ResourceMapping resourceMapping, 
-			SensinactService service, Instant timestamp) throws ValueMappingException {
+			SensinactService service, Instant timestamp, String providerId) throws ValueMappingException {
 
 		SensinactResource resource = service.getResources().get(resourceMapping.getMid());
 		
@@ -445,6 +460,13 @@ public class ValueMapperImpl implements ValueMapper {
 
 		Optional<Object> value = extractValue(sourceInstance, resourceMapping);
 		if (value.isPresent()) {
+			// The resource's change rule decides whether this value reaches the twin at all.
+			// Interim: the rule describes what the history provider should persist, and is
+			// applied here until that provider can apply it itself.
+			if (changeRuleFilter != null && !changeRuleFilter.accept(mapping.getMid(), providerId,
+					service.getName(), resourceMapping, value.get(), timestamp)) {
+				return;
+			}
 			try {
 				resource.setValue(value.get(), timestamp);
 				logger.finest(String.format("Set resource %s.%s = %s", service.getName(), resource.getName(), value.get()));
