@@ -97,9 +97,17 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
 
 - `launch.bndrun` — dev playground: mapping engine + SensiNact gateway + Gogo shell + the
   **test simulator** + the Model Atlas client (`local.config` points it at
-  `http://localhost:8086/atlas/rest`, scope `jena`). Its `configs/sensinact.json` is the same
-  file as the docker one except that the hosted SensorThings MQTT broker defaults to **2883**,
-  so it does not fight a local broker on 1883 — same `/event/rest/{sensinact,v1.1}` bases.
+  `http://localhost:8080/atlas/rest`, scope `jena` — where the model.atlas jena container
+  publishes, per `docker-compose-jena.yml` in `eclipse-fennec/model.atlas`). Because the Atlas
+  owns 8080, its `configs/sensinact.json` puts the runtime's own whiteboard on **8090**, so the
+  local REST bases are `http://localhost:8090/event/rest/{v1.1,ingest}` — otherwise the same
+  file as the docker one. Note `sensinact.json` configures `sensinact.northbound.rest`, but
+  `launch.bndrun` carries no `…northbound.rest` bundle, so that config is inert and
+  `/event/rest/sensinact/**` answers the SensorThings 500 described below, not a provider list.
+  It also feeds **two** EObject registries from the Atlas:
+  `sensinact-mappings` from the `sensinactmapping` atlas registry (key `mid`) and
+  `sensinact-profiles` from `sensinactprofile` (key `profileId`) — the profiles registry is not
+  optional, since a mapping whose profile cannot be resolved is skipped entirely.
 - `eventatlas.runtime_docker.bndrun` — self-contained image runtime: engine + gateway +
   northbound REST + the SensorThings v1.1 REST gateway and MQTT broker; mappings/profiles read
   from XMI files under `/opt/eventatlas/runtime` **and** optionally from a Model Atlas; no

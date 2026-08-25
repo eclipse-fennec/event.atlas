@@ -184,7 +184,7 @@ The resource declares no application, so it binds to the default application at 
 unlike SensiNact's northbound REST, which lives under its own `/sensinact` base.
 
 ```bash
-curl -i -X POST http://localhost:8080/ingest/weather \
+curl -i -X POST http://localhost:8090/event/rest/ingest/weather \
      -H 'Content-Type: application/xml' \
      --data-binary @/tmp/weather.xmi
 ```
@@ -208,7 +208,7 @@ sna:describe 10567
 ```
 
 The docker runtime additionally exposes the northbound REST API
-(`curl http://localhost:8080/sensinact/providers`); `launch.bndrun` does not include it.
+(`curl http://localhost:8080/event/rest/sensinact/providers`); `launch.bndrun` does not include it.
 
 ## Outcomes
 
