@@ -20,14 +20,15 @@ Gradle graph automatically):
 | `…event.atlas.mapping` | the mapping metamodel (`model/event-atlas-mapping.ecore` → `src-gen`) + the mapping engine + its DS components |
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
 | `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles}` mount-point skeleton |
-| `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring) |
-| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — two resources: `config.json` (file providers + Model Atlas client + MQTT southbound) and `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker) |
+| `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring + the timescale history store) |
+| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — three resources: `config.json` (file providers + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker) and `timescale.json` (the history store) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload (XMI or JSON), pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, `FORMAT_UNSUPPORTED`, …) |
 | `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
 | `…event.atlas.rest.southbound.adapter` | `PayloadIngestResource` — `POST <whiteboard base>/ingest/{channel}`; the HTTP status mirrors the `IngestResult` outcome |
 
-`docker/eventatlas/` (not a bnd project, in `bnd_exclude`) holds the Dockerfile; its
+`docker/eventatlas/` (not a bnd project, in `bnd_exclude`) holds the Dockerfile and
+`docker-compose.example.yml` (the image plus a TimescaleDB, the runnable history example); its
 `content/` staging dir is git-ignored (see `docker/eventatlas/README.md`).
 
 Java packages follow the BSNs: `org.eclipse.fennec.event.atlas.mapping` (hand-written) and
@@ -94,8 +95,10 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
 ```
 
 - `launch.bndrun` — dev playground: mapping engine + SensiNact gateway + Gogo shell + the
-  **test simulator** + the Model Atlas client (`local.config` points it at
-  `http://localhost:8086/atlas/rest`, scope `jena`). Its `configs/sensinact.json` is the same
+  Model Atlas client (`local.config` points it at `http://localhost:8086/atlas/rest`, scope
+  `jena`) + the history store. It does **not** carry `…mapping.test.component` or any domain
+  model any more — add both to `-runrequires` (and re-resolve) if you want the simulator to
+  push, otherwise the mapping's `providerClasses` stay unresolved. Its `configs/sensinact.json` is the same
   file as the docker one except that the hosted SensorThings MQTT broker defaults to **2883**,
   so it does not fight a local broker on 1883 — same `/event/rest/{sensinact,v1.1}` bases.
 - `eventatlas.runtime_docker.bndrun` — self-contained image runtime: engine + gateway +
@@ -134,6 +137,18 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   channel a *resolve-time* guarantee rather than a runtime surprise. `JsonPayloadIngestTest`
   (OSGi, with `data/dragino-example.json`) is the regression guard; `PayloadIngestImpl` now
   also reports a missing factory as `FORMAT_UNSUPPORTED` (HTTP 501) instead of parsing on.
+- **History is the timescale provider, switched on by its config.** Both bndruns require
+  `…southbound.history.timescale-provider`, which brings `org.postgresql.jdbc` and the two
+  Aries `tx-control` bundles (it reaches the database through the OSGi Transaction Control
+  service; those two also export the `org.osgi.service.transaction.control*` API packages, so
+  no separate API bundle is needed). All three are third-party artifacts that
+  `cnf/ext/sensinact.maven` pins but the Eclipse SensiNact repos do not host — they are
+  declared in `central.mvn` for exactly the reason described below. The store's component is
+  `configuration-policy=require`, so `configs/timescale.json` in the two config bundles is the
+  on/off switch: with a database it creates the `sensinact.history` hypertable and records; with
+  none it stays inactive and silent (the failure only reaches the OSGi log service, so `scr:list`
+  is where an empty history shows up). Its `provider` name must match `history.provider` in
+  `sensinact.json` — both are `brokerHistory`.
 - **Docker config is a bundle, not a mounted file.** The Felix configurator's
   `configurator.initial` pass runs before the runtime's JSON provider is wired and fails with
   "Invalid JSON", so the docker wiring is baked into `…mapping.docker.config`. See

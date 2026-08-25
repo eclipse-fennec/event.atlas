@@ -108,6 +108,7 @@ config does not work here. The bundle ships two configurator resources
 |---|---|
 | `config.json` | the event.atlas side: file providers → EObject registries `sensinact-mappings` / `sensinact-profiles`, the Model Atlas REST client + `AtlasEObjectProvider`, and the MQTT southbound (SensiNact MQTT client + `MqttPayloadListener`) |
 | `sensinact.json` | the SensiNact side: session manager `ALLOW_ALL`, the named Felix HTTP whiteboard + Jersey whiteboard, northbound REST (anonymous), SensorThings REST (`history.provider`) and the SensorThings MQTT broker ports/keystore |
+| `timescale.json` | the history store: where the twin's value updates are written, and under which provider name they are served back — see [History](#history) |
 
 Deployment-specific values are `$[env:…]` placeholders resolved at configuration-delivery
 time by `org.apache.felix.configadmin.plugin.interpolation`, so one published image serves
@@ -125,6 +126,9 @@ every environment. Every placeholder has a default — the image starts standalo
 | `EVENTATLAS_MQTT_TOPICS` | `eventatlas/#` | comma-separated topics **subscribed at the broker** |
 | `EVENTATLAS_MQTT_XMI_TOPICS` | `eventatlas/#` | which of those the **XMI** ingest channel handles |
 | `EVENTATLAS_MQTT_JSON_TOPICS` | `eventatlas/json/#` | which of those the **JSON** ingest channel handles |
+| `TIMESCALE_HOST` / `_PORT` / `_DB` | `localhost` / `5432` / `sensinactHistory` | the history database (see [History](#history)); with nothing listening there the history store simply stays inactive |
+| `TIMESCALE_USER` / `_PWD` | `snaHistory` / empty | history database credentials |
+| `TIMESCALE_PROVIDER` | `brokerHistory` | the name the history store is registered under - must match `history.provider` in `sensinact.json` |
 | `SENSORTHINGS_MQTT_PORT` / `_SECURE_PORT` | `1883` / `8883` | hosted SensorThings broker, TCP / TLS |
 | `SENSORTHINGS_MQTT_WS_PORT` / `_WSS_PORT` | `8885` / `8886` | hosted SensorThings broker, WebSocket / WSS |
 | `SENSORTHINGS_MQTT_KEYSTORE_FILE` / `_TYPE` | empty / `jks` | keystore for the TLS listeners; without a file the TLS ports stay closed |
@@ -156,6 +160,56 @@ paho's `MqttDefaultFilePersistence` — which sensiNact's `MqttClientHandler` ge
 `MqttException (0)` from `open()` if it cannot write there, killing the southbound MQTT client at
 activation. If you override the working directory when running the image, point it at a writable
 path.
+
+## History
+
+Without a history store the twin only ever holds each resource's *current* value: SensorThings
+`Observations` return one row, and there is nothing to plot. This image therefore carries the
+SensiNact **timescale** history provider (`…southbound.history.timescale-provider`, plus the
+postgres driver and the two Aries tx-control bundles it reaches the database through). It
+subscribes to the twin's update notifications and appends them to a TimescaleDB hypertable.
+
+Two names have to agree, and both default to `brokerHistory`: the `provider` in
+`timescale.json` (what the store registers itself as) and `history.provider` in
+`sensinact.json` (what the SensorThings gateway asks for). Change one, change the other -
+`TIMESCALE_PROVIDER` exists so that a deployment can do it in one place.
+
+The store's component is `configuration-policy=require`, so `timescale.json` is the on/off
+switch. It ships in the config bundle, which means:
+
+- **with a reachable database** the store connects on activation, creates its schema if it is
+  not there yet (`sensinact.history`, a hypertable keyed by provider/service/resource and time)
+  and starts recording. `TimescaleDB enabled` in the log is the confirmation.
+- **without one** the component fails to activate and nothing else happens - no retry storm, no
+  stack traces on stdout. The runtime serves everything else exactly as before, and history
+  queries stay empty. The activation failure is reported through the OSGi log service only, so
+  if history stays empty when you expect data, that is the first thing to check (`scr:list` in
+  the Gogo shell shows the component as unsatisfied or failed).
+
+`exclude.resources` keeps the per-provider location resources (`observedArea`, `viewport`) out
+of the table - they are state, not measurements. It is a list of resource-selector filters, so a
+deployment can exclude more.
+
+A database to try it against, and the image wired to it:
+
+```bash
+docker compose -f docker/eventatlas/docker-compose.example.yml up
+```
+
+That compose file is the whole example: a `timescale/timescaledb-ha:pg16` service with the
+default database/user this config expects, and the runtime pointed at it. What lands in the
+table needs a mapping and its domain model, exactly as for the current value - history is
+downstream of the same push.
+
+```bash
+# what has been recorded
+docker compose -f docker/eventatlas/docker-compose.example.yml exec timescaledb \
+    psql -U snaHistory -d sensinactHistory \
+    -c 'select time, provider, service, resource, value_num from sensinact.history order by time desc limit 20;'
+
+# and through the northbound: the Observations of one datastream
+curl 'http://localhost:8080/event/rest/v1.1/Datastreams'
+```
 
 ## Building locally
 

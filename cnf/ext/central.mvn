@@ -220,6 +220,19 @@ tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.2.2
 com.fasterxml.jackson.core:jackson-core:2.19.2
 com.fasterxml.jackson.core:jackson-annotations:2.22
 
+# The SensiNact history timescale-provider's runtime closure. cnf/ext/sensinact.maven pins
+# these too, but the Eclipse SensiNact repos do not host third-party artifacts, so they have
+# to be declared here to be fetchable on a clean CI runner (the timescale-provider bundle
+# itself IS served from there). The provider reaches postgres through the OSGi Transaction
+# Control service, which is what tx-control brings: it publishes the TransactionControl and
+# JDBCConnectionProviderFactory services the provider's component requires, and exports the
+# two org.osgi.service.transaction.control* API packages itself - no separate API bundle.
+# tx-control 1.0.1 imports org.slf4j [1.7,2), which resolves because slf4j-api 2.0.x still
+# exports the package at 1.7.36 next to its own version.
+org.postgresql:postgresql:42.7.13
+org.apache.aries.tx-control:tx-control-service-local:1.0.1
+org.apache.aries.tx-control:tx-control-provider-jdbc-local:1.0.1
+
 # Model Atlas client bundles (incl. the eobject.provider, which moved out of this workspace)
 # used by the docker runtime and the mapping.runtime launch bndrun.
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.api:0.1.0-SNAPSHOT
