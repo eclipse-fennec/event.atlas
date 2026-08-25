@@ -68,6 +68,22 @@
     "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
   },
 
+  /* JSON payloads do not name their model; the codec types them through the discriminator
+   * registry named here, and its single discriminator path (see docs/json-southbound-typing.md).
+   * One registry per runtime - every JSON device family shares it.
+   *
+   * THIS PID IS NOT OPTIONAL FOR A JSON DEPLOYMENT. PayloadIngestImpl is
+   * ConfigurationPolicy.OPTIONAL with `codec.typeMapId` defaulting to "", and an empty map id
+   * means no load option is passed at all - the deserializer then finds no type information and
+   * drops every JSON payload:
+   *   CodecEObjectDeserializer SEVERE: Cannot deserialize: no type information found and no
+   *   CODEC_ROOT_TYPE hint
+   * The activation line `Payload typing: map '<none>'` is the give-away. Env-interpolated like
+   * every other value here, so one published image serves every deployment. */
+  "event.atlas.southbound.ingest": {
+    "codec.typeMapId": "$[env:EVENTATLAS_CODEC_TYPE_MAP_ID;default=jena-sensors]"
+  },
+
   /* `;type=String[]` is REQUIRED on every list property, not optional next to `delimiter`: the
    * interpolation plugin only converts a value when the `type` directive is present
    * (InterpolationConfigurationPlugin:196 -> convertType), so `delimiter=,` ALONE is silently
