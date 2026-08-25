@@ -14,6 +14,8 @@
 package org.eclipse.fennec.event.atlas.mapping.tests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -24,6 +26,7 @@ import java.util.Map;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EcoreFactory;
+import org.eclipse.emf.ecore.InternalEObject;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.util.EcoreUtil;
@@ -35,7 +38,9 @@ import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
+import org.eclipse.fennec.event.atlas.model.mapping.ProfileProvider;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy;
 import org.gecko.weather.model.weather.WeatherPackage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,6 +64,7 @@ public class MappingRegistryListenerTest {
 
 	private static final String MAPPING_URI = "/data/WeatherProviderMapping.xmi";
 	private static final String SOURCE = "test-source";
+	private static final String PROFILE_ID = "resolution-test-profile";
 
 	@InjectService
 	WeatherPackage weatherPackage;
@@ -96,6 +102,68 @@ public class MappingRegistryListenerTest {
 		Resource providerResource = resourceSet.createResource(URI.createURI(providerUrl.toString()));
 		providerResource.load(null);
 		return (ProviderMapping) providerResource.getContents().get(0);
+	}
+
+	@Test
+	@DisplayName("An unresolved profile reference is resolved through the profile registry")
+	void unresolvedProfile_isResolvedThroughTheProfileRegistry() throws IOException {
+		ProviderMapping mapping = loadWeatherMapping();
+		EClass providerClass = weatherPackage.getMOSMIXSWeatherReport();
+
+		// What a mapping delivered without its profile document looks like: the reference
+		// carries the profile's type and its id in the proxy URI fragment, nothing else.
+		mapping.setProfile(proxyProfile());
+		MappingProfile registered = minimalProfile();
+		profileRegistry.registerProfile(registered);
+
+		attach("sensinact-mappings", mappingListener);
+		writer.put(SOURCE, mapping.getMid(), mapping, Map.of());
+
+		assertEquals(List.of(mapping), mappingRegistry.getProviderMapping(providerClass),
+				"the mapping should have been registered");
+		assertFalse(mapping.getProfile().eIsProxy(), "the proxy should have been replaced");
+		assertSame(registered, mapping.getProfile(), "resolved to the registered profile instance");
+
+		profileRegistry.unregisterProfile(PROFILE_ID);
+	}
+
+	@Test
+	@DisplayName("A mapping whose profile cannot be resolved is skipped, not registered half-configured")
+	void unresolvableProfile_skipsTheMapping() throws IOException {
+		ProviderMapping mapping = loadWeatherMapping();
+		EClass providerClass = weatherPackage.getMOSMIXSWeatherReport();
+
+		// Nothing registered under that id: the profile decides the provider identity, so
+		// registering without it would push data to a different provider than was asked for.
+		mapping.setProfile(proxyProfile());
+
+		attach("sensinact-mappings", mappingListener);
+		writer.put(SOURCE, mapping.getMid(), mapping, Map.of());
+
+		assertTrue(mappingRegistry.getProviderMapping(providerClass).isEmpty(),
+				"the mapping should have been skipped");
+	}
+
+	private static MappingProfile proxyProfile() {
+		MappingProfile proxy = MappingFactory.eINSTANCE.createMappingProfile();
+		((InternalEObject) proxy).eSetProxyURI(URI.createURI("battery-sensor-profile.xmi#" + PROFILE_ID));
+		return proxy;
+	}
+
+	/**
+	 * A profile every mapping conforms to: it requires no service and no admin, so conformance
+	 * validation has nothing to complain about and the test stays about resolution.
+	 */
+	private static MappingProfile minimalProfile() {
+		MappingProfile profile = MappingFactory.eINSTANCE.createMappingProfile();
+		profile.setProfileId(PROFILE_ID);
+		profile.setName("Resolution test profile");
+		// SEPARATE keeps the provider id the mapping's own, so this changes nothing in the twin
+		profile.setProviderStrategy(ProviderStrategy.SEPARATE);
+		ProfileProvider provider = MappingFactory.eINSTANCE.createProfileProvider();
+		provider.setProviderId(PROFILE_ID);
+		profile.setProvider(provider);
+		return profile;
 	}
 
 	@Test

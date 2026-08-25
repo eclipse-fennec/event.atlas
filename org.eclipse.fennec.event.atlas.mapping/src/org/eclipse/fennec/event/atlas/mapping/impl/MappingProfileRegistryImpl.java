@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
+import org.eclipse.emf.ecore.InternalEObject;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryListener;
@@ -162,7 +163,20 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
         }
         
         MappingProfile profile = mapping.getProfile();
+        if (profile.eIsProxy()) {
+            // An unresolved reference: the profile document was not reachable and nothing
+            // resolved the proxy through this registry. Its features are all null, so there is
+            // nothing to validate against - report it instead of dereferencing one.
+            result.addError("Profile reference of mapping '" + mapping.getMid() + "' is unresolved ("
+                    + ((InternalEObject) profile).eProxyURI() + ") - the profile is neither reachable as a "
+                    + "document nor registered");
+            return result;
+        }
         ProfileProvider profileProvider = profile.getProvider();
+        if (profileProvider == null) {
+            result.addError("Profile '" + profile.getProfileId() + "' declares no provider structure");
+            return result;
+        }
         
         // Validate admin service
         if (profileProvider.getAdmin() != null) {
