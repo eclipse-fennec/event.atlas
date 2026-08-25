@@ -3,9 +3,18 @@
   ":configurator:symbolic-name": "org.eclipse.fennec.event.atlas.mapping.local.config",
   ":configurator:version": "1.0.0",
 
+  /* Domain EPackages come from the Atlas, not from model bundles in the runtime. EAGER
+   * pre-fetches them at activation so the mapping sync below finds them; "release" is the
+   * jena scope's final stage. register.in.global.registry mirrors them into
+   * EPackage.Registry.INSTANCE, where EMF deserialization looks. */
   "org.eclipse.fennec.model.atlas.rest.client~jena": {
     "base.uri": "http://localhost:8086/atlas/rest",
     "scope.allow.list": ["jena"],
+    "default.scope": "jena",
+    "mode": "EAGER",
+    "eager.scopes": ["jena"],
+    "eager.stages": ["release"],
+    "register.in.global.registry": true,
     "drift.check.interval.ms": 10000
   },
 
@@ -24,9 +33,23 @@
     "emf.eobject.provider.name": "atlas-jena",
     "registries": ["sensinactmapping"],
     "key.feature": "mid",
-    "required.nsuris": ["https://fennec.eclipse.org/event.atlas/mapping/1.0"],
+    /* Gate, not a loader: the mapping sync waits until these EPackages are registered. */
+    "required.nsuris": [
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0",
+      "https://datainmotion.de/demo/m5airq/1.0",
+      "http://data-in-motion.biz/waterparc/domain"
+    ],
     "refresh.interval.ms": 60000
   },
+
+  /* JSON payloads do not name their model; the codec types them through the discriminator
+   * registry named here. One registry and one discriminator path per runtime - every JSON
+   * device family shares it (see docs/json-southbound-typing.md). */
+  "event.atlas.southbound.ingest": {
+    "codec.typeMapId": "jena-sensors"
+  },
+
+  /* --- local dev broker: weather simulator (XMI) + a generic JSON channel --- */
 
   "sensinact.southbound.mqtt~local": {
     "id": "local-broker",
@@ -51,5 +74,41 @@
     "mqtt.handler.id": "local-broker",
     "format": "json",
     "name": "local-mqtt-json"
+  },
+
+  /* --- M5AirQ air quality device (JSON, discriminator `deduplicationId`) --- */
+
+  "sensinact.southbound.mqtt~airquality": {
+    "id": "airquality-broker",
+    "protocol": "tcp",
+    "host": "$[env:AIRQ_MQTT_HOST;default=datainmotion.de]",
+    "port": "$[env:AIRQ_MQTT_PORT;default=1883;type=Integer]",
+    "user": "$[env:AIRQ_MQTT_USER;default=demo]",
+    ".password": "$[env:AIRQ_MQTT_PASSWORD;default=]",
+    "topics": ["airquality/#"]
+  },
+
+  "event.atlas.southbound.mqtt~airquality": {
+    "mqttTopics": ["airquality/sensor"],
+    "mqtt.handler.id": "airquality-broker",
+    "format": "json",
+    "name": "airquality-mqtt"
+  },
+
+  /* --- waterpark simulation (JSON since the sim's emf_sink switched from XMI) --- */
+
+  "sensinact.southbound.mqtt~waterpark": {
+    "id": "waterpark-broker",
+    "protocol": "tcp",
+    "host": "$[env:WATERPARK_MQTT_HOST;default=localhost]",
+    "port": "$[env:WATERPARK_MQTT_PORT;default=1885;type=Integer]",
+    "topics": ["waterpark/sensors/#"]
+  },
+
+  "event.atlas.southbound.mqtt~waterpark": {
+    "mqttTopics": ["waterpark/sensors/#"],
+    "mqtt.handler.id": "waterpark-broker",
+    "format": "json",
+    "name": "waterpark-mqtt"
   }
 }
