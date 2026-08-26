@@ -104,7 +104,7 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   publishes, per `docker-compose-jena.yml` in `eclipse-fennec/model.atlas`. Because the Atlas owns
   8080, `configs/sensinact.json` puts the runtime's own whiteboard on **8090**, so the local REST
   bases are `http://localhost:8090/event/rest/{sensinact,v1.1,ingest}` — otherwise the same file as
-  the docker one apart from `history.provider`, which only the docker copy sets. Note
+  the docker one. Note
   `sensinact.json` configures `sensinact.northbound.rest`, but `launch.bndrun` carries no
   `…northbound.rest` bundle, so that config is inert and `/event/rest/sensinact/**` answers the
   SensorThings 500 described below, not a provider list.
