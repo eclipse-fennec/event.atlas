@@ -3,21 +3,36 @@
   ":configurator:symbolic-name": "org.eclipse.fennec.event.atlas.mapping.local.config",
   ":configurator:version": "1.0.0",
 
-  /* Domain EPackages come from the Atlas, not from model bundles in the runtime. EAGER
-   * pre-fetches them at activation so the mapping sync below finds them; "release" is the
-   * jena scope's final stage. register.in.global.registry mirrors them into
-   * EPackage.Registry.INSTANCE, where EMF deserialization looks. */
+  /* Domain EPackages come from the Atlas, not from model bundles in the runtime, and so do the
+   * mappings and profiles below.
+   *
+   * The Atlas runs as a local container on 8080 (docker-compose-jena.yml in
+   * eclipse-fennec/model.atlas, published as-is). The runtime's own HTTP whiteboard therefore
+   * moves to 8090 in sensinact.json - the two cannot both own 8080.
+   *
+   * EAGER pre-fetches the whole scope at activation instead of resolving one nsURI at a time, so
+   * the mapping sync below finds the domain packages. Worth keeping even though the client now
+   * resolves the references a fetched EPackage makes into other packages: it turns a layered
+   * domain model (a shared base package plus vendor extensions) into a start-up cost rather than
+   * a first-payload one. register.in.global.registry mirrors them into EPackage.Registry.INSTANCE,
+   * where EMF deserialization looks.
+   *
+   * `eager.stages` is deliberately absent - empty is the default and exposes one stage-free
+   * registry per scope, resolving that scope's own final stage server-side, which is correct
+   * whatever a scope names its stages (the jena registries here stage draft -> release). */
   "org.eclipse.fennec.model.atlas.rest.client~jena": {
-    "base.uri": "http://localhost:8086/atlas/rest",
+    "base.uri": "http://localhost:8080/atlas/rest",
     "scope.allow.list": ["jena"],
     "default.scope": "jena",
     "mode": "EAGER",
     "eager.scopes": ["jena"],
-    "eager.stages": ["release"],
     "register.in.global.registry": true,
     "drift.check.interval.ms": 10000
   },
 
+  /* Both file providers carry no `locations`: an empty list is a valid, empty initial state,
+   * and it exists only to satisfy each registry's `initialProvider.target`. Locally all content
+   * comes from the Atlas providers below. */
   "FileEObjectProvider~mappings": {
     "emf.eobject.provider.name": "mapping-files"
   },
@@ -25,6 +40,18 @@
   "EObjectRegistry~mappings": {
     "name": "sensinact-mappings",
     "initialProvider.target": "(emf.eobject.provider.name=mapping-files)"
+  },
+
+  "FileEObjectProvider~profiles": {
+    "emf.eobject.provider.name": "profile-files"
+  },
+
+  /* Without this registry MappingProfileRegistryImpl never binds, and every mapping carrying a
+   * `profile` reference is skipped rather than registered profile-less - the profile decides
+   * provider identity, so ProviderMappingRegistryImpl.resolveProfile refuses to guess. */
+  "EObjectRegistry~profiles": {
+    "name": "sensinact-profiles",
+    "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
   },
 
   "AtlasEObjectProvider~jena": {
@@ -39,6 +66,19 @@
       "https://datainmotion.de/demo/m5airq/1.0",
       "http://data-in-motion.biz/waterparc/domain"
     ],
+    "refresh.interval.ms": 60000
+  },
+
+  /* Profiles come from their own Atlas registry: `sensinactmapping` pins root.eclass.uri to
+   * ProviderMapping, so a MappingProfile cannot live there. `key.feature` is profileId, which is
+   * what a mapping's profile proxy fragment resolves against. */
+  "AtlasEObjectProvider~jenaProfiles": {
+    "atlasScope.target": "(atlas.scope=jena)",
+    "writer.target": "(emf.eobject.registry.name=sensinact-profiles)",
+    "emf.eobject.provider.name": "atlas-jena-profiles",
+    "registries": ["sensinactprofile"],
+    "key.feature": "profileId",
+    "required.nsuris": ["https://fennec.eclipse.org/event.atlas/mapping/1.0"],
     "refresh.interval.ms": 60000
   },
 

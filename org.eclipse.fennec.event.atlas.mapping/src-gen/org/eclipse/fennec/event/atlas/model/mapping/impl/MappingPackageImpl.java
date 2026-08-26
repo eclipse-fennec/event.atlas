@@ -52,6 +52,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ProfileService;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy;
 import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimeThrottleChangeRule;
@@ -240,6 +241,13 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	private EClass deletionRuleEClass = null;
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	private EClass referenceResourceBindingEClass = null;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -1206,6 +1214,16 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
+	public EReference getReferenceMapping_Bindings() {
+		return (EReference)referenceMappingEClass.getEStructuralFeatures().get(4);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public EClass getPersistenceRuleRegistry() {
 		return persistenceRuleRegistryEClass;
 	}
@@ -1436,6 +1454,56 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
+	public EClass getReferenceResourceBinding() {
+		return referenceResourceBindingEClass;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getReferenceResourceBinding_Attributes() {
+		return (EReference)referenceResourceBindingEClass.getEStructuralFeatures().get(0);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getReferenceResourceBinding_ChangeRule() {
+		return (EReference)referenceResourceBindingEClass.getEStructuralFeatures().get(1);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getReferenceResourceBinding_DeletionRule() {
+		return (EReference)referenceResourceBindingEClass.getEStructuralFeatures().get(2);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getReferenceResourceBinding_Unit() {
+		return (EAttribute)referenceResourceBindingEClass.getEStructuralFeatures().get(3);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public EEnum getTimestampStrategy() {
 		return timestampStrategyEEnum;
 	}
@@ -1630,6 +1698,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEAttribute(referenceMappingEClass, REFERENCE_MAPPING__EXCLUDE);
 		createEReference(referenceMappingEClass, REFERENCE_MAPPING__REFERENCE_MAPPINGS);
 		createEReference(referenceMappingEClass, REFERENCE_MAPPING__TARGET_ECLASS);
+		createEReference(referenceMappingEClass, REFERENCE_MAPPING__BINDINGS);
 
 		persistenceRuleRegistryEClass = createEClass(PERSISTENCE_RULE_REGISTRY);
 		createEReference(persistenceRuleRegistryEClass, PERSISTENCE_RULE_REGISTRY__CHANGE_RULES);
@@ -1661,6 +1730,12 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEAttribute(deletionRuleEClass, DELETION_RULE__CLEANUP_INTERVAL);
 		createEAttribute(deletionRuleEClass, DELETION_RULE__CLEANUP_INTERVAL_UNIT);
 		createEAttribute(deletionRuleEClass, DELETION_RULE__MAX_COUNT);
+
+		referenceResourceBindingEClass = createEClass(REFERENCE_RESOURCE_BINDING);
+		createEReference(referenceResourceBindingEClass, REFERENCE_RESOURCE_BINDING__ATTRIBUTES);
+		createEReference(referenceResourceBindingEClass, REFERENCE_RESOURCE_BINDING__CHANGE_RULE);
+		createEReference(referenceResourceBindingEClass, REFERENCE_RESOURCE_BINDING__DELETION_RULE);
+		createEAttribute(referenceResourceBindingEClass, REFERENCE_RESOURCE_BINDING__UNIT);
 
 		// Create enums
 		timestampStrategyEEnum = createEEnum(TIMESTAMP_STRATEGY);
@@ -1769,8 +1844,8 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEAttribute(getResourceMapping_Mid(), ecorePackage.getEString(), "mid", null, 1, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getResourceMapping_ExtraMetadata(), this.getStringToStringMap(), null, "extraMetadata", null, 0, -1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getResourceMapping_DescriptionMapping(), this.getNameMapping(), null, "descriptionMapping", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, IS_DERIVED, IS_ORDERED);
-		initEReference(getResourceMapping_ChangeRule(), this.getChangeRule(), null, "changeRule", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
-		initEReference(getResourceMapping_DeletionRule(), this.getDeletionRule(), null, "deletionRule", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getResourceMapping_ChangeRule(), this.getChangeRule(), null, "changeRule", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getResourceMapping_DeletionRule(), this.getDeletionRule(), null, "deletionRule", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		EOperation op = initEOperation(getResourceMapping__MapUnit__EObject_Function(), null, "mapUnit", 0, 1, IS_UNIQUE, IS_ORDERED);
 		addEParameter(op, ecorePackage.getEObject(), "eobject", 1, 1, IS_UNIQUE, IS_ORDERED);
@@ -1829,13 +1904,14 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEAttribute(getReferenceMapping_Exclude(), ecorePackage.getEBoolean(), "exclude", "true", 0, 1, ReferenceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getReferenceMapping_ReferenceMappings(), this.getReferenceMapping(), null, "referenceMappings", null, 0, -1, ReferenceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getReferenceMapping_TargetEClass(), ecorePackage.getEClass(), null, "targetEClass", null, 0, 1, ReferenceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getReferenceMapping_Bindings(), this.getReferenceResourceBinding(), null, "bindings", null, 0, -1, ReferenceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(persistenceRuleRegistryEClass, PersistenceRuleRegistry.class, "PersistenceRuleRegistry", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 		initEReference(getPersistenceRuleRegistry_ChangeRules(), this.getChangeRule(), null, "changeRules", null, 0, -1, PersistenceRuleRegistry.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getPersistenceRuleRegistry_DeletionRules(), this.getDeletionRule(), null, "deletionRules", null, 0, -1, PersistenceRuleRegistry.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(persistenceRuleEClass, PersistenceRule.class, "PersistenceRule", IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
-		initEAttribute(getPersistenceRule_Id(), ecorePackage.getEString(), "id", null, 1, 1, PersistenceRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getPersistenceRule_Id(), ecorePackage.getEString(), "id", null, 0, 1, PersistenceRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getPersistenceRule_Name(), ecorePackage.getEString(), "name", null, 0, 1, PersistenceRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getPersistenceRule_Description(), ecorePackage.getEString(), "description", null, 0, 1, PersistenceRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
@@ -1860,6 +1936,12 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEAttribute(getDeletionRule_CleanupInterval(), ecorePackage.getEIntegerObject(), "cleanupInterval", null, 0, 1, DeletionRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getDeletionRule_CleanupIntervalUnit(), this.getDurationUnit(), "cleanupIntervalUnit", null, 0, 1, DeletionRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getDeletionRule_MaxCount(), ecorePackage.getEIntegerObject(), "maxCount", null, 0, 1, DeletionRule.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+
+		initEClass(referenceResourceBindingEClass, ReferenceResourceBinding.class, "ReferenceResourceBinding", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
+		initEReference(getReferenceResourceBinding_Attributes(), ecorePackage.getEAttribute(), null, "attributes", null, 0, -1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getReferenceResourceBinding_ChangeRule(), this.getChangeRule(), null, "changeRule", null, 0, 1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getReferenceResourceBinding_DeletionRule(), this.getDeletionRule(), null, "deletionRule", null, 0, 1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getReferenceResourceBinding_Unit(), ecorePackage.getEString(), "unit", null, 0, 1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		// Initialize enums and add enum literals
 		initEEnum(timestampStrategyEEnum, TimestampStrategy.class, "TimestampStrategy");

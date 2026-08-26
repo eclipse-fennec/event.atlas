@@ -57,8 +57,10 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-08-24: `./gradlew clean build` is green — **58 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus the plain-JUnit `ProviderModelMapperTest`.
+Baseline as of 2026-08-25: `./gradlew clean build` is green — **68 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus 39 plain-JUnit tests (`ProviderModelMapperTest`,
+`ChangeRuleFilterImplTest`, `BindingResolverTest`, `MappingProfileValidationTest`,
+`GeneratedResourceValidationTest`).
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -95,12 +97,21 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
 ```
 
 - `launch.bndrun` — dev playground: mapping engine + SensiNact gateway + Gogo shell + the
-  Model Atlas client (`local.config` points it at `http://localhost:8086/atlas/rest`, scope
-  `jena`) + the history store. It does **not** carry `…mapping.test.component` or any domain
-  model any more — add both to `-runrequires` (and re-resolve) if you want the simulator to
-  push, otherwise the mapping's `providerClasses` stay unresolved. Its `configs/sensinact.json` is the same
-  file as the docker one except that the hosted SensorThings MQTT broker defaults to **2883**,
-  so it does not fight a local broker on 1883 — same `/event/rest/{sensinact,v1.1}` bases.
+  Model Atlas client + the history store. It does **not** carry `…mapping.test.component` or any
+  domain model any more — add both to `-runrequires` (and re-resolve) if you want the simulator to
+  push, otherwise the mapping's `providerClasses` stay unresolved. `local.config` points the client
+  at `http://localhost:8080/atlas/rest`, scope `jena` — where the model.atlas jena container
+  publishes, per `docker-compose-jena.yml` in `eclipse-fennec/model.atlas`. Because the Atlas owns
+  8080, `configs/sensinact.json` puts the runtime's own whiteboard on **8090**, so the local REST
+  bases are `http://localhost:8090/event/rest/{sensinact,v1.1,ingest}` — otherwise the same file as
+  the docker one. Note
+  `sensinact.json` configures `sensinact.northbound.rest`, but `launch.bndrun` carries no
+  `…northbound.rest` bundle, so that config is inert and `/event/rest/sensinact/**` answers the
+  SensorThings 500 described below, not a provider list.
+  It also feeds **two** EObject registries from the Atlas:
+  `sensinact-mappings` from the `sensinactmapping` atlas registry (key `mid`) and
+  `sensinact-profiles` from `sensinactprofile` (key `profileId`) — the profiles registry is not
+  optional, since a mapping whose profile cannot be resolved is skipped entirely.
 - `eventatlas.runtime_docker.bndrun` — self-contained image runtime: engine + gateway +
   northbound REST + the SensorThings v1.1 REST gateway and MQTT broker; mappings/profiles read
   from XMI files under `/opt/eventatlas/runtime` **and** optionally from a Model Atlas; no
@@ -176,11 +187,29 @@ Core concepts, all expressed as XMI instances of that metamodel:
 - **`MappingProfile`** — a reusable *target* structure several vendor mappings conform to
   (`providerStrategy` `SEPARATE` vs `UNIFIED`), keyed by `profileId`; the profile registry
   validates conformance against `required` / `expectedType` / `expectedUnit`.
-- **Persistence rules** — `PersistenceRuleRegistry` holds reusable `ChangeRule` subtypes
-  (percentage / absolute / count / time-throttle) and `DeletionRule`s that `ResourceMapping`s
-  reference by id. **Model-only today**: the enforcing notification proxy is a planned separate
-  component — design in `docs/WP-SN-2-persistence-rules-plan.md` (it also documents why a
-  transparent interceptor on SensiNact's fan-out typed-event bus cannot work).
+- **Persistence rules** — `ChangeRule` subtypes (percentage / absolute / count / time-throttle)
+  and `DeletionRule`, **contained** by the `ResourceMapping` or `ReferenceResourceBinding` that
+  uses them. Since 2026-08-25 they are written inline, not shared by reference: a mapping
+  carries its rules wherever it travels (a Model Atlas included), at the cost of editing a
+  threshold in every copy. `PersistenceRuleRegistry` survives as a *catalogue* container —
+  nothing reads it, and `model/examples/persistence-rules.xmi` says so; don't put it in a
+  runtime's mappings directory. An old-style `href` to a rule in another document leaves an
+  unresolved proxy whose parameters are all null; `ChangeRuleFilterImpl` detects that and pushes
+  unfiltered with a warning rather than applying a zero threshold.
+  A `ReferenceMapping` gives rules to its auto-generated resources through `bindings`
+  (`ReferenceResourceBinding`: `attributes` — empty means all — plus `changeRule`,
+  `deletionRule`, `unit`), resolved at registration time, nearest declaration winning over an
+  inherited one. **The binding's rule must be `EcoreUtil.copy`-ed onto each generated resource**
+  — containment allows one container, so assigning it would move it out of the binding and
+  leave a single resource with a rule (guarded by `ChangeRuleFilterTest`).
+  **`changeRule` elements need an `xsi:type`** — `ChangeRule` is abstract, so EMF has no class
+  to instantiate without one, exactly like `featurePath`.
+  **Change rules are enforced at ingest, deletion rules are still model-only.** The rules
+  describe what the *history provider* should persist; until it can apply them itself,
+  `ChangeRuleFilter` applies the change rules on the way into the twin — which also freezes the
+  live value at the last accepted one (see below). The intended enforcement point, and why a
+  transparent interceptor on SensiNact's fan-out typed-event bus cannot work, is in
+  `docs/WP-SN-2-persistence-rules-plan.md`.
 
 ## Runtime layering
 
@@ -197,6 +226,28 @@ important thing to know, and the part that changed most recently:
   validates each entry, indexes it by `providerClasses` and builds the provider model in the
   twin. `MappingProfileRegistryImpl` does the same against **`sensinact-profiles`** (keys =
   `profileId`).
+- **A mapping's `profile` reference is resolved through the profile registry.** `profile` is
+  non-containment, i.e. a reference into another document, which a mapping delivered from a
+  Model Atlas does not have (the atlas hands over standalone roots, and its fallback resolves
+  *EPackages*, not instance documents). Since `MappingProfile.profileId` is an EMF ID, the
+  proxy's URI fragment *is* the profile id, so `ProviderMappingRegistryImpl.validMapping` looks
+  it up in `MappingProfileRegistry` and replaces the reference. A profile that cannot be found
+  **skips the mapping** rather than registering it profile-less — the profile decides provider
+  identity (`providerStrategy` `UNIFIED`), so carrying on would push data to the wrong provider.
+  Storing a `MappingProfile` in a Model Atlas additionally needs its own atlas registry: the
+  `sensinactmapping` registry pins `root.eclass.uri` to `ProviderMapping` (tracked in
+  `eclipse-fennec/model.atlas`).
+- **Resources generated from a `ReferenceMapping` are expanded before anything reads them.**
+  `ProviderModelSensinactMapper.registerModelMapping` runs `generateReferencedResources` first,
+  so profile validation and the twin model both see `temporaryResources`; generation clears
+  before regenerating, and is no longer hidden inside `mapService` (which only runs while the
+  twin provider does not exist yet).
+- **A resource's unit has two sources**, and `MappingAnnotations.effectiveUnit` is the only
+  place that decides between them: the `unit` field first, then the `sensinact.mapping`
+  annotation — which is how a domain `.ecore` supplies units for generated resources, since
+  their annotations are copied off the source attribute. Both the twin metadata and profile
+  validation go through it; reading only the field made every annotation-supplied unit look
+  like a profile mismatch.
 - Content reaches those registries through registry *providers*: emf.osgi's
   `FileEObjectProvider` for local XMI directories, `AtlasEObjectProvider` for a Model Atlas, or
   programmatically via `registerModelMapping` (what the OSGi tests do). See the two
@@ -205,6 +256,20 @@ important thing to know, and the part that changed most recently:
   southbound connectors: receive a payload, deserialize it to an EObject, push. Lookup keys on
   **EClass identity**, so incoming instances must come from the same `EPackage` instance the
   mappings resolved their `providerClasses` against.
+- **`ChangeRuleFilter`** (`ChangeRuleFilterImpl`, config pid
+  `sensinact.mapping.changerule.filter`, `enabled=true` by default) is consulted by
+  `ValueMapperImpl.mapSingleResource` immediately before `resource.setValue`, and drops a value
+  its `ResourceMapping`'s `ChangeRule` rejects. It is *stateful* — last accepted value, its
+  timestamp and a notification counter per `mappingMid/providerId/serviceMid/resourceMid` —
+  because a fresh `ValueMapperImpl` is created per push; comparisons are against the last
+  *accepted* value, so a slow drift is not filtered away one step at a time, and the first value
+  of a resource is always accepted. Time throttling measures the *payload's* timestamp, not
+  arrival time. An inapplicable rule (numeric rule on a non-numeric resource) accepts and warns
+  once rather than dropping. Wired optionally and dynamically into `InstancePusherImpl` (which
+  passes it to `ValueMapperFactory.createValueMapper`) and into `ProviderMappingRegistryImpl`,
+  which calls `reset(mid)` when a mapping is updated or removed so an edited rule starts from a
+  clean baseline. Nothing in it touches sensinact types — the bundle must still resolve without
+  the gateway. `enabled=false` restores unfiltered pushing.
 - `ValueMapper` / `ValueMapperFactory` — the plain-Java engine face: `mapInstance` (update the
   twin), `mapResourceValues` (extract only), `validateInstance`. `ValueMapperImpl` (~1100 lines,
   package `…mapping.impl`) does path navigation, collection handling, type conversion, timestamp

@@ -8,8 +8,10 @@
 	  "auth.policy": "ALLOW_ALL"
 	},
 
+	/* 8090, not 8080: a local Model Atlas container owns 8080 (see config.json's base.uri).
+	   Every REST base therefore starts at http://localhost:8090/event/rest. */
 	"org.apache.felix.http~eventHttp": {
-	    "org.osgi.service.http.port": "8080",
+	    "org.osgi.service.http.port": "8090",
 	    "org.osgi.service.http.host": "0.0.0.0",
 	    "org.apache.felix.http.context_path": "event/",
 	    "org.apache.felix.http.name": "Event Http Whiteboard",
@@ -30,6 +32,7 @@
 	},
 
     "sensinact.sensorthings.northbound.rest": {
+        "history.provider": "brokerHistory"
     },
 	
     "sensiNact.northbound.sensorthings.mqtt": {

@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:8906bc1c1e84644325f05a4d30472acb617cf4e14ff90daf8fef338639d164e5", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:0c2751f0b84184da40c7defd5d861085d0ed91ee9ba4bc97062765bbba93c57b", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -1006,7 +1006,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int RESOURCE_MAPPING__DESCRIPTION_MAPPING = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 6;
 
 	/**
-	 * The feature id for the '<em><b>Change Rule</b></em>' reference.
+	 * The feature id for the '<em><b>Change Rule</b></em>' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
@@ -1015,7 +1015,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int RESOURCE_MAPPING__CHANGE_RULE = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 7;
 
 	/**
-	 * The feature id for the '<em><b>Deletion Rule</b></em>' reference.
+	 * The feature id for the '<em><b>Deletion Rule</b></em>' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
@@ -1725,13 +1725,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int REFERENCE_MAPPING__TARGET_ECLASS = FEATURE_MAPPING_FEATURE_COUNT + 3;
 
 	/**
+	 * The feature id for the '<em><b>Bindings</b></em>' containment reference list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_MAPPING__BINDINGS = FEATURE_MAPPING_FEATURE_COUNT + 4;
+
+	/**
 	 * The number of structural features of the '<em>Reference Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int REFERENCE_MAPPING_FEATURE_COUNT = FEATURE_MAPPING_FEATURE_COUNT + 4;
+	int REFERENCE_MAPPING_FEATURE_COUNT = FEATURE_MAPPING_FEATURE_COUNT + 5;
 
 	/**
 	 * The number of operations of the '<em>Reference Mapping</em>' class.
@@ -2264,6 +2273,70 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int DELETION_RULE_OPERATION_COUNT = PERSISTENCE_RULE_OPERATION_COUNT + 0;
 
 	/**
+	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl <em>Reference Resource Binding</em>}' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getReferenceResourceBinding()
+	 * @generated
+	 */
+	int REFERENCE_RESOURCE_BINDING = 25;
+
+	/**
+	 * The feature id for the '<em><b>Attributes</b></em>' reference list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING__ATTRIBUTES = 0;
+
+	/**
+	 * The feature id for the '<em><b>Change Rule</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING__CHANGE_RULE = 1;
+
+	/**
+	 * The feature id for the '<em><b>Deletion Rule</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING__DELETION_RULE = 2;
+
+	/**
+	 * The feature id for the '<em><b>Unit</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING__UNIT = 3;
+
+	/**
+	 * The number of structural features of the '<em>Reference Resource Binding</em>' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING_FEATURE_COUNT = 4;
+
+	/**
+	 * The number of operations of the '<em>Reference Resource Binding</em>' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING_OPERATION_COUNT = 0;
+
+	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}' enum.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -2271,7 +2344,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getTimestampStrategy()
 	 * @generated
 	 */
-	int TIMESTAMP_STRATEGY = 25;
+	int TIMESTAMP_STRATEGY = 26;
 
 	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy <em>Provider Strategy</em>}' enum.
@@ -2281,7 +2354,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getProviderStrategy()
 	 * @generated
 	 */
-	int PROVIDER_STRATEGY = 26;
+	int PROVIDER_STRATEGY = 27;
 
 	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.DurationUnit <em>Duration Unit</em>}' enum.
@@ -2291,7 +2364,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getDurationUnit()
 	 * @generated
 	 */
-	int DURATION_UNIT = 27;
+	int DURATION_UNIT = 28;
 
 	/**
 	 * The meta object id for the '<em>EInstant</em>' data type.
@@ -2301,7 +2374,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getEInstant()
 	 * @generated
 	 */
-	int EINSTANT = 28;
+	int EINSTANT = 29;
 
 	/**
 	 * The meta object id for the '<em>Java String Function</em>' data type.
@@ -2311,7 +2384,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getJavaStringFunction()
 	 * @generated
 	 */
-	int JAVA_STRING_FUNCTION = 29;
+	int JAVA_STRING_FUNCTION = 30;
 
 	/**
 	 * The meta object id for the '<em>Java Instant Function</em>' data type.
@@ -2321,7 +2394,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getJavaInstantFunction()
 	 * @generated
 	 */
-	int JAVA_INSTANT_FUNCTION = 30;
+	int JAVA_INSTANT_FUNCTION = 31;
 
 	/**
 	 * The meta object id for the '<em>Java Object Function</em>' data type.
@@ -2331,7 +2404,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getJavaObjectFunction()
 	 * @generated
 	 */
-	int JAVA_OBJECT_FUNCTION = 31;
+	int JAVA_OBJECT_FUNCTION = 32;
 
 
 	/**
@@ -2800,10 +2873,10 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getResourceMapping_DescriptionMapping();
 
 	/**
-	 * Returns the meta object for the reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule <em>Change Rule</em>}'.
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule <em>Change Rule</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @return the meta object for the reference '<em>Change Rule</em>'.
+	 * @return the meta object for the containment reference '<em>Change Rule</em>'.
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule()
 	 * @see #getResourceMapping()
 	 * @generated
@@ -2811,10 +2884,10 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getResourceMapping_ChangeRule();
 
 	/**
-	 * Returns the meta object for the reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule <em>Deletion Rule</em>}'.
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule <em>Deletion Rule</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @return the meta object for the reference '<em>Deletion Rule</em>'.
+	 * @return the meta object for the containment reference '<em>Deletion Rule</em>'.
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule()
 	 * @see #getResourceMapping()
 	 * @generated
@@ -3252,6 +3325,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getReferenceMapping_TargetEClass();
 
 	/**
+	 * Returns the meta object for the containment reference list '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping#getBindings <em>Bindings</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference list '<em>Bindings</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping#getBindings()
+	 * @see #getReferenceMapping()
+	 * @generated
+	 */
+	EReference getReferenceMapping_Bindings();
+
+	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.PersistenceRuleRegistry <em>Persistence Rule Registry</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -3495,6 +3579,60 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 */
 	EAttribute getDeletionRule_MaxCount();
+
+	/**
+	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding <em>Reference Resource Binding</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for class '<em>Reference Resource Binding</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding
+	 * @generated
+	 */
+	EClass getReferenceResourceBinding();
+
+	/**
+	 * Returns the meta object for the reference list '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getAttributes <em>Attributes</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the reference list '<em>Attributes</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getAttributes()
+	 * @see #getReferenceResourceBinding()
+	 * @generated
+	 */
+	EReference getReferenceResourceBinding_Attributes();
+
+	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getChangeRule <em>Change Rule</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Change Rule</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getChangeRule()
+	 * @see #getReferenceResourceBinding()
+	 * @generated
+	 */
+	EReference getReferenceResourceBinding_ChangeRule();
+
+	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getDeletionRule <em>Deletion Rule</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Deletion Rule</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getDeletionRule()
+	 * @see #getReferenceResourceBinding()
+	 * @generated
+	 */
+	EReference getReferenceResourceBinding_DeletionRule();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getUnit <em>Unit</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Unit</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getUnit()
+	 * @see #getReferenceResourceBinding()
+	 * @generated
+	 */
+	EAttribute getReferenceResourceBinding_Unit();
 
 	/**
 	 * Returns the meta object for enum '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}'.
@@ -3954,7 +4092,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference RESOURCE_MAPPING__DESCRIPTION_MAPPING = eINSTANCE.getResourceMapping_DescriptionMapping();
 
 		/**
-		 * The meta object literal for the '<em><b>Change Rule</b></em>' reference feature.
+		 * The meta object literal for the '<em><b>Change Rule</b></em>' containment reference feature.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
 		 * @generated
@@ -3962,7 +4100,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference RESOURCE_MAPPING__CHANGE_RULE = eINSTANCE.getResourceMapping_ChangeRule();
 
 		/**
-		 * The meta object literal for the '<em><b>Deletion Rule</b></em>' reference feature.
+		 * The meta object literal for the '<em><b>Deletion Rule</b></em>' containment reference feature.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
 		 * @generated
@@ -4308,6 +4446,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference REFERENCE_MAPPING__TARGET_ECLASS = eINSTANCE.getReferenceMapping_TargetEClass();
 
 		/**
+		 * The meta object literal for the '<em><b>Bindings</b></em>' containment reference list feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference REFERENCE_MAPPING__BINDINGS = eINSTANCE.getReferenceMapping_Bindings();
+
+		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.PersistenceRuleRegistryImpl <em>Persistence Rule Registry</em>}' class.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
@@ -4506,6 +4652,48 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EAttribute DELETION_RULE__MAX_COUNT = eINSTANCE.getDeletionRule_MaxCount();
+
+		/**
+		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl <em>Reference Resource Binding</em>}' class.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl
+		 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getReferenceResourceBinding()
+		 * @generated
+		 */
+		EClass REFERENCE_RESOURCE_BINDING = eINSTANCE.getReferenceResourceBinding();
+
+		/**
+		 * The meta object literal for the '<em><b>Attributes</b></em>' reference list feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference REFERENCE_RESOURCE_BINDING__ATTRIBUTES = eINSTANCE.getReferenceResourceBinding_Attributes();
+
+		/**
+		 * The meta object literal for the '<em><b>Change Rule</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference REFERENCE_RESOURCE_BINDING__CHANGE_RULE = eINSTANCE.getReferenceResourceBinding_ChangeRule();
+
+		/**
+		 * The meta object literal for the '<em><b>Deletion Rule</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference REFERENCE_RESOURCE_BINDING__DELETION_RULE = eINSTANCE.getReferenceResourceBinding_DeletionRule();
+
+		/**
+		 * The meta object literal for the '<em><b>Unit</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute REFERENCE_RESOURCE_BINDING__UNIT = eINSTANCE.getReferenceResourceBinding_Unit();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}' enum.

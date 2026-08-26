@@ -32,6 +32,7 @@ import org.eclipse.emf.ecore.util.InternalEList;
 
 import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
 import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding;
 
 /**
  * <!-- begin-user-doc -->
@@ -45,6 +46,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceMappingImpl#isExclude <em>Exclude</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceMappingImpl#getReferenceMappings <em>Reference Mappings</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceMappingImpl#getTargetEClass <em>Target EClass</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceMappingImpl#getBindings <em>Bindings</em>}</li>
  * </ul>
  *
  * @generated
@@ -99,6 +101,16 @@ public class ReferenceMappingImpl extends FeatureMappingImpl implements Referenc
 	 * @ordered
 	 */
 	protected EClass targetEClass;
+
+	/**
+	 * The cached value of the '{@link #getBindings() <em>Bindings</em>}' containment reference list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getBindings()
+	 * @generated
+	 * @ordered
+	 */
+	protected EList<ReferenceResourceBinding> bindings;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -214,10 +226,25 @@ public class ReferenceMappingImpl extends FeatureMappingImpl implements Referenc
 	 * @generated
 	 */
 	@Override
+	public EList<ReferenceResourceBinding> getBindings() {
+		if (bindings == null) {
+			bindings = new EObjectContainmentEList<ReferenceResourceBinding>(ReferenceResourceBinding.class, this, MappingPackage.REFERENCE_MAPPING__BINDINGS);
+		}
+		return bindings;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs) {
 		switch (featureID) {
 			case MappingPackage.REFERENCE_MAPPING__REFERENCE_MAPPINGS:
 				return ((InternalEList<?>)getReferenceMappings()).basicRemove(otherEnd, msgs);
+			case MappingPackage.REFERENCE_MAPPING__BINDINGS:
+				return ((InternalEList<?>)getBindings()).basicRemove(otherEnd, msgs);
 		}
 		return super.eInverseRemove(otherEnd, featureID, msgs);
 	}
@@ -239,6 +266,8 @@ public class ReferenceMappingImpl extends FeatureMappingImpl implements Referenc
 			case MappingPackage.REFERENCE_MAPPING__TARGET_ECLASS:
 				if (resolve) return getTargetEClass();
 				return basicGetTargetEClass();
+			case MappingPackage.REFERENCE_MAPPING__BINDINGS:
+				return getBindings();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -266,6 +295,10 @@ public class ReferenceMappingImpl extends FeatureMappingImpl implements Referenc
 			case MappingPackage.REFERENCE_MAPPING__TARGET_ECLASS:
 				setTargetEClass((EClass)newValue);
 				return;
+			case MappingPackage.REFERENCE_MAPPING__BINDINGS:
+				getBindings().clear();
+				getBindings().addAll((Collection<? extends ReferenceResourceBinding>)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -290,6 +323,9 @@ public class ReferenceMappingImpl extends FeatureMappingImpl implements Referenc
 			case MappingPackage.REFERENCE_MAPPING__TARGET_ECLASS:
 				setTargetEClass((EClass)null);
 				return;
+			case MappingPackage.REFERENCE_MAPPING__BINDINGS:
+				getBindings().clear();
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -310,6 +346,8 @@ public class ReferenceMappingImpl extends FeatureMappingImpl implements Referenc
 				return referenceMappings != null && !referenceMappings.isEmpty();
 			case MappingPackage.REFERENCE_MAPPING__TARGET_ECLASS:
 				return targetEClass != null;
+			case MappingPackage.REFERENCE_MAPPING__BINDINGS:
+				return bindings != null && !bindings.isEmpty();
 		}
 		return super.eIsSet(featureID);
 	}

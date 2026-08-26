@@ -176,54 +176,55 @@ public interface ResourceMapping extends EObject, EAttribute {
 	void setDescriptionMapping(NameMapping value);
 
 	/**
-	 * Returns the value of the '<em><b>Change Rule</b></em>' reference.
+	 * Returns the value of the '<em><b>Change Rule</b></em>' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Optional reference to a reusable change rule that decides whether a value change of this
-	 * resource is forwarded to the history provider. Non-containment: multiple resources may
-	 * reference the same shared rule owned by a PersistenceRuleRegistry.
+	 * Optional change rule deciding whether a value change of this resource is stored.
+	 * Contained: the rule belongs to this resource alone. Two resources that behave alike each carry
+	 * their own copy, so changing a threshold means editing every resource that uses it.
+	 * Because the declared type is abstract, an XMI element must name the concrete rule, e.g.
+	 * xsi:type="mapping:PercentageChangeRule".
 	 * <!-- end-model-doc -->
-	 * @return the value of the '<em>Change Rule</em>' reference.
+	 * @return the value of the '<em>Change Rule</em>' containment reference.
 	 * @see #setChangeRule(ChangeRule)
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getResourceMapping_ChangeRule()
-	 * @model
+	 * @model containment="true"
 	 * @generated
 	 */
 	ChangeRule getChangeRule();
 
 	/**
-	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule <em>Change Rule</em>}' reference.
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule <em>Change Rule</em>}' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @param value the new value of the '<em>Change Rule</em>' reference.
+	 * @param value the new value of the '<em>Change Rule</em>' containment reference.
 	 * @see #getChangeRule()
 	 * @generated
 	 */
 	void setChangeRule(ChangeRule value);
 
 	/**
-	 * Returns the value of the '<em><b>Deletion Rule</b></em>' reference.
+	 * Returns the value of the '<em><b>Deletion Rule</b></em>' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Optional reference to a reusable deletion rule that controls purging of this resource's
-	 * stored history data. Non-containment: multiple resources may reference the same shared rule
-	 * owned by a PersistenceRuleRegistry.
+	 * Optional deletion rule controlling purging of this resource's stored history data.
+	 * Contained: the rule belongs to this resource alone. Nothing enforces deletion rules yet.
 	 * <!-- end-model-doc -->
-	 * @return the value of the '<em>Deletion Rule</em>' reference.
+	 * @return the value of the '<em>Deletion Rule</em>' containment reference.
 	 * @see #setDeletionRule(DeletionRule)
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getResourceMapping_DeletionRule()
-	 * @model
+	 * @model containment="true"
 	 * @generated
 	 */
 	DeletionRule getDeletionRule();
 
 	/**
-	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule <em>Deletion Rule</em>}' reference.
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule <em>Deletion Rule</em>}' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @param value the new value of the '<em>Deletion Rule</em>' reference.
+	 * @param value the new value of the '<em>Deletion Rule</em>' containment reference.
 	 * @see #getDeletionRule()
 	 * @generated
 	 */

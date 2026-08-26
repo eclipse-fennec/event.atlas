@@ -505,18 +505,53 @@ southbound's function registry.
 
 ## Persistence rules (history control)
 
-> **Status: model support in place; enforcement is a separate upcoming component.** The
-> mapping model carries the rules; a *notification proxy* (planned) reads them to decide what
-> the SensiNact history provider actually stores.
+> **Status: change rules are enforced on the way *into* the twin, as an interim measure.**
+> The rules describe what the SensiNact *history provider* should persist, and the intended
+> enforcement is a notification proxy between the twin and the history store (see
+> `WP-SN-2-persistence-rules-plan.md`). Until that exists, the mapping engine applies the
+> change rules when a payload is mapped: a value its rule rejects never reaches the resource.
+>
+> **This also freezes the twin's live value at the last accepted one** — under
+> `TimeThrottleChangeRule` a northbound read returns a value up to one interval old, and under
+> `CountChangeRule` one of every *n* readings. Set `enabled=false` on the configuration pid
+> `sensinact.mapping.changerule.filter` to push every value again.
+>
+> **Deletion rules are still model-only.** Nothing purges history yet; there is no purge API
+> to call.
 
 By default the history provider persists *every* value change of *every* resource. Persistence
 rules let you control this **per resource**: how often a change is worth storing, and how long
-to keep it. Rules are **reusable** — defined once in a registry and referenced by many
-resources.
+to keep it.
 
-### The registry (rules are defined once)
+A rule is **contained by the resource that uses it** — written inline, owned by that resource
+alone. Two resources that behave alike each carry their own copy, which means changing a
+threshold is an edit in every place that uses it. The upside is that a mapping is
+self-contained: it carries its rules wherever it travels, including through a Model Atlas,
+with nothing to resolve and nothing to deploy alongside it.
 
-Rules live in a `PersistenceRuleRegistry`, usually its own file. They are *contained* here:
+### Writing a rule on a resource
+
+```xml
+<resources mid="temperature" unit="F">
+  <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+  <valueFeature xsi:type="ecore:EAttribute" href="../ecowitt.ecore#//EcoWittWeather/temperaturOutdoor"/>
+  <changeRule   xsi:type="mapping:PercentageChangeRule" percentage="5.0"/>
+  <deletionRule retention="365" retentionUnit="DAYS" cleanupInterval="7" cleanupIntervalUnit="DAYS"/>
+</resources>
+```
+
+**`changeRule` needs an `xsi:type`.** Its declared type `ChangeRule` is abstract, so EMF has no
+class to instantiate without one and the file fails to load with *"Class 'ChangeRule' is not
+found or is abstract"* — the same rule that applies to `featurePath` and `valueFeature`.
+`deletionRule` is concrete and needs none.
+
+The optional `id`, `name` and `description` on a rule are documentation — they show up in log
+messages. Nothing resolves them: a rule is reached through its container, never by id.
+
+### A catalogue of rule shapes
+
+`PersistenceRuleRegistry` is a plain container for rules, useful for keeping the shapes an
+installation has agreed on in one file to copy from:
 
 ```xml
 <mapping:PersistenceRuleRegistry
@@ -532,26 +567,21 @@ Rules live in a `PersistenceRuleRegistry`, usually its own file. They are *conta
 </mapping:PersistenceRuleRegistry>
 ```
 
-### Binding rules to resources (shared, not copied)
+**Nothing reads that file.** It is not a source the runtime resolves against, and it must not
+go into a runtime's mappings directory — the mapping registry will report it as content it
+cannot use. `model/examples/EcoWittPersistenceMapping.xmi` shows the same rules written where
+they take effect.
 
-A `ResourceMapping` references a rule by id via non-containment — so temperature, humidity and
-water can all point at the *same* rule instance:
-
-```xml
-<resources mid="temperature" unit="F">
-  <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
-  <valueFeature xsi:type="ecore:EAttribute" href="../ecowitt.ecore#//EcoWittWeather/temperaturOutdoor"/>
-  <changeRule   href="persistence-rules.xmi#pct-5"/>
-  <deletionRule href="persistence-rules.xmi#keep-1y"/>
-</resources>
-```
-
-(Working pair: `model/examples/persistence-rules.xmi` + `model/examples/EcoWittPersistenceMapping.xmi`.)
+An `href` to a rule in another document is what the previous model wanted, and it now leaves an
+unresolved proxy behind. That proxy carries the rule's type but none of its parameters, so the
+runtime reports it as inapplicable and pushes the resource unfiltered rather than silently
+applying a zero threshold — the log message names the mapping, the resource and the href.
 
 ### Change rules — "store this change only if…"
 
-Each is a concrete subtype carrying exactly its parameter. Comparisons are against the **last
-stored** value, and the first value of a resource is always stored.
+Each is a concrete subtype carrying exactly its parameter, written inline on the resource or
+binding that uses it. Comparisons are against the **last stored** value, and the first value of
+a resource is always stored.
 
 | Type | Parameter | Stores when |
 |---|---|---|
@@ -559,6 +589,55 @@ stored** value, and the first value of a resource is always stored.
 | `AbsoluteChangeRule` | `delta` | the absolute change ≥ *delta* |
 | `CountChangeRule` | `n` | one out of every *n* notifications (`n=1` = every change) |
 | `TimeThrottleChangeRule` | `interval` + `intervalUnit` | at most once per interval (drops the in-between changes) |
+
+### Rules on a reference mapping (bindings)
+
+A `ReferenceMapping` generates one resource per attribute of the referenced type, so those
+resources exist nowhere in the XMI and there is no `ResourceMapping` to hang a rule on. The
+reference's **bindings** fill that gap: each binding names the attributes it applies to — the
+same way `filter` does — and carries their rule.
+
+```xml
+<referencedResource xsi:type="mapping:ReferenceMapping" collectionIndex="0" exclude="true">
+  <featurePath xsi:type="ecore:EReference" href="../weather.ecore#//WeatherReports/reports"/>
+  <targetEClass href="../weather.ecore#//MOSMIXSWeatherReport"/>
+
+  <!-- named attributes: their own rule, and a unit overriding the source annotation -->
+  <bindings unit="kn">
+    <attributes href="../weather.ecore#//MOSMIXSWeatherReport/windSpeed"/>
+    <changeRule xsi:type="mapping:PercentageChangeRule" percentage="5.0"/>
+  </bindings>
+
+  <!-- no attributes named: the default for everything else generated here -->
+  <bindings>
+    <changeRule xsi:type="mapping:TimeThrottleChangeRule" interval="10" intervalUnit="MINUTES"/>
+  </bindings>
+</referencedResource>
+```
+
+- A binding with an **empty `attributes` list** applies to every resource generated at that
+  level — the convention `filter` uses, and the way to declare a default for a whole reference.
+- Bindings **cascade into nested `referenceMappings`**, and the nearest declaration wins: a
+  binding on the nested mapping overrides one inherited from its parent.
+- `changeRule`, `deletionRule` and `unit` resolve **independently**, so a binding can override
+  the rule of one attribute and leave its unit to the level above.
+- An attribute named by two bindings resolves to the first; the duplicate is logged.
+
+Resolution happens when the resources are generated, so a generated resource is
+indistinguishable from a hand-written one by the time the engine reads it. A binding's rule is
+**copied** onto each resource it applies to, not shared with them — one binding is still the
+single place you edit it, which is what makes a binding worth using for a rule that covers
+many resources.
+
+**Pick scale-free rules for a default.** A binding without named attributes covers resources
+of mixed units and magnitudes — temperature, pressure, a counter. `PercentageChangeRule`,
+`CountChangeRule` and `TimeThrottleChangeRule` generalize over those; an `AbsoluteChangeRule`
+almost never does, since `delta="2.0"` means something different for each of them.
+
+`unit` is there for the cases the source model cannot cover: a domain `.ecore` you cannot
+annotate, or a mapping that publishes a different unit than the model declares (an attribute
+annotated `F` exposed as `C` after conversion). Otherwise a generated resource takes its unit
+from the source attribute's `sensinact.mapping` annotation, which is copied along with it.
 
 ### Deletion rules — retention & cleanup
 
@@ -635,7 +714,8 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 | `AdminMapping` | `friendlyName`/`friendlyNameFeature`, `latitude`/`latitudeRef` (+ longitude, elevation), `providerPackage` |
 | `NameMapping` | `name`, `featurePath`, `collectionIndex` |
 | `TimestampMapping` | `strategy` (`NOW`/`FEATURE`/`FUNCTION`), `hint`, `timestamp`, `featurePath` |
-| `ReferenceMapping` | `featurePath`, `targetEClass`, `filter`, `exclude`, `referenceMappings`, `collectionIndex` |
+| `ReferenceMapping` | `featurePath`, `targetEClass`, `filter`, `exclude`, `referenceMappings`, `collectionIndex`, `bindings` |
+| `ReferenceResourceBinding` | `attributes` (empty = all), `changeRule`, `deletionRule`, `unit` |
 | `FeatureMapping` (base) | `functionId`, `featurePath`, `collectionIndex`, `collectionFilter` |
 | `MappingProfile` | `profileId`, `name`, `version`, `providerStrategy`, `provider` |
 | `ProfileProvider` / `ProfileService` / `ProfileResource` / `ProfileAdmin` | `*Id`, `required`, `expectedType`, `expectedUnit`, `requiresLocation`, `requiresFriendlyName` |

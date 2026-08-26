@@ -199,14 +199,16 @@
         eType="#//StringToStringMap" containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="descriptionMapping" eType="#//NameMapping"
         derived="true"/>
-    <eStructuralFeatures xsi:type="ecore:EReference" name="changeRule" eType="#//ChangeRule">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="changeRule" eType="#//ChangeRule"
+        containment="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Optional reference to a reusable change rule that decides whether a value change of this&#xA;resource is forwarded to the history provider. Non-containment: multiple resources may&#xA;reference the same shared rule owned by a PersistenceRuleRegistry."/>
+        <details key="documentation" value="Optional change rule deciding whether a value change of this resource is stored.&#xA;Contained: the rule belongs to this resource alone. Two resources that behave alike each carry&#xA;their own copy, so changing a threshold means editing every resource that uses it.&#xA;Because the declared type is abstract, an XMI element must name the concrete rule, e.g.&#xA;xsi:type=&quot;mapping:PercentageChangeRule&quot;."/>
       </eAnnotations>
     </eStructuralFeatures>
-    <eStructuralFeatures xsi:type="ecore:EReference" name="deletionRule" eType="#//DeletionRule">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="deletionRule" eType="#//DeletionRule"
+        containment="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Optional reference to a reusable deletion rule that controls purging of this resource's&#xA;stored history data. Non-containment: multiple resources may reference the same shared rule&#xA;owned by a PersistenceRuleRegistry."/>
+        <details key="documentation" value="Optional deletion rule controlling purging of this resource's stored history data.&#xA;Contained: the rule belongs to this resource alone. Nothing enforces deletion rules yet."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>
@@ -330,6 +332,12 @@
         <details key="documentation" value="Optional specification of the concrete EClass to use for generating resources.&#xA;If not set, the declared type of the feature path's target will be used.&#xA;This is useful when the feature has a base type but you know instances will be of a specific subtype.&#xA;&#xA;Example: If 'reports' is declared as WeatherReport[] but you know instances are MOSMIXWeatherReport,&#xA;set targetEClass to MOSMIXWeatherReport to generate resources from its attributes."/>
       </eAnnotations>
     </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="bindings" upperBound="-1"
+        eType="#//ReferenceResourceBinding" containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Optional per-attribute bindings for the resources this reference mapping generates: they&#xA;attach persistence rules and metadata overrides to a subset of those resources.&#xA;&#xA;A binding with an empty 'attributes' list applies to every resource generated here and is&#xA;therefore the default for the whole reference - the same convention 'filter' uses, where an&#xA;empty list means &quot;all attributes&quot;.&#xA;&#xA;Bindings cascade into nested reference mappings ('referenceMappings'): attributes are&#xA;addressed by globally unique EAttribute references, so a binding declared here can name an&#xA;attribute of a nested type. The nearest declaration wins - a binding on the nested mapping&#xA;overrides one declared here for the same attribute, and a nested default overrides this one."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EEnum" name="DurationUnit">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -343,7 +351,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="PersistenceRuleRegistry">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="Container that owns reusable persistence rules. Change rules and deletion rules are&#xA;contained (defined once) here and referenced from ResourceMapping via non-containment&#xA;references, so multiple resources can share the same rule instance."/>
+      <details key="documentation" value="A standalone container for persistence rules.&#xA;Nothing in the runtime reads it: rules are contained by the ResourceMapping or the&#xA;ReferenceResourceBinding that uses them, so a registry file is a catalogue to copy rules out&#xA;of - a place to keep the shapes an installation has agreed on - not a source the engine&#xA;resolves against. It is kept because a shared rule source may be wanted again later."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EReference" name="changeRules" upperBound="-1"
         eType="#//ChangeRule" containment="true"/>
@@ -352,12 +360,11 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="PersistenceRule" abstract="true">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="Common base for reusable persistence rules. Identified by id so a ResourceMapping can&#xA;reference it (also across files)."/>
+      <details key="documentation" value="Common base for persistence rules. A rule is contained by the resource mapping or the&#xA;reference binding that uses it; id, name and description are documentation, not identity."/>
     </eAnnotations>
-    <eStructuralFeatures xsi:type="ecore:EAttribute" name="id" lowerBound="1" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
-        iD="true">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="id" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Unique identifier for this rule, used as the reference target from resources."/>
+        <details key="documentation" value="Optional label for this rule, useful in logs and when copying a rule out of a catalogue.&#xA;Nothing resolves it - a rule is reached through its container, not by id."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="name" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
@@ -417,6 +424,34 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="maxCount" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EIntegerObject">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Optional cap on the number of samples kept per resource."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ReferenceResourceBinding">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="Attaches persistence rules and metadata overrides to a subset of the resources that a&#xA;ReferenceMapping generates.&#xA;&#xA;A reference mapping generates one resource per attribute of the referenced type, so a single&#xA;rule on the reference itself would have to fit all of them - which it rarely does: wind speed&#xA;and temperature do not tolerate the same absolute delta. A binding names the attributes it&#xA;applies to and carries the settings for exactly those.&#xA;&#xA;Every setting resolves independently: for a generated resource, each feature is taken from the&#xA;most specific binding that sets it, and stays unset when no binding does. Resolution happens&#xA;when the resources are generated, so the mapping engine only ever reads these settings from the&#xA;generated ResourceMapping - it never looks at the binding itself."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="attributes" upperBound="-1"
+        eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EAttribute">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The attributes of the referenced type this binding applies to, referenced the same way as&#xA;ReferenceMapping.filter.&#xA;&#xA;An empty list makes the binding apply to every resource generated from the reference mapping,&#xA;which is how the default for a whole reference is declared.&#xA;&#xA;An attribute named by more than one binding at the same level resolves to the first binding&#xA;that names it; the duplicate is ignored and logged."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="changeRule" eType="#//ChangeRule"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Optional change rule for the selected resources, with the same meaning it has on&#xA;ResourceMapping.changeRule. Contained here, and copied onto every resource this binding&#xA;applies to - the resources get equal rules, not one shared rule."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="deletionRule" eType="#//DeletionRule"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Optional deletion rule for the selected resources, with the same meaning it has on&#xA;ResourceMapping.deletionRule. Contained here, and copied onto every resource this binding&#xA;applies to."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="unit" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Optional unit for the selected resources, applied as ResourceMapping.unit.&#xA;&#xA;A generated resource otherwise takes its unit from the source attribute's 'sensinact.mapping'&#xA;annotation, which is copied along with the attribute. Set this when that is not an option -&#xA;a source model that cannot be annotated - or when the mapping publishes a different unit than&#xA;the model declares, for instance an attribute annotated 'F' exposed as 'C' after conversion.&#xA;ResourceMapping.unit takes precedence over the annotation."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>

@@ -23,8 +23,8 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * Common base for reusable persistence rules. Identified by id so a ResourceMapping can
- * reference it (also across files).
+ * Common base for persistence rules. A rule is contained by the resource mapping or the
+ * reference binding that uses it; id, name and description are documentation, not identity.
  * <!-- end-model-doc -->
  *
  * <p>
@@ -47,12 +47,13 @@ public interface PersistenceRule extends EObject {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Unique identifier for this rule, used as the reference target from resources.
+	 * Optional label for this rule, useful in logs and when copying a rule out of a catalogue.
+	 * Nothing resolves it - a rule is reached through its container, not by id.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Id</em>' attribute.
 	 * @see #setId(String)
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getPersistenceRule_Id()
-	 * @model id="true" required="true"
+	 * @model
 	 * @generated
 	 */
 	String getId();

@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Reusable persistence rules (WP-SN-2).
+  A catalogue of persistence-rule shapes (WP-SN-2).
 
-  Rules are CONTAINED here (defined once) and referenced from resource mappings via
-  non-containment references, so several resources can share the same rule instance.
-  See EcoWittPersistenceMapping.xmi for the referencing side.
+  NOTHING READS THIS FILE. Rules are contained by the ResourceMapping or the
+  ReferenceResourceBinding that uses them, so this is a place to keep the shapes an
+  installation has agreed on and copy them into a mapping - not a source the runtime resolves
+  against. Do not put it in a runtime's mappings directory: the mapping registry will report it
+  as content it cannot use.
+
+  See EcoWittPersistenceMapping.xmi for the same rules written where they take effect.
 -->
 <mapping:PersistenceRuleRegistry
     xmi:version="2.0"

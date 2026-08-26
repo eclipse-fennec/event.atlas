@@ -116,7 +116,10 @@
 	org.eclipse.sensinact.gateway.southbound.history.timescale-provider;version='[0.0.2,0.0.3)',\
 	org.postgresql.jdbc;version='[42.7.13,42.7.14)',\
 	tx-control-provider-jdbc-local;version='[1.0.1,1.0.2)',\
-	tx-control-service-local;version='[1.0.1,1.0.2)'
+	tx-control-service-local;version='[1.0.1,1.0.2)',\
+	org.eclipse.sensinact.gateway.filters.resource.selector;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.filters.resource.selector.impl;version='[0.0.2,0.0.3)',\
+	org.osgi.service.cm;version='[1.6.1,1.6.2)'
 
 # org.eclipse.fennec.codec is the EMF JSON codec (the Resource.Factory for the `json` file
 # extension PayloadIngest selects for a JSON channel) - see eventatlas.runtime_docker.bndrun.

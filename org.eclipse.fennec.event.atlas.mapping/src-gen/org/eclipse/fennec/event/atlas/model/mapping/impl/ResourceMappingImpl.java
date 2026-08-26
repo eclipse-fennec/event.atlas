@@ -158,7 +158,7 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	protected NameMapping descriptionMapping;
 
 	/**
-	 * The cached value of the '{@link #getChangeRule() <em>Change Rule</em>}' reference.
+	 * The cached value of the '{@link #getChangeRule() <em>Change Rule</em>}' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @see #getChangeRule()
@@ -168,7 +168,7 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	protected ChangeRule changeRule;
 
 	/**
-	 * The cached value of the '{@link #getDeletionRule() <em>Deletion Rule</em>}' reference.
+	 * The cached value of the '{@link #getDeletionRule() <em>Deletion Rule</em>}' containment reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @see #getDeletionRule()
@@ -368,14 +368,6 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 */
 	@Override
 	public ChangeRule getChangeRule() {
-		if (changeRule != null && changeRule.eIsProxy()) {
-			InternalEObject oldChangeRule = (InternalEObject)changeRule;
-			changeRule = (ChangeRule)eResolveProxy(oldChangeRule);
-			if (changeRule != oldChangeRule) {
-				if (eNotificationRequired())
-					eNotify(new ENotificationImpl(this, Notification.RESOLVE, MappingPackage.RESOURCE_MAPPING__CHANGE_RULE, oldChangeRule, changeRule));
-			}
-		}
 		return changeRule;
 	}
 
@@ -384,8 +376,14 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 * <!-- end-user-doc -->
 	 * @generated
 	 */
-	public ChangeRule basicGetChangeRule() {
-		return changeRule;
+	public NotificationChain basicSetChangeRule(ChangeRule newChangeRule, NotificationChain msgs) {
+		ChangeRule oldChangeRule = changeRule;
+		changeRule = newChangeRule;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__CHANGE_RULE, oldChangeRule, newChangeRule);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
 	}
 
 	/**
@@ -395,10 +393,17 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 */
 	@Override
 	public void setChangeRule(ChangeRule newChangeRule) {
-		ChangeRule oldChangeRule = changeRule;
-		changeRule = newChangeRule;
-		if (eNotificationRequired())
-			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__CHANGE_RULE, oldChangeRule, changeRule));
+		if (newChangeRule != changeRule) {
+			NotificationChain msgs = null;
+			if (changeRule != null)
+				msgs = ((InternalEObject)changeRule).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.RESOURCE_MAPPING__CHANGE_RULE, null, msgs);
+			if (newChangeRule != null)
+				msgs = ((InternalEObject)newChangeRule).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.RESOURCE_MAPPING__CHANGE_RULE, null, msgs);
+			msgs = basicSetChangeRule(newChangeRule, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__CHANGE_RULE, newChangeRule, newChangeRule));
 	}
 
 	/**
@@ -408,14 +413,6 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 */
 	@Override
 	public DeletionRule getDeletionRule() {
-		if (deletionRule != null && deletionRule.eIsProxy()) {
-			InternalEObject oldDeletionRule = (InternalEObject)deletionRule;
-			deletionRule = (DeletionRule)eResolveProxy(oldDeletionRule);
-			if (deletionRule != oldDeletionRule) {
-				if (eNotificationRequired())
-					eNotify(new ENotificationImpl(this, Notification.RESOLVE, MappingPackage.RESOURCE_MAPPING__DELETION_RULE, oldDeletionRule, deletionRule));
-			}
-		}
 		return deletionRule;
 	}
 
@@ -424,8 +421,14 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 * <!-- end-user-doc -->
 	 * @generated
 	 */
-	public DeletionRule basicGetDeletionRule() {
-		return deletionRule;
+	public NotificationChain basicSetDeletionRule(DeletionRule newDeletionRule, NotificationChain msgs) {
+		DeletionRule oldDeletionRule = deletionRule;
+		deletionRule = newDeletionRule;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__DELETION_RULE, oldDeletionRule, newDeletionRule);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
 	}
 
 	/**
@@ -435,10 +438,17 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 */
 	@Override
 	public void setDeletionRule(DeletionRule newDeletionRule) {
-		DeletionRule oldDeletionRule = deletionRule;
-		deletionRule = newDeletionRule;
-		if (eNotificationRequired())
-			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__DELETION_RULE, oldDeletionRule, deletionRule));
+		if (newDeletionRule != deletionRule) {
+			NotificationChain msgs = null;
+			if (deletionRule != null)
+				msgs = ((InternalEObject)deletionRule).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.RESOURCE_MAPPING__DELETION_RULE, null, msgs);
+			if (newDeletionRule != null)
+				msgs = ((InternalEObject)newDeletionRule).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.RESOURCE_MAPPING__DELETION_RULE, null, msgs);
+			msgs = basicSetDeletionRule(newDeletionRule, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__DELETION_RULE, newDeletionRule, newDeletionRule));
 	}
 
 	/**
@@ -463,6 +473,10 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 		switch (featureID) {
 			case MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA:
 				return ((InternalEList<?>)getExtraMetadata()).basicRemove(otherEnd, msgs);
+			case MappingPackage.RESOURCE_MAPPING__CHANGE_RULE:
+				return basicSetChangeRule(null, msgs);
+			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
+				return basicSetDeletionRule(null, msgs);
 		}
 		return super.eInverseRemove(otherEnd, featureID, msgs);
 	}
@@ -493,11 +507,9 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 				if (resolve) return getDescriptionMapping();
 				return basicGetDescriptionMapping();
 			case MappingPackage.RESOURCE_MAPPING__CHANGE_RULE:
-				if (resolve) return getChangeRule();
-				return basicGetChangeRule();
+				return getChangeRule();
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
-				if (resolve) return getDeletionRule();
-				return basicGetDeletionRule();
+				return getDeletionRule();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}

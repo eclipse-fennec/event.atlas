@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
+import org.eclipse.emf.ecore.InternalEObject;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryListener;
@@ -162,7 +163,20 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
         }
         
         MappingProfile profile = mapping.getProfile();
+        if (profile.eIsProxy()) {
+            // An unresolved reference: the profile document was not reachable and nothing
+            // resolved the proxy through this registry. Its features are all null, so there is
+            // nothing to validate against - report it instead of dereferencing one.
+            result.addError("Profile reference of mapping '" + mapping.getMid() + "' is unresolved ("
+                    + ((InternalEObject) profile).eProxyURI() + ") - the profile is neither reachable as a "
+                    + "document nor registered");
+            return result;
+        }
         ProfileProvider profileProvider = profile.getProvider();
+        if (profileProvider == null) {
+            result.addError("Profile '" + profile.getProfileId() + "' declares no provider structure");
+            return result;
+        }
         
         // Validate admin service
         if (profileProvider.getAdmin() != null) {
@@ -231,7 +245,14 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
     private void validateServiceResources(ServiceMapping mappingService, ProfileService profileService, ValidationResultImpl result) {
         Map<String, ResourceMapping> mappingResources = new ConcurrentHashMap<>();
         
-        // Index mapping resources by ID
+        // Index mapping resources by ID. Resources generated from a ReferenceMapping exist only
+        // in temporaryResources, and leaving them out meant a service built from a reference
+        // was not validated at all: a required resource that *is* generated read as missing,
+        // and no type or unit was ever compared. Explicit resources are indexed second so they
+        // shadow a generated one of the same mid, which is the order the runtime maps them in.
+        for (ResourceMapping resource : mappingService.getTemporaryResources()) {
+            mappingResources.put(resource.getMid(), resource);
+        }
         for (ResourceMapping resource : mappingService.getResources()) {
             mappingResources.put(resource.getMid(), resource);
         }
@@ -257,11 +278,15 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
                 }
             }
             
-            // Validate unit compatibility
+            // Validate unit compatibility. The unit may come from the mapping's `unit` field or
+            // from a `sensinact.mapping` annotation copied off the source attribute - reading
+            // only the field reported every annotation-supplied unit as a mismatch, while the
+            // twin published it correctly.
             if (profileResource.getExpectedUnit() != null) {
-                if (!profileResource.getExpectedUnit().equals(mappingResource.getUnit())) {
+                String unit = MappingAnnotations.effectiveUnit(mappingResource);
+                if (!profileResource.getExpectedUnit().equals(unit)) {
                     result.addWarning("Resource '" + profileResource.getResourceId() + 
-                                    "' has unit '" + mappingResource.getUnit() + 
+                                    "' has unit '" + unit + 
                                     "' but profile expects '" + profileResource.getExpectedUnit() + "'");
                 }
             }

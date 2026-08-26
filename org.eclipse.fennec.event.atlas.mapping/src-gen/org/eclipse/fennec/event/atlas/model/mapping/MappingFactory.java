@@ -234,6 +234,15 @@ public interface MappingFactory extends EFactory {
 	DeletionRule createDeletionRule();
 
 	/**
+	 * Returns a new object of class '<em>Reference Resource Binding</em>'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return a new object of class '<em>Reference Resource Binding</em>'.
+	 * @generated
+	 */
+	ReferenceResourceBinding createReferenceResourceBinding();
+
+	/**
 	 * Returns the package supported by this factory.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->

@@ -18,10 +18,11 @@ import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import org.eclipse.emf.common.util.EList;
@@ -35,6 +36,8 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
 import org.eclipse.fennec.event.atlas.mapping.SensinactMapperConstants;
 import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ChangeRule;
+import org.eclipse.fennec.event.atlas.model.mapping.DeletionRule;
 import org.eclipse.fennec.event.atlas.model.mapping.Mapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
@@ -42,6 +45,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.NameMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy;
 import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.sensinact.core.emf.model.EMFModel;
@@ -112,6 +116,14 @@ public class ProviderModelSensinactMapper {
 		if (isNull(providerMapping)) {
 			return;
 		}
+
+		// Generate the resources of every ReferenceMapping first: profile conformance is
+		// validated below and has to see them, and the twin model is built from them further
+		// down. Doing it here rather than inside mapService also makes it unconditional -
+		// mapService is only reached while the provider does not exist yet, so a mapping
+		// registered against an existing provider used to end up with no generated resources
+		// at all, and pushes through it mapped nothing for those services.
+		generateReferencedResources(providerMapping);
 
 		// Validate against profile if one is referenced
 		if (nonNull(providerMapping.getProfile()) && nonNull(profileRegistry)) {
@@ -307,11 +319,6 @@ public class ProviderModelSensinactMapper {
 			service = model.createService(serviceMapping.getMid()).build();
 		}
 
-		// Auto-generate ResourceMappings from ReferenceMapping if configured
-		if (serviceMapping.getReferencedResource() != null) {
-			generateResourcesFromReferenceMapping(serviceMapping);
-		}
-
 		for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
 			mapResource(service, resourceMapping);
 		}
@@ -322,6 +329,22 @@ public class ProviderModelSensinactMapper {
 	}
 
 	/**
+	 * Generates the resources of every service that maps a referenced object.
+	 * <p>
+	 * Package private: the generated resources are what profile validation and the twin model
+	 * are built from, so a test needs to be able to produce them without a digital twin.
+	 * @param providerMapping the mapping whose services to expand. Parameter must not be
+	 * <code>null</code>
+	 */
+	void generateReferencedResources(ProviderMapping providerMapping) {
+		for (ServiceMapping serviceMapping : providerMapping.getServices()) {
+			if (serviceMapping.getReferencedResource() != null) {
+				generateResourcesFromReferenceMapping(serviceMapping);
+			}
+		}
+	}
+
+	/**
 	 * Generates ResourceMapping objects from a ReferenceMapping configuration.
 	 * This auto-generates resources for all attributes of the referenced type.
 	 *
@@ -329,6 +352,10 @@ public class ProviderModelSensinactMapper {
 	 */
 	private void generateResourcesFromReferenceMapping(ServiceMapping serviceMapping) {
 		ReferenceMapping refMapping = serviceMapping.getReferencedResource();
+
+		// Start from empty: the same mapping may be registered more than once, and appending
+		// would give every resource a duplicate.
+		serviceMapping.getTemporaryResources().clear();
 
 		// Determine the target EClass
 		EClass targetClass = null;
@@ -352,7 +379,7 @@ public class ProviderModelSensinactMapper {
 
 		// Generate resources recursively, passing the base feature path from the ReferenceMapping
 		generateResourcesFromEClass(targetClass, refMapping, serviceMapping.getTemporaryResources(), "",
-				new ArrayList<>(refMapping.getFeaturePath()), false);
+				new ArrayList<>(refMapping.getFeaturePath()), false, new BindingResolver(null, refMapping));
 	}
 
 	/**
@@ -363,12 +390,14 @@ public class ProviderModelSensinactMapper {
 	 * @param resourceList the list to add generated ResourceMappings to
 	 * @param namePrefix prefix for resource names (e.g., "station" for nested references)
 	 * @param baseFeaturePath the base feature path from the root object to the current object
+	 * @param bindings the per-attribute settings declared by this reference mapping and the
+	 *        ones it is nested in
 	 */
 	private void generateResourcesFromEClass(EClass eClass,
 			ReferenceMapping refMapping,
 			EList<ResourceMapping> resourceList,
 			String namePrefix,
-			List<EStructuralFeature> baseFeaturePath, boolean nested) {
+			List<EStructuralFeature> baseFeaturePath, boolean nested, BindingResolver bindings) {
 
 		// Get filtered attributes
 		List<EAttribute> allAttributes = eClass.getEAllAttributes();
@@ -423,6 +452,23 @@ public class ProviderModelSensinactMapper {
 			if(nested) resourceMapping.getValueFeature().addAll(baseFeaturePath);
 			resourceMapping.getValueFeature().add(attribute);
 
+			// Per-attribute settings from the reference mapping's bindings. Resolving them
+			// here is what keeps the engine ResourceMapping-only: a generated resource is
+			// indistinguishable from a hand-written one by the time anything reads it.
+			//
+			// Copy, don't move: changeRule/deletionRule are containment references, so setting
+			// the binding's own rule would relocate it out of the binding - the first generated
+			// resource would take it and every later one would take it from its predecessor,
+			// leaving a single resource with a rule and the binding empty.
+			resourceMapping.setChangeRule(EcoreUtil.copy(bindings.changeRule(attribute)));
+			resourceMapping.setDeletionRule(EcoreUtil.copy(bindings.deletionRule(attribute)));
+			String boundUnit = bindings.unit(attribute);
+			if (boundUnit != null) {
+				// Wins over the source attribute's copied sensinact.mapping annotation,
+				// because mapResource prefers the field over the annotation.
+				resourceMapping.setUnit(boundUnit);
+			}
+
 			resourceList.add(resourceMapping);
 			logger.fine(String.format("Auto-generated resource %s from ReferenceMapping", resourceName));
 		}
@@ -468,9 +514,88 @@ public class ProviderModelSensinactMapper {
 						new ArrayList<>();
 				nestedFeaturePath.add(targetReference);
 
-				// Recursively generate resources from the nested object
-				generateResourcesFromEClass(nestedClass, nestedMapping, resourceList, nestedPrefix, nestedFeaturePath, true);
+				// Recursively generate resources from the nested object. The nested mapping's
+				// own bindings override the ones inherited from here.
+				generateResourcesFromEClass(nestedClass, nestedMapping, resourceList, nestedPrefix, nestedFeaturePath,
+						true, new BindingResolver(bindings, nestedMapping));
 			}
+		}
+	}
+
+	/**
+	 * Resolves the settings a {@link ReferenceMapping}'s
+	 * {@link ReferenceMapping#getBindings() bindings} declare for one generated resource.
+	 * <p>
+	 * Three levels, most specific first: a binding that names the attribute, then the level's
+	 * default (the binding with an empty attribute list), then the enclosing reference
+	 * mapping's resolver. Each setting resolves on its own, so a binding may override the
+	 * change rule of a resource and leave its unit to the level above.
+	 */
+	// Package private so its resolution order can be tested without a twin.
+	static final class BindingResolver {
+
+		private final BindingResolver parent;
+		private final Map<EAttribute, ReferenceResourceBinding> byAttribute = new LinkedHashMap<>();
+		private final ReferenceResourceBinding defaultBinding;
+
+		/**
+		 * @param parent the resolver of the enclosing reference mapping, or <code>null</code>
+		 * at the top level
+		 * @param refMapping the reference mapping whose bindings to read
+		 */
+		BindingResolver(BindingResolver parent, ReferenceMapping refMapping) {
+			this.parent = parent;
+			ReferenceResourceBinding levelDefault = null;
+			for (ReferenceResourceBinding binding : refMapping.getBindings()) {
+				if (binding.getAttributes().isEmpty()) {
+					// An empty attribute list means "every resource generated here", the same
+					// convention ReferenceMapping.filter uses.
+					if (levelDefault == null) {
+						levelDefault = binding;
+					} else {
+						logger.warning("More than one default binding (empty attribute list) on a reference mapping - ignoring all but the first");
+					}
+					continue;
+				}
+				for (EAttribute attribute : binding.getAttributes()) {
+					ReferenceResourceBinding previous = byAttribute.putIfAbsent(attribute, binding);
+					if (previous != null) {
+						logger.warning(String.format(
+								"Attribute '%s' is named by more than one binding of the same reference mapping - ignoring the later one",
+								attribute.getName()));
+					}
+				}
+			}
+			this.defaultBinding = levelDefault;
+		}
+
+		ChangeRule changeRule(EAttribute attribute) {
+			return resolve(attribute, ReferenceResourceBinding::getChangeRule);
+		}
+
+		DeletionRule deletionRule(EAttribute attribute) {
+			return resolve(attribute, ReferenceResourceBinding::getDeletionRule);
+		}
+
+		String unit(EAttribute attribute) {
+			return resolve(attribute, ReferenceResourceBinding::getUnit);
+		}
+
+		private <T> T resolve(EAttribute attribute, Function<ReferenceResourceBinding, T> setting) {
+			ReferenceResourceBinding specific = byAttribute.get(attribute);
+			if (specific != null) {
+				T value = setting.apply(specific);
+				if (value != null) {
+					return value;
+				}
+			}
+			if (defaultBinding != null) {
+				T value = setting.apply(defaultBinding);
+				if (value != null) {
+					return value;
+				}
+			}
+			return parent == null ? null : parent.resolve(attribute, setting);
 		}
 	}
 
@@ -564,11 +689,9 @@ public class ProviderModelSensinactMapper {
 				resourceBuilder = resourceBuilder.withInitialValue(defaultValue);
 			}
 			Map<String, Object> metadata = new HashMap<>();
-			if (nonNull(resourceMapping.getUnit())) {
-				metadata.put("unit", resourceMapping.getUnit());
-			} else {
-				metadata.put("unit", extractAnnotationValue(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE, SensinactMapperConstants.SENSINACT_MAPPING_UNIT));
-			}
+			// Field first, annotation second - the same order MappingProfileRegistryImpl
+			// validates against, so the two cannot disagree about a resource's unit.
+			putIfPresent(metadata, "unit", MappingAnnotations.effectiveUnit(resourceMapping));
 			
 			if (nonNull(resourceMapping.getName()) ) {
 				metadata.put("friendlyName", resourceMapping.getName());
@@ -577,16 +700,17 @@ public class ProviderModelSensinactMapper {
 			if (nonNull(resourceMapping.getDescriptionMapping()) ) {
 				metadata.put("description", resourceMapping.getDescriptionMapping().getName());
 			} else {
-				metadata.put("description", extractAnnotationValue(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE, 
-						SensinactMapperConstants.SENSINACT_MAPPING_DESCRIPTION).isEmpty() ? 
-						extractAnnotationValue(resourceMapping, GENMODEL_ANNOTATION, DOCUMENTATION_KEY) : 
-						extractAnnotationValue(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE, SensinactMapperConstants.SENSINACT_MAPPING_DESCRIPTION));
+				String described = MappingAnnotations.annotationValue(resourceMapping,
+						SensinactMapperConstants.SENSINACT_MAPPING_ANNOTATION_SOURCE,
+						SensinactMapperConstants.SENSINACT_MAPPING_DESCRIPTION);
+				putIfPresent(metadata, "description", described != null ? described
+						: MappingAnnotations.annotationValue(resourceMapping, GENMODEL_ANNOTATION, DOCUMENTATION_KEY));
 			}
 			
 			if(!resourceMapping.getExtraMetadata().isEmpty()) {
 				resourceMapping.getExtraMetadata().forEach(e -> metadata.put(e.getKey(), e.getValue()));
 			} else {
-				metadata.putAll(extractAnnotationDetails(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_METADATA_ANNOTATION_SOURCE));
+				metadata.putAll(MappingAnnotations.annotationDetails(resourceMapping, SensinactMapperConstants.SENSINACT_MAPPING_METADATA_ANNOTATION_SOURCE));
 			}
 			if (!metadata.isEmpty()) {
 				resourceBuilder = resourceBuilder.withDefaultMetadata(metadata);
@@ -596,20 +720,15 @@ public class ProviderModelSensinactMapper {
 		return resource;
 	}
 	
-	private static String extractAnnotationValue(EAttribute eAttribute, String source, String detailKey) {
-		if(eAttribute.getEAnnotation(source) != null) {
-			if(eAttribute.getEAnnotation(source).getDetails().containsKey(detailKey)) {
-				return eAttribute.getEAnnotation(source).getDetails().get(detailKey);
-			}
+	/**
+	 * Adds a metadata entry only when there is a value for it. Publishing an absent one as an
+	 * empty string tells a northbound consumer that the resource has a unit of "", which is a
+	 * different claim from having none.
+	 */
+	private static void putIfPresent(Map<String, Object> metadata, String key, String value) {
+		if (nonNull(value) && !value.isEmpty()) {
+			metadata.put(key, value);
 		}
-		return "";
-	}
-	
-	private static Map<String, String> extractAnnotationDetails(EAttribute eAttribute, String source) {
-		if(eAttribute.getEAnnotation(source) != null) {
-			return eAttribute.getEAnnotation(source).getDetails().map();
-		}
-		return Collections.emptyMap();
 	}
 
 }

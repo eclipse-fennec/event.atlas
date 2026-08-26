@@ -140,6 +140,7 @@
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceMapping/exclude"/>
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceMapping/referenceMappings"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceMapping/targetEClass"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceMapping/bindings"/>
     </genClasses>
     <genClasses ecoreClass="event-atlas-mapping.ecore#//PersistenceRuleRegistry">
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//PersistenceRuleRegistry/changeRules"/>
@@ -170,6 +171,12 @@
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/cleanupInterval"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/cleanupIntervalUnit"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//DeletionRule/maxCount"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//ReferenceResourceBinding">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceResourceBinding/attributes"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceResourceBinding/changeRule"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceResourceBinding/deletionRule"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceResourceBinding/unit"/>
     </genClasses>
   </genPackages>
 </genmodel:GenModel>

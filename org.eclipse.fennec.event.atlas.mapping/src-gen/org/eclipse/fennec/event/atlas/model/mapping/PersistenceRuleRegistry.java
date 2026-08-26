@@ -25,9 +25,11 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * Container that owns reusable persistence rules. Change rules and deletion rules are
- * contained (defined once) here and referenced from ResourceMapping via non-containment
- * references, so multiple resources can share the same rule instance.
+ * A standalone container for persistence rules.
+ * Nothing in the runtime reads it: rules are contained by the ResourceMapping or the
+ * ReferenceResourceBinding that uses them, so a registry file is a catalogue to copy rules out
+ * of - a place to keep the shapes an installation has agreed on - not a source the engine
+ * resolves against. It is kept because a shared rule source may be wanted again later.
  * <!-- end-model-doc -->
  *
  * <p>

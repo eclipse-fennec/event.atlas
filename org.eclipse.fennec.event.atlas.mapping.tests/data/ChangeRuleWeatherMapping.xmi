@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Exercises the change rules on both paths a resource can reach the twin by:
+
+  * service 'explicit' - hand-written ResourceMappings, each with its own changeRule;
+  * service 'generated' - resources auto-generated from a ReferenceMapping, whose rules come
+    from the reference's bindings: one binding names windSpeed, the other names no attribute
+    at all and is therefore the default for everything else generated here.
+
+  Rules are contained where they are used, so each one is written out inline. abs-1000 is a
+  delta no test value ever reaches: "only the first value gets through".
+-->
+<mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="dwd-weather-change-rules"
+    providerTimestamp="false">
+
+  <!-- Provider timestamp from reports[0].timestamp: it is what the time throttle measures,
+       so a test controls the throttle clock by setting the report timestamp. -->
+  <timestamp strategy="FEATURE">
+    <featurePath xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+    <featurePath xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//WeatherReport/timestamp"/>
+  </timestamp>
+
+  <name>
+    <featurePath xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+    <featurePath xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReport/weatherStation"/>
+    <featurePath xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//WeatherStation/id"/>
+  </name>
+
+  <providerClasses href="http://cdc.dwd.de/common/weather#//WeatherReports"/>
+
+  <!-- Required: the model mapper insists on an admin mapping -->
+  <admin mid="admin">
+    <name name="Admin"/>
+    <friendlyNameFeature xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+    <friendlyNameFeature xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReport/weatherStation"/>
+    <friendlyNameFeature xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//WeatherStation/name"/>
+    <providerPackage href="http://cdc.dwd.de/common/weather#/"/>
+  </admin>
+
+  <services mid="explicit">
+    <name name="Explicit resources"/>
+
+    <!-- Percentage: a 5% move is dropped, a 20% move is stored -->
+    <resources name="Wind speed" unit="m/s" timestamp="//@timestamp" mid="windSpeed">
+      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EFloatObject"/>
+      <valueFeature xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+      <valueFeature xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport/windSpeed"/>
+      <changeRule xsi:type="mapping:PercentageChangeRule" id="pct-10" percentage="10.0"/>
+    </resources>
+
+    <!-- Count: one of every three pushes, regardless of how much the value moved -->
+    <resources name="Wind direction" unit="Degree" timestamp="//@timestamp" mid="windDirection">
+      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EFloatObject"/>
+      <valueFeature xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+      <valueFeature xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport/windDirection"/>
+      <changeRule xsi:type="mapping:CountChangeRule" id="every-3" n="3"/>
+    </resources>
+
+    <!-- Time throttle: measured on the payload's own timestamp, not on arrival time -->
+    <resources name="Temperature 5cm" unit="K" timestamp="//@timestamp" mid="tempAboveSurface5">
+      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EFloatObject"/>
+      <valueFeature xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+      <valueFeature xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport/tempAboveSurface5"/>
+      <changeRule xsi:type="mapping:TimeThrottleChangeRule" id="throttle-10m" interval="10" intervalUnit="MINUTES"/>
+    </resources>
+
+    <!-- Control: no rule, so every value is stored -->
+    <resources name="Visibility" unit="m" timestamp="//@timestamp" mid="visibility">
+      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EFloatObject"/>
+      <valueFeature xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+      <valueFeature xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport/visibility"/>
+    </resources>
+  </services>
+
+  <services mid="generated">
+    <name name="Generated resources"/>
+    <referencedResource xsi:type="mapping:ReferenceMapping" collectionIndex="0" exclude="true">
+      <featurePath xsi:type="ecore:EReference" href="http://cdc.dwd.de/common/weather#//WeatherReports/reports"/>
+      <targetEClass href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport"/>
+
+      <filter xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//WeatherReport/id"/>
+      <filter xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//WeatherReport/timestamp"/>
+      <filter xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//WeatherReport/issueTime"/>
+      <filter xsi:type="ecore:EAttribute" href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport/significantWeather3Hours"/>
+
+      <!-- Named attribute: its own rule, and a unit that overrides the source annotation -->
+      <bindings unit="kn">
+        <attributes href="http://cdc.dwd.de/common/weather#//MOSMIXSWeatherReport/windSpeed"/>
+        <changeRule xsi:type="mapping:PercentageChangeRule" id="pct-10" percentage="10.0"/>
+      </bindings>
+
+      <!-- No attributes named: the default for every other generated resource -->
+      <bindings>
+        <changeRule xsi:type="mapping:AbsoluteChangeRule" id="abs-1000" delta="1000.0"/>
+      </bindings>
+    </referencedResource>
+  </services>
+</mapping:ProviderMapping>

@@ -37,6 +37,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping#isExclude <em>Exclude</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping#getReferenceMappings <em>Reference Mappings</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping#getTargetEClass <em>Target EClass</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping#getBindings <em>Bindings</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getReferenceMapping()
@@ -121,5 +122,30 @@ public interface ReferenceMapping extends FeatureMapping {
 	 * @generated
 	 */
 	void setTargetEClass(EClass value);
+
+	/**
+	 * Returns the value of the '<em><b>Bindings</b></em>' containment reference list.
+	 * The list contents are of type {@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding}.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * Optional per-attribute bindings for the resources this reference mapping generates: they
+	 * attach persistence rules and metadata overrides to a subset of those resources.
+	 * 
+	 * A binding with an empty 'attributes' list applies to every resource generated here and is
+	 * therefore the default for the whole reference - the same convention 'filter' uses, where an
+	 * empty list means "all attributes".
+	 * 
+	 * Bindings cascade into nested reference mappings ('referenceMappings'): attributes are
+	 * addressed by globally unique EAttribute references, so a binding declared here can name an
+	 * attribute of a nested type. The nearest declaration wins - a binding on the nested mapping
+	 * overrides one declared here for the same attribute, and a nested default overrides this one.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Bindings</em>' containment reference list.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getReferenceMapping_Bindings()
+	 * @model containment="true"
+	 * @generated
+	 */
+	EList<ReferenceResourceBinding> getBindings();
 
 } // ReferenceMapping

@@ -23,15 +23,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.InternalEObject;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryListener;
+import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
+import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.sensinact.core.command.GatewayThread;
 import org.eclipse.sensinact.core.emf.command.AbstractSensinactEMFCommand;
@@ -42,6 +47,9 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
 
@@ -69,6 +77,10 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	private GatewayThread gatewayThread;
 	@Reference
 	private MappingProfileRegistry profileRegistry;
+	/** Optional: only present when change rules are enforced on the way into the twin. */
+	@Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC, //
+			policyOption = ReferencePolicyOption.GREEDY)
+	private volatile ChangeRuleFilter changeRuleFilter;
 
 	@Activate
 	public void activate() {
@@ -102,6 +114,9 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 		// see a gap - the remove-after-add ordering of the former service whiteboard
 		validMapping(entry, false).ifPresent(this::registerModelMapping);
 		validMapping(oldEntry, true).ifPresent(this::unregisterModelMapping);
+		// The rules themselves may have changed with the entry, and a baseline gathered under
+		// the previous rule applies neither faithfully.
+		validMapping(entry, true).ifPresent(m -> resetChangeRuleState(m.getMid()));
 	}
 
 	/*
@@ -139,7 +154,55 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			}
 			return Optional.empty();
 		}
+		if (!resolveProfile(mapping, quiet)) {
+			return Optional.empty();
+		}
 		return Optional.of(mapping);
+	}
+
+	/**
+	 * Resolves a mapping's {@code profile} reference through the profile registry when the
+	 * document it points at is not available.
+	 * <p>
+	 * {@code profile} is a non-containment reference to another document, so a mapping that
+	 * arrives without its profile file - every mapping delivered from a Model Atlas, which
+	 * hands over standalone root objects - carries an unresolved proxy. Since
+	 * {@code MappingProfile.profileId} is an EMF ID, the proxy's URI fragment <em>is</em> the
+	 * profile id, and the profile registry is already indexed by exactly that, fed by whatever
+	 * providers the runtime configures. So the profile is looked up there and the reference is
+	 * replaced with the registered instance - which is what EMF's own proxy resolution would
+	 * have done, had the document been reachable.
+	 * <p>
+	 * A profile that cannot be found makes the mapping <em>invalid</em> rather than
+	 * profile-less: the profile decides the provider identity
+	 * ({@code providerStrategy == UNIFIED} maps every conforming mapping onto one shared
+	 * provider), so carrying on without it would silently push data to a different provider
+	 * than the operator asked for. Registration is skipped instead, the same way an unresolved
+	 * provider class skips it - a later entry update or atlas refresh tries again.
+	 * @return <code>true</code> if the mapping may be registered
+	 */
+	private boolean resolveProfile(ProviderMapping mapping, boolean quiet) {
+		MappingProfile profile = mapping.getProfile();
+		if (profile == null || !profile.eIsProxy()) {
+			return true;
+		}
+		URI proxyUri = ((InternalEObject) profile).eProxyURI();
+		String profileId = proxyUri == null ? null : proxyUri.fragment();
+		Optional<MappingProfile> registered = profileId == null ? Optional.empty()
+				: profileRegistry.getProfile(profileId);
+		if (registered.isEmpty()) {
+			if (!quiet) {
+				logger.severe(String.format(
+						"ProviderMapping '%s' references profile '%s' (%s), which is neither reachable as a "
+								+ "document nor registered in the profile registry - is the profile deployed? Skipping",
+						mapping.getMid(), profileId, proxyUri));
+			}
+			return false;
+		}
+		mapping.setProfile(registered.get());
+		logger.fine(String.format("Resolved profile '%s' of ProviderMapping '%s' through the profile registry",
+				profileId, mapping.getMid()));
+		return true;
 	}
 
 	/*
@@ -162,7 +225,10 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 					mapperFactory.createMapper(twin, mmgr).registerModelMapping(mapping);
 					return pf.resolved(Boolean.TRUE);
 				} catch (Throwable e) {
-					logger.warning(String.format("Failed registering provider '%s' into sensinact, with error %s", mapping.getMid(), e.getMessage()));
+					// Log the throwable, not getMessage(): an exception without a message - an
+					// NPE, say - would otherwise be reported as "with error null".
+					logger.log(Level.WARNING,
+							String.format("Failed registering provider '%s' into sensinact", mapping.getMid()), e);
 					return pf.failed(e);
 				}
 			}
@@ -182,6 +248,7 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	 */
 	@Override
 	public void unregisterModelMapping(ProviderMapping mapping) {
+		resetChangeRuleState(mapping.getMid());
 		mapping.getProviderClasses().forEach(ec->{
 			logger.fine(String.format("Un-registering provider mapping for '%s' into registry", mapping.getMid()));
 			registry.getOrDefault(ec, Collections.emptyList()).remove(mapping);
@@ -196,7 +263,8 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 					mapperFactory.createMapper(twin, mmgr).unregisterModelMapping(mapping);
 					return pf.resolved(Boolean.TRUE);
 				} catch (Throwable e) {
-					logger.fine(String.format("Failed un-registering provider '%s' from sensinact, with error %s", mapping.getMid(), e.getMessage()));
+					logger.log(Level.FINE,
+							String.format("Failed un-registering provider '%s' from sensinact", mapping.getMid()), e);
 					return pf.failed(e);
 				}
 			}
@@ -211,6 +279,17 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	public List<ProviderMapping> getProviderMapping(EClass eclass) {
 		requireNonNull(eclass);
 		return registry.getOrDefault(eclass, Collections.emptyList());
+	}
+
+	/**
+	 * Drops what the change rule filter retained for a mapping, so the next value of each of
+	 * its resources counts as the first one again. A no-op when nothing enforces the rules.
+	 */
+	private void resetChangeRuleState(String mid) {
+		ChangeRuleFilter filter = changeRuleFilter;
+		if (filter != null && mid != null) {
+			filter.reset(mid);
+		}
 	}
 
 }
