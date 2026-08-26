@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    xsi:schemaLocation="https://fennec.eclipse.org/event.atlas/mapping/1.0 ../sensinact-mapping.ecore"
+    mid="m5airq-airquality"
+    providerTimestamp="true">
+
+  <!-- The device RTC is not synchronized (reports year 2000), so the payload
+       timestamps are unusable — take the ingest time instead. -->
+  <timestamp strategy="NOW"/>
+
+  <!-- Provider id from the unique devEui, static fallback for robustness -->
+  <name name="m5airq">
+    <featurePath
+        xsi:type="ecore:EReference"
+        href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/deviceInfo"/>
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://datainmotion.de/demo/m5airq/1.0#//DeviceInfo/devEui"/>
+  </name>
+
+  <providerClasses
+      href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage"/>
+
+  <admin
+      mid="admin">
+    <friendlyNameFeature
+        xsi:type="ecore:EReference"
+        href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/deviceInfo"/>
+    <friendlyNameFeature
+        xsi:type="ecore:EAttribute"
+        href="https://datainmotion.de/demo/m5airq/1.0#//DeviceInfo/deviceName"/>
+    <providerPackage
+        href="https://datainmotion.de/demo/m5airq/1.0#/"/>
+  </admin>
+
+  <!-- CO2 from the SCD40 -->
+  <services mid="co2">
+    <name name="CO2"/>
+    <resources
+        name="Concentration"
+        changeable="false"
+        unit="ppm"
+        mid="concentration">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/scd40"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Scd40Reading/co2"/>
+    </resources>
+  </services>
+
+  <!-- Climate from the SEN55 (the SCD40 temperature runs several degrees high
+       due to device self-heating, so the SEN55 is the primary climate source) -->
+  <services mid="climate">
+    <name name="Climate"/>
+    <resources
+        name="Temperature"
+        changeable="false"
+        unit="°C"
+        mid="temperature">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/temperature"/>
+    </resources>
+    <resources
+        name="Humidity"
+        changeable="false"
+        unit="%"
+        mid="humidity">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/humidity"/>
+    </resources>
+  </services>
+
+  <!-- Particulate matter from the SEN55 -->
+  <services mid="particulates">
+    <name name="Particulate Matter"/>
+    <resources
+        name="PM1.0"
+        changeable="false"
+        unit="µg/m³"
+        mid="pm1p0">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/pm1p0"/>
+    </resources>
+    <resources
+        name="PM2.5"
+        changeable="false"
+        unit="µg/m³"
+        mid="pm2p5">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/pm2p5"/>
+    </resources>
+    <resources
+        name="PM4.0"
+        changeable="false"
+        unit="µg/m³"
+        mid="pm4p0">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/pm4p0"/>
+    </resources>
+    <resources
+        name="PM10"
+        changeable="false"
+        unit="µg/m³"
+        mid="pm10p0">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/pm10p0"/>
+    </resources>
+  </services>
+
+  <!-- Sensirion gas indices from the SEN55 -->
+  <services mid="gasIndex">
+    <name name="Gas Index"/>
+    <resources
+        name="VOC Index"
+        changeable="false"
+        unit="index"
+        mid="voc">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/vocIndex"/>
+    </resources>
+    <resources
+        name="NOx Index"
+        changeable="false"
+        unit="index"
+        mid="nox">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/sen55"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//Sen55Reading/noxIndex"/>
+    </resources>
+  </services>
+
+  <!-- Occupancy from the PIR -->
+  <services mid="occupancy">
+    <name name="Occupancy"/>
+    <resources
+        name="Motion Detected"
+        changeable="false"
+        mid="motion">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/pir"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//PirReading/motionDetected"/>
+    </resources>
+  </services>
+
+  <!-- Device health -->
+  <services mid="status">
+    <name name="Status"/>
+    <resources
+        name="Connected"
+        changeable="false"
+        mid="connected">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/status"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//DeviceStatus/connected"/>
+    </resources>
+    <resources
+        name="Uptime"
+        changeable="false"
+        unit="s"
+        mid="uptime">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//AirQualityMessage/payload"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://datainmotion.de/demo/m5airq/1.0#//SensorPayload/status"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://datainmotion.de/demo/m5airq/1.0#//DeviceStatus/uptime"/>
+    </resources>
+  </services>
+
+</sensinactMapping:ProviderMapping>

@@ -17,6 +17,16 @@
   "org.eclipse.fennec.model.atlas.rest.client~atlas": {
     "base.uri": "$[env:EVENTATLAS_ATLAS_BASE_URI;default=http://localhost:8086/atlas/rest]",
     "scope.allow.list": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
+    "default.scope": "$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]",
+    /* Domain EPackages come from the Atlas too, not from model bundles baked into the image.
+     * EAGER pre-fetches them at activation so the mapping sync below finds them; the stage
+     * name is the scope's final stage - "release" in the jena scope, NOT the client default
+     * "released". register.in.global.registry mirrors them into EPackage.Registry.INSTANCE,
+     * which is where AtlasObjectSync.ensureRequiredPackages() and EMF deserialization look. */
+    "mode": "EAGER",
+    "eager.scopes": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
+    "eager.stages": ["$[env:EVENTATLAS_ATLAS_STAGE;default=release]"],
+    "register.in.global.registry": true,
     "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000;type=Long]"
   },
 
@@ -37,7 +47,13 @@
     "emf.eobject.provider.name": "atlas-mappings",
     "registries": ["$[env:EVENTATLAS_ATLAS_REGISTRY;default=sensinactmapping]"],
     "key.feature": "mid",
-    "required.nsuris": ["https://fennec.eclipse.org/event.atlas/mapping/1.0"],
+    /* Gate, not a loader: the sync pass is postponed until these EPackages are registered.
+     * The mapping metamodel comes from the mapping bundle, the domain models from the Atlas
+     * (see the client above). Add every domain nsURI you map here. */
+    "required.nsuris": [
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0",
+      "$[env:EVENTATLAS_DOMAIN_NSURI;default=https://datainmotion.de/demo/m5airq/1.0]"
+    ],
     "refresh.interval.ms": "$[env:EVENTATLAS_ATLAS_REFRESH_INTERVAL_MS;default=60000;type=Long]"
   },
 
@@ -50,6 +66,22 @@
   "EObjectRegistry~profiles": {
     "name": "sensinact-profiles",
     "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
+  },
+
+  /* JSON payloads do not name their model; the codec types them through the discriminator
+   * registry named here, and its single discriminator path (see docs/json-southbound-typing.md).
+   * One registry per runtime - every JSON device family shares it.
+   *
+   * THIS PID IS NOT OPTIONAL FOR A JSON DEPLOYMENT. PayloadIngestImpl is
+   * ConfigurationPolicy.OPTIONAL with `codec.typeMapId` defaulting to "", and an empty map id
+   * means no load option is passed at all - the deserializer then finds no type information and
+   * drops every JSON payload:
+   *   CodecEObjectDeserializer SEVERE: Cannot deserialize: no type information found and no
+   *   CODEC_ROOT_TYPE hint
+   * The activation line `Payload typing: map '<none>'` is the give-away. Env-interpolated like
+   * every other value here, so one published image serves every deployment. */
+  "event.atlas.southbound.ingest": {
+    "codec.typeMapId": "$[env:EVENTATLAS_CODEC_TYPE_MAP_ID;default=jena-sensors]"
   },
 
   /* `;type=String[]` is REQUIRED on every list property, not optional next to `delimiter`: the

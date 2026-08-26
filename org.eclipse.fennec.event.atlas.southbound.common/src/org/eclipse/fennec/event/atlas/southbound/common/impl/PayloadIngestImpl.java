@@ -17,6 +17,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.ByteArrayInputStream;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
@@ -34,6 +36,10 @@ import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.osgi.service.component.annotations.Modified;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Reference;
 
 /**
@@ -46,10 +52,44 @@ import org.osgi.service.component.annotations.Reference;
  * southbound adapter it means data is being dropped, and needs to be visible.
  * @author Ilenia Salvadori
  */
-@Component
+@Component(configurationPid = "event.atlas.southbound.ingest", configurationPolicy = ConfigurationPolicy.OPTIONAL)
 public class PayloadIngestImpl implements PayloadIngest {
 
+	/**
+	 * Configuration of this component.
+	 */
+	@ObjectClassDefinition
+	public @interface Config {
+		/**
+		 * The codec's type-mapping registry id (mapId). Payload formats that do not name
+		 * their own model - JSON, unlike XMI - are typed by the codec's discriminator:
+		 * the model annotates each EClass with
+		 * {@code http://eclipse.org/fennec/codec/typeMapping/<mapId>} carrying
+		 * {@code typeDiscriminator} and {@code typeDiscriminatorPath}. Empty leaves the
+		 * codec to its own defaults, which means untyped JSON yields no objects.
+		 */
+		String codec_typeMapId() default "";
+
+		/**
+		 * Whether the codec reads JSON property names from the model's
+		 * {@code ExtendedMetaData} annotations instead of the plain feature names. Device
+		 * payloads usually carry the wire names ({@code object}, {@code voc_index}), which
+		 * is exactly what those annotations record; the codec's own default is the feature
+		 * name.
+		 */
+		boolean codec_useNamesFromExtendedMetadata() default true;
+	}
+
+	/** Codec load option selecting the type-mapping registry; see {@code CodecOptions}. */
+	private static final String OPTION_TYPE_MAP_ID = "codec.typeMapId";
+
+	/** Codec load option honouring ExtendedMetaData names; see {@code ConfigProperty}. */
+	private static final String OPTION_USE_EMD_NAMES = "codec.useNamesFromExtendedMetadata";
+
 	private static final Logger logger = Logger.getLogger(PayloadIngestImpl.class.getName());
+
+	/** Empty unless a mapId is configured; passed to every JSON load. */
+	private volatile Map<String, Object> loadOptions = Collections.emptyMap();
 
 	/** Distinguishes the throw-away resource URIs; only needs to be unique per runtime. */
 	private final AtomicLong sequence = new AtomicLong();
@@ -58,6 +98,25 @@ public class PayloadIngestImpl implements PayloadIngest {
 	private ResourceSetFactory resourceSetFactory;
 	@Reference
 	private InstancePusher instancePusher;
+
+	@Activate
+	@Modified
+	void activate(Config config) {
+		Map<String, Object> options = new LinkedHashMap<>();
+		String mapId = config.codec_typeMapId();
+		if (mapId == null || mapId.isBlank()) {
+			logger.fine("No codec type map configured - payloads must name their own model");
+		} else {
+			options.put(OPTION_TYPE_MAP_ID, mapId);
+		}
+		if (config.codec_useNamesFromExtendedMetadata()) {
+			options.put(OPTION_USE_EMD_NAMES, Boolean.TRUE);
+		}
+		loadOptions = options.isEmpty() ? Collections.emptyMap() : Map.copyOf(options);
+		logger.info(String.format("Payload typing: map '%s', ExtendedMetaData names %s",
+				mapId == null || mapId.isBlank() ? "<none>" : mapId,
+				config.codec_useNamesFromExtendedMetadata() ? "on" : "off"));
+	}
 
 	/*
 	 * (non-Javadoc)
@@ -148,7 +207,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 		Resource resource = resourceSet
 				.createResource(URI.createURI("eventatlas-ingest/" + sequence.incrementAndGet() + "." + format));
 		try {
-			resource.load(new ByteArrayInputStream(payload), Collections.emptyMap());
+			resource.load(new ByteArrayInputStream(payload), loadOptions);
 		} catch (Exception e) {
 			PackageNotFoundException notFound = findPackageNotFound(e);
 			throw notFound == null ? e : notFound;

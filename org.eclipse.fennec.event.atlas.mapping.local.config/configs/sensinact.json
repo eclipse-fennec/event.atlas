@@ -32,7 +32,6 @@
 	},
 
     "sensinact.sensorthings.northbound.rest": {
-        "history.provider": "brokerHistory"
     },
 	
     "sensiNact.northbound.sensorthings.mqtt": {
