@@ -208,6 +208,14 @@ runtime resolves it on the next payload.
   OCD even though only the batch service reads it — without it the component does not activate.
   `max.tokens` must be raised well past the component's own 1024 default, which would truncate a
   turn that authors a package.
+- **Local credentials go in `…mapping.runtime/secrets.bndrun`, which is gitignored.** It sets
+  `-runvm.secrets: -DANTHROPIC_API_KEY=…` (and the endpoints), `launch.bndrun` pulls it in with
+  an optional `-include: -secrets.bndrun`, and every value in `config.json` is read as
+  `$[env:NAME;default=$[prop:NAME;default=…]]` — exported environment variable first, then the
+  system property the bndrun set, then the file's own default. `secrets.bndrun.template` is the
+  committed copy to start from; the same pattern (and the same gitignore) is used in
+  `eclipse-fennec/nsc`. A checkout without the file resolves, launches and exports exactly as
+  before, which is why the include is optional.
 - **`codecTypeMapId` on `event.atlas.model.inference` must match `codec.typeMapId` on
   `event.atlas.southbound.ingest`.** The agent annotates the model for *this* runtime's type map;
   a model annotated for another one deserializes nothing here. It is the one value duplicated

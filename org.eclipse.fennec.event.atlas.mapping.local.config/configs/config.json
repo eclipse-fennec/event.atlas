@@ -170,7 +170,7 @@
    * refers to - change it in both places or the completion will not activate. */
   "RemoteMCPEndpoint~metamodel": {
     "server.name": "metamodel",
-    "server.url": "$[env:METAMODEL_MCP_URL;default=http://localhost:8181/mcp/emf]"
+    "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=http://localhost:8181/mcp/emf]]"
   },
 
   /* The Claude client. Note `mcpServers.target`: the reference is 1..n and unfiltered by
@@ -181,6 +181,12 @@
    * `download.file.folder` is required even though only the batch service reads it: the shared
    * OCD marks it mandatory, so the component does not activate without it.
    *
+   * The values are read as $[env:NAME;default=$[prop:NAME;default=...]] - an exported
+   * environment variable first, then a system property (which is what secrets.bndrun sets
+   * through -runvm), then the default here. The numeric ones carry no `type=Integer`: a nested
+   * placeholder and a type directive would have to survive the same `;`-separated parse, and
+   * Declarative Services coerces a numeric string to the component's int either way.
+   *
    * `max.tokens` is the per-answer output ceiling. The component's own default of 1024 is far
    * too small for a turn that authors a package, and hitting it truncates the answer mid-way.
    *
@@ -190,11 +196,11 @@
    * unregisters a package is left out, and nothing here can promote a draft to a released
    * stage - that stays a human decision. */
   "ClaudeChatCompletionService": {
-    "api.key": "$[env:ANTHROPIC_API_KEY]",
-    "base.url": "$[env:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]",
-    "model": "$[env:INFERENCE_MODEL;default=claude-opus-5]",
-    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=16000;type=Integer]",
-    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]",
+    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
+    "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
+    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-opus-5]]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=$[prop:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]]",
     "mcpServers.target": "(server.name=metamodel)",
     "mcp.tools.enabled": [
       "list_registry",
@@ -225,9 +231,9 @@
    * codecTypeMapId has to match `codec.typeMapId` on event.atlas.southbound.ingest above: a
    * model annotated for a different map deserializes nothing in this runtime. */
   "event.atlas.model.inference": {
-    "namespace": "$[env:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]",
+    "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]]",
     "codecTypeMapId": "jena-sensors",
-    "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=3;type=Integer]",
+    "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=3]]",
     "intervalSeconds": 3600,
     "timeoutSeconds": 600
   },
@@ -235,6 +241,6 @@
   /* Left at its defaults except for the wait: a dev broker publishes often, and half an hour
    * is a long time to watch nothing happen. */
   "event.atlas.southbound.sampling": {
-    "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=300;type=Integer]"
+    "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=$[prop:SAMPLING_MAX_WAIT;default=300]]"
   }
 }

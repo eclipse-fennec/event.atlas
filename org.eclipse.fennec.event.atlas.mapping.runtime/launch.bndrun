@@ -1,3 +1,8 @@
+# Optional: local credentials and endpoints for model inference, as system properties. The
+# leading '-' means "ignore if absent", so a checkout without the file - CI, or anyone not
+# running inference - resolves and launches exactly as before. See secrets.bndrun.template.
+-include: -secrets.bndrun
+
 -runprovidedcapabilities: ${native_capability}
 
 -resolve.effective: active
