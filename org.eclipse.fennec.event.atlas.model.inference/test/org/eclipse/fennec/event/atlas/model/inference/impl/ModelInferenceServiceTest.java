@@ -15,6 +15,7 @@ package org.eclipse.fennec.event.atlas.model.inference.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -166,6 +167,30 @@ public class ModelInferenceServiceTest {
 		} finally {
 			release.countDown();
 		}
+	}
+
+	@Test
+	@DisplayName("The provider request runs on this component's own daemon thread")
+	// The request to the provider is synchronous and can take minutes, so which thread it occupies
+	// is the whole safety property: never a broker callback, never an HTTP request thread, never
+	// the ingest hand-off or the collector's hand-over thread. Pinned here so a later refactor
+	// cannot quietly move it back onto the caller.
+	void completion_runsOnItsOwnThread() throws Exception {
+		BlockingQueue<Thread> ranOn = new LinkedBlockingQueue<>();
+		ModelInferenceService service = service((systemMessage, userMessage) -> {
+			ranOn.add(Thread.currentThread());
+			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
+		}, NAMESPACE, "", 5);
+		Thread caller = Thread.currentThread();
+
+		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
+
+		Thread completionThread = ranOn.poll(5, TimeUnit.SECONDS);
+		assertNotNull(completionThread, "The completion should have been called");
+		assertNotSame(caller, completionThread, "The caller must never carry the request");
+		assertTrue(completionThread.getName().startsWith("event.atlas-model-inference"),
+				"Expected one of this component's threads, was " + completionThread.getName());
+		assertTrue(completionThread.isDaemon(), "An agent mid-run must not keep the JVM alive");
 	}
 
 	@Test
