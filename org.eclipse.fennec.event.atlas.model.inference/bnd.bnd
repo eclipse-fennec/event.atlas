@@ -1,0 +1,13 @@
+Bundle-Name: Event Atlas Model Inference
+Bundle-Description: Turns a collected payload sample set into a reviewed model draft: \
+ de-duplicates by sample-set fingerprint, rate limits, composes one prompt and runs a \
+ single agentic chat completion whose tools author, validate and publish the package \
+ elsewhere - so what comes back here is a receipt, never a metamodel document. Carries no \
+ EMF dependency at all, which is what makes "never registers an inferred package locally" \
+ a property of the bundle rather than a promise.
+
+-workingset: SensiNact
+
+-buildpath: \
+	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
+	org.eclipse.fennec.event.atlas.southbound.sampling;version=snapshot
