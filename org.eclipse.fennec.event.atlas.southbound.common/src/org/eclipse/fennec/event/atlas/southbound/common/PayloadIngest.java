@@ -32,6 +32,10 @@ import org.osgi.annotation.versioning.ProviderType;
  * Implementations never throw for a bad payload - every foreseeable failure is reported as
  * an {@link IngestResult} and logged - so an adapter can call this directly from a broker
  * callback or a request thread without risking the connection.
+ * <p>
+ * A payload with no resolvable model is dropped, but not necessarily unnoticed: registering
+ * an {@link UnknownModelHandler} service has such payloads additionally offered to it, off
+ * the ingest thread and without changing the {@link IngestResult}.
  * @author Ilenia Salvadori
  */
 @ProviderType

@@ -13,8 +13,10 @@
  */
 package org.eclipse.fennec.event.atlas.southbound.common.impl;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +26,11 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
@@ -42,6 +49,9 @@ import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult.Outcome;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.UnknownModelHandler;
+import org.eclipse.fennec.event.atlas.southbound.common.UnknownPayload;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,6 +85,12 @@ public class PayloadIngestImplTest {
 		// The component fields are DS-injected at runtime; set them directly here.
 		inject(ingest, "instancePusher", instancePusher);
 		inject(ingest, "resourceSetFactory", (ResourceSetFactory) this::createResourceSet);
+	}
+
+	@AfterEach
+	void tearDown() {
+		// the component's hand-off thread is a daemon, but leaking one per test is still noise
+		ingest.deactivate();
 	}
 
 	@Test
@@ -342,6 +358,276 @@ public class PayloadIngestImplTest {
 		} catch (ReflectiveOperationException e) {
 			throw new IllegalStateException("Could not inject '" + fieldName + "'", e);
 		}
+	}
+
+	// ---------------------------------------------------------------------------------------
+	// The optional UnknownModelHandler seam (issue #27)
+	// ---------------------------------------------------------------------------------------
+
+	/**
+	 * Records what it was offered and lets a test wait for it. The hand-off is asynchronous,
+	 * so every assertion about it has to go through {@link #awaitPayload()} rather than
+	 * reading a field straight after the ingest call.
+	 */
+	private static class RecordingHandler implements UnknownModelHandler {
+
+		private final BlockingQueue<UnknownPayload> received = new LinkedBlockingQueue<>();
+		private final RuntimeException failWith;
+
+		RecordingHandler() {
+			this(null);
+		}
+
+		RecordingHandler(RuntimeException failWith) {
+			this.failWith = failWith;
+		}
+
+		@Override
+		public void onUnknownModel(UnknownPayload payload) {
+			received.add(payload);
+			if (failWith != null) {
+				throw failWith;
+			}
+		}
+
+		UnknownPayload awaitPayload() throws InterruptedException {
+			UnknownPayload payload = received.poll(5, TimeUnit.SECONDS);
+			assertNotNull(payload, "The handler should have been offered a payload");
+			return payload;
+		}
+
+		void assertNothingOffered() throws InterruptedException {
+			assertNull(received.poll(250, TimeUnit.MILLISECONDS), "The handler should not have been offered anything");
+		}
+	}
+
+	@Test
+	@DisplayName("Without a handler, an unhandled payload is dropped exactly as before")
+	// The seam is opt-in: nothing about ingest may change in a runtime that deploys no handler.
+	void ingest_withoutHandler_behavesAsBefore() {
+		IngestResult unknownModel = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+		IngestResult parseError = ingest.ingest("not xmi at all".getBytes(StandardCharsets.UTF_8),
+				PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.MODEL_UNKNOWN, unknownModel.outcome());
+		assertEquals(UNKNOWN_NS_URI, unknownModel.detail());
+		assertEquals(Outcome.PARSE_ERROR, parseError.outcome());
+		verify(instancePusher, never()).pushInstance(any());
+	}
+
+	@Test
+	@DisplayName("A JSON payload whose discriminator matches nothing fires the hook with EMPTY")
+	// EMPTY is the case the hook exists for. A JSON payload declares no nsURI, so it can never
+	// reach MODEL_UNKNOWN: the codec records a diagnostic and hands back an empty resource, and
+	// a hook wired to MODEL_UNKNOWN alone would never fire for an MQTT/JSON sensor at all.
+	void ingest_withUntypedJson_offersTheHandlerAnEmptyOutcome() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
+			ResourceSet resourceSet = new ResourceSetImpl();
+			// stands in for the Fennec codec meeting a payload no typeMapping discriminator
+			// matches: it does not throw, it records a diagnostic and contributes nothing
+			resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put(PayloadIngest.FORMAT_JSON,
+					(Resource.Factory) uri -> new XMIResourceImpl(uri) {
+						@Override
+						public void doLoad(java.io.InputStream inputStream, java.util.Map<?, ?> options) {
+							getErrors().add(new XMIException("no type mapping matched"));
+						}
+					});
+			return resourceSet;
+		});
+
+		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "sensors/dragino/1");
+
+		assertEquals(Outcome.EMPTY, result.outcome());
+		UnknownPayload offered = handler.awaitPayload();
+		assertEquals(Outcome.EMPTY, offered.outcome());
+		assertEquals(PayloadIngest.FORMAT_JSON, offered.format(), "The resolved format must be reported");
+		assertEquals("sensors/dragino/1", offered.source(), "The channel identity must be reported");
+		assertNull(offered.namespaceUri(), "A JSON payload declares no nsURI");
+		assertArrayEquals(sensorJson(), offered.payload(), "The raw bytes must be handed over unchanged");
+		assertNotNull(offered.timestamp());
+		assertEquals(sensorJson().length, offered.size());
+	}
+
+	@Test
+	@DisplayName("An XMI payload naming an unresolvable nsURI fires the hook with MODEL_UNKNOWN and that nsURI")
+	void ingest_withUnresolvableModel_offersTheHandlerTheNsUri() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+
+		IngestResult result = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.MODEL_UNKNOWN, result.outcome());
+		UnknownPayload offered = handler.awaitPayload();
+		assertEquals(Outcome.MODEL_UNKNOWN, offered.outcome());
+		assertEquals(UNKNOWN_NS_URI, offered.namespaceUri(), "The declared, unresolvable nsURI must be reported");
+		assertEquals(PayloadIngest.FORMAT_XMI, offered.format());
+		assertArrayEquals(unknownModelXmi(), offered.payload());
+	}
+
+	@Test
+	@DisplayName("A malformed payload fires the hook with PARSE_ERROR")
+	// It may be the model that is wrong rather than the data.
+	void ingest_withMalformedPayload_offersTheHandlerAParseError() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+
+		IngestResult result = ingest.ingest("this is not xmi at all".getBytes(StandardCharsets.UTF_8),
+				PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.PARSE_ERROR, result.outcome());
+		assertEquals(Outcome.PARSE_ERROR, handler.awaitPayload().outcome());
+	}
+
+	@Test
+	@DisplayName("A handler that throws changes neither the result nor the caller's control flow")
+	void ingest_whenHandlerThrows_doesNotAffectTheResult() throws Exception {
+		RecordingHandler handler = new RecordingHandler(new IllegalStateException("inference service unreachable"));
+		inject(ingest, "unknownModelHandler", handler);
+
+		IngestResult result = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.MODEL_UNKNOWN, result.outcome());
+		assertEquals(UNKNOWN_NS_URI, result.detail());
+		handler.awaitPayload();
+		// and the hand-off thread survives it, so the next payload is still offered
+		RecordingHandler next = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", next);
+		ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+		assertEquals(Outcome.MODEL_UNKNOWN, next.awaitPayload().outcome());
+	}
+
+	@Test
+	@DisplayName("A blocking handler does not stall ingest")
+	// A handler does network I/O, so the hand-off has to be asynchronous: ingest must return
+	// while the handler is still busy, and the adapter's broker callback or request thread with it.
+	void ingest_withBlockingHandler_returnsWithoutWaiting() throws Exception {
+		CountDownLatch entered = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+		inject(ingest, "unknownModelHandler", (UnknownModelHandler) payload -> {
+			entered.countDown();
+			try {
+				release.await(5, TimeUnit.SECONDS);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		});
+
+		try {
+			IngestResult result = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+			assertEquals(Outcome.MODEL_UNKNOWN, result.outcome());
+			assertTrue(entered.await(5, TimeUnit.SECONDS), "The handler should have been called");
+			// the handler is still inside onUnknownModel here, and ingest has long returned
+			assertEquals(1, release.getCount());
+			// a second payload is not blocked from being ingested either
+			assertEquals(Outcome.MODEL_UNKNOWN,
+					ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test").outcome());
+		} finally {
+			release.countDown();
+		}
+	}
+
+	@Test
+	@DisplayName("A handler slower than the payloads discards samples rather than queueing without bound")
+	// The hand-off queue is bounded, so a handler doing network I/O in front of a sensor farm
+	// costs samples - which is what happens without a handler anyway - and not the runtime's
+	// memory. Every ingest still completes normally while the queue is over capacity.
+	void ingest_withSaturatedHandoff_keepsIngestingAndDropsTheOverflow() throws Exception {
+		CountDownLatch entered = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+		AtomicInteger offered = new AtomicInteger();
+		inject(ingest, "unknownModelHandler", (UnknownModelHandler) payload -> {
+			offered.incrementAndGet();
+			entered.countDown();
+			try {
+				release.await(5, TimeUnit.SECONDS);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		});
+		// the EMPTY path rather than MODEL_UNKNOWN: it reaches the same hand-off without EMF
+		// having to build and throw a PackageNotFoundException per payload, which at this
+		// repetition count dominates the runtime of the test
+		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
+			ResourceSet resourceSet = new ResourceSetImpl();
+			resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("xmi",
+					(Resource.Factory) uri -> new XMIResourceImpl(uri) {
+						@Override
+						public void doLoad(java.io.InputStream inputStream, java.util.Map<?, ?> options) {
+							// accepts anything, contributes nothing
+						}
+					});
+			return resourceSet;
+		});
+
+		try {
+			// one payload occupies the handler, the next 64 fill the queue, the rest overflow
+			int payloads = 200;
+			for (int i = 0; i < payloads; i++) {
+				assertEquals(Outcome.EMPTY,
+						ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test").outcome(),
+						"Ingest must be unaffected by the state of the hand-off queue");
+			}
+			assertTrue(entered.await(5, TimeUnit.SECONDS), "The handler should have been called");
+			assertTrue(offered.get() < payloads, "The overflow must have been discarded, not queued");
+		} finally {
+			release.countDown();
+		}
+	}
+
+	@Test
+	@DisplayName("FORMAT_UNSUPPORTED does not fire the hook")
+	// A missing codec bundle is a deployment gap - no model would fix it.
+	void ingest_withUnsupportedFormat_doesNotOfferTheHandler() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+
+		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "sensors/test");
+
+		assertEquals(Outcome.FORMAT_UNSUPPORTED, result.outcome());
+		handler.assertNothingOffered();
+	}
+
+	@Test
+	@DisplayName("NO_MAPPING does not fire the hook")
+	// The model exists, the sensinact mapping does not - a different problem, and inferring a
+	// model for a payload that already deserialized would be actively wrong.
+	void ingest_withoutMapping_doesNotOfferTheHandler() throws Exception {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(0);
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+
+		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.NO_MAPPING, result.outcome());
+		handler.assertNothingOffered();
+	}
+
+	@Test
+	@DisplayName("An applied payload does not fire the hook")
+	void ingest_whenApplied_doesNotOfferTheHandler() throws Exception {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+
+		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+		handler.assertNothingOffered();
+	}
+
+	@Test
+	@DisplayName("An adapter that passes no source still yields a usable channel identity")
+	// source is what a collector groups payloads by, so it must never be null.
+	void ingest_withoutSource_reportsAPlaceholderSource() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		inject(ingest, "unknownModelHandler", handler);
+
+		ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, null);
+
+		assertEquals("<unknown source>", handler.awaitPayload().source());
 	}
 
 	@Test

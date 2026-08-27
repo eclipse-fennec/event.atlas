@@ -16,11 +16,16 @@ package org.eclipse.fennec.event.atlas.southbound.common.impl;
 import static java.util.Objects.requireNonNull;
 
 import java.io.ByteArrayInputStream;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,12 +40,18 @@ import org.eclipse.fennec.emf.osgi.ResourceSetFactory;
 import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.UnknownModelHandler;
+import org.eclipse.fennec.event.atlas.southbound.common.UnknownPayload;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 
 /**
  * Default {@link PayloadIngest}: deserializes through the runtime's {@link ResourceSet} and
@@ -88,16 +99,52 @@ public class PayloadIngestImpl implements PayloadIngest {
 
 	private static final Logger logger = Logger.getLogger(PayloadIngestImpl.class.getName());
 
+	/**
+	 * How many unhandled payloads may wait for the {@link UnknownModelHandler}. Bounded on
+	 * purpose: a handler doing network I/O is slower than a sensor farm publishing, and
+	 * discarding a sample is exactly what happens without a handler anyway - growing a queue
+	 * until the runtime runs out of memory is not.
+	 */
+	private static final int HANDOFF_QUEUE_CAPACITY = 64;
+
+	/** Warn on the first discarded payload and every {@code n}th after it, not on each. */
+	private static final long HANDOFF_DISCARD_LOG_INTERVAL = 100;
+
 	/** Empty unless a mapId is configured; passed to every JSON load. */
 	private volatile Map<String, Object> loadOptions = Collections.emptyMap();
 
 	/** Distinguishes the throw-away resource URIs; only needs to be unique per runtime. */
 	private final AtomicLong sequence = new AtomicLong();
 
+	/** Payloads discarded because the hand-off queue was full; for the throttled warning. */
+	private final AtomicLong handoffDiscarded = new AtomicLong();
+
+	/**
+	 * Takes the payloads offered to the {@link UnknownModelHandler} off the ingest thread.
+	 * <p>
+	 * One daemon thread, created on the first unhandled payload and reclaimed after 30s idle,
+	 * so a runtime without a handler - or one that never sees an unknown payload - pays
+	 * nothing for this. A single thread also means a handler sees the payloads of a channel in
+	 * arrival order, which a sample collector reasoning about optionality across a window
+	 * needs. Created in the field initializer rather than in {@link #activate(Config)},
+	 * because that method is also the {@link Modified} handler and must not replace it.
+	 */
+	private final ExecutorService handoff = new ThreadPoolExecutor(0, 1, 30L, TimeUnit.SECONDS,
+			new ArrayBlockingQueue<>(HANDOFF_QUEUE_CAPACITY), PayloadIngestImpl::newHandoffThread,
+			(task, executor) -> rejectedHandoff(executor));
+
 	@Reference
 	private ResourceSetFactory resourceSetFactory;
 	@Reference
 	private InstancePusher instancePusher;
+	/**
+	 * Optional so a runtime without one behaves exactly as it did before the hook existed;
+	 * dynamic so deploying or reconfiguring a handler does not tear ingest down and interrupt
+	 * the southbound adapters bound to it.
+	 */
+	@Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC, //
+			policyOption = ReferencePolicyOption.GREEDY)
+	private volatile UnknownModelHandler unknownModelHandler;
 
 	@Activate
 	@Modified
@@ -116,6 +163,13 @@ public class PayloadIngestImpl implements PayloadIngest {
 		logger.info(String.format("Payload typing: map '%s', ExtendedMetaData names %s",
 				mapId == null || mapId.isBlank() ? "<none>" : mapId,
 				config.codec_useNamesFromExtendedMetadata() ? "on" : "off"));
+	}
+
+	@Deactivate
+	void deactivate() {
+		// Drop whatever is still queued instead of waiting: the payloads are best-effort
+		// samples, and a handler blocked on network I/O must not delay the shutdown.
+		handoff.shutdownNow();
 	}
 
 	/*
@@ -138,7 +192,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 					"Cannot deserialize payload from '%s': model '%s' is not available "
 							+ "(neither deployed nor resolvable via the Model Atlas) - dropping payload",
 					origin, e.uri()));
-			return IngestResult.modelUnknown(e.uri());
+			return offerUnknown(IngestResult.modelUnknown(e.uri()), payload, format, origin);
 		} catch (UnsupportedFormatException e) {
 			// A deployment gap, not a payload problem: without this the payload would be
 			// handed to the wildcard XMI factory and fail as an XML parse error, which reads
@@ -150,7 +204,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 			logger.warning(String.format("Cannot deserialize %s payload from '%s' - dropping payload: %s", format,
 					origin, describe(e)));
 			logger.log(Level.FINE, "Payload deserialization failure for " + origin, e);
-			return IngestResult.parseError(describe(e));
+			return offerUnknown(IngestResult.parseError(describe(e)), payload, format, origin);
 		}
 
 		List<EObject> roots = List.copyOf(resource.getContents());
@@ -162,7 +216,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 			logger.warning(String.format(
 					"Payload from '%s' was read as %s but contained no objects - dropping payload%s", origin, format,
 					reason == null ? "" : ": " + reason));
-			return IngestResult.empty(reason);
+			return offerUnknown(IngestResult.empty(reason), payload, format, origin);
 		}
 
 		int applied = 0;
@@ -189,6 +243,82 @@ public class PayloadIngestImpl implements PayloadIngest {
 		logger.info(String.format("Pushed payload from '%s' - %s object(s), %s mapping(s) applied", origin,
 				roots.size(), applied));
 		return IngestResult.applied(roots.size(), applied);
+	}
+
+	/**
+	 * Offers a payload this runtime has no model for to the {@link UnknownModelHandler}, if
+	 * one is deployed, and returns <code>result</code> unchanged.
+	 * <p>
+	 * Called from the three outcomes that can be a missing model - {@code MODEL_UNKNOWN},
+	 * {@code EMPTY} and {@code PARSE_ERROR} - and from those only. A missing codec bundle
+	 * ({@code FORMAT_UNSUPPORTED}), a model without a mapping ({@code NO_MAPPING}) and an
+	 * unavailable twin ({@code PUSH_FAILED}) are not model problems; the reasoning is in
+	 * {@link UnknownModelHandler}.
+	 * <p>
+	 * The result is returned untouched on every path, including a rejected hand-off and a
+	 * handler that throws: the southbound adapters map outcomes onto transport responses, and
+	 * this is a side channel, not a second result.
+	 */
+	private IngestResult offerUnknown(IngestResult result, byte[] payload, String format, String origin) {
+		UnknownModelHandler handler = unknownModelHandler;
+		if (handler == null) {
+			return result;
+		}
+		// The nsURI only exists for MODEL_UNKNOWN, where it is what the outcome reports.
+		String nsUri = result.outcome() == IngestResult.Outcome.MODEL_UNKNOWN ? result.detail() : null;
+		UnknownPayload unknown = new UnknownPayload(payload, format, origin, nsUri, result.outcome(), Instant.now());
+		// The handler is captured here rather than read again in the task: a dynamic reference
+		// may be unbound while the payload waits, and calling a handler that has just gone away
+		// is contained by notifyHandler - dropping the sample silently because of a race is
+		// worse. A full queue or a shutdown pool goes to rejectedHandoff and never throws here.
+		handoff.execute(() -> notifyHandler(handler, unknown));
+		return result;
+	}
+
+	/**
+	 * Runs the handler on the hand-off thread. A handler is third-party code doing network
+	 * I/O: anything it throws - including an {@link Error} - stays here, because the thread it
+	 * would kill is the one every later payload needs.
+	 */
+	private static void notifyHandler(UnknownModelHandler handler, UnknownPayload unknown) {
+		try {
+			handler.onUnknownModel(unknown);
+		} catch (Throwable e) {
+			logger.log(Level.WARNING,
+					String.format("The unknown-model handler failed on %s - the payload is dropped", unknown), e);
+		}
+	}
+
+	/**
+	 * The hand-off pool would not take this payload, so it is dropped. Called on the ingest
+	 * thread, so it must stay cheap and must not throw - the whole point of a rejection
+	 * handler here rather than the default {@code AbortPolicy} is that
+	 * {@link ExecutorService#execute(Runnable)} never fails an ingest.
+	 * <p>
+	 * A shutdown pool is deactivation and unremarkable. A full queue means the handler cannot
+	 * keep up, which is worth a warning - but on the first occurrence and every
+	 * {@link #HANDOFF_DISCARD_LOG_INTERVAL}th after it, since a sensor farm would otherwise
+	 * turn one warning per payload into the log flood this bounded queue exists to prevent.
+	 */
+	private void rejectedHandoff(ThreadPoolExecutor executor) {
+		if (executor.isShutdown()) {
+			logger.fine("Ingest is shutting down - the unknown-model handler is no longer offered payloads");
+			return;
+		}
+		long discarded = handoffDiscarded.incrementAndGet();
+		if (discarded == 1 || discarded % HANDOFF_DISCARD_LOG_INTERVAL == 0) {
+			logger.warning(String.format(
+					"The unknown-model handler is not keeping up - %s payload(s) discarded without being offered "
+							+ "(queue capacity %s)",
+					discarded, HANDOFF_QUEUE_CAPACITY));
+		}
+	}
+
+	private static Thread newHandoffThread(Runnable task) {
+		Thread thread = new Thread(task, "event.atlas-unknown-model-handoff");
+		// A handler blocked on I/O must not keep the JVM alive
+		thread.setDaemon(true);
+		return thread;
 	}
 
 	/**
