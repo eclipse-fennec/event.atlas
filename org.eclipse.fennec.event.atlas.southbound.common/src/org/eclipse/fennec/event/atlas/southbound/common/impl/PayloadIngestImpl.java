@@ -188,7 +188,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 		} catch (PackageNotFoundException e) {
 			// The model is neither deployed nor resolvable through the Model Atlas. Not an
 			// error on our side - the payload simply cannot be understood yet.
-			logger.warning(String.format(
+			logDrop(origin, String.format(
 					"Cannot deserialize payload from '%s': model '%s' is not available "
 							+ "(neither deployed nor resolvable via the Model Atlas) - dropping payload",
 					origin, e.uri()));
@@ -201,7 +201,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 					origin, e.getMessage()));
 			return IngestResult.formatUnsupported(format);
 		} catch (Exception e) {
-			logger.warning(String.format("Cannot deserialize %s payload from '%s' - dropping payload: %s", format,
+			logDrop(origin, String.format("Cannot deserialize %s payload from '%s' - dropping payload: %s", format,
 					origin, describe(e)));
 			logger.log(Level.FINE, "Payload deserialization failure for " + origin, e);
 			return offerUnknown(IngestResult.parseError(describe(e)), payload, format, origin);
@@ -213,7 +213,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 			// records a diagnostic and returns an empty resource. Passing that on is the
 			// difference between "contained no objects" and knowing why.
 			String reason = firstError(resource);
-			logger.warning(String.format(
+			logDrop(origin, String.format(
 					"Payload from '%s' was read as %s but contained no objects - dropping payload%s", origin, format,
 					reason == null ? "" : ": " + reason));
 			return offerUnknown(IngestResult.empty(reason), payload, format, origin);
@@ -243,6 +243,42 @@ public class PayloadIngestImpl implements PayloadIngest {
 		logger.info(String.format("Pushed payload from '%s' - %s object(s), %s mapping(s) applied", origin,
 				roots.size(), applied));
 		return IngestResult.applied(roots.size(), applied);
+	}
+
+	/**
+	 * Reports a payload that could not be turned into objects: at warning level, unless the
+	 * {@link UnknownModelHandler} says it is currently collecting that channel's payloads on
+	 * purpose.
+	 * <p>
+	 * A drop normally means data is being lost and has to be visible. While a handler gathers a
+	 * channel's payloads to infer a model from, though, every one of them is an expected drop,
+	 * and one warning per payload would make commissioning a new sensor look like an outage.
+	 * The handler logs its own line when it starts collecting and when it stops; in between,
+	 * this drops to {@code FINE}.
+	 */
+	private void logDrop(String origin, String message) {
+		if (isCollecting(origin)) {
+			logger.fine(message);
+		} else {
+			logger.warning(message);
+		}
+	}
+
+	/**
+	 * @return whether the deployed handler is collecting <code>origin</code>'s payloads. A
+	 * handler that misbehaves here must not cost the log message, let alone the ingest
+	 */
+	private boolean isCollecting(String origin) {
+		UnknownModelHandler handler = unknownModelHandler;
+		if (handler == null) {
+			return false;
+		}
+		try {
+			return handler.isCollecting(origin);
+		} catch (Throwable e) {
+			logger.log(Level.FINE, "The unknown-model handler failed to answer isCollecting", e);
+			return false;
+		}
 	}
 
 	/**

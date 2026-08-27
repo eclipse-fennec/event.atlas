@@ -26,11 +26,17 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
@@ -616,6 +622,87 @@ public class PayloadIngestImplTest {
 
 		assertEquals(Outcome.APPLIED, result.outcome());
 		handler.assertNothingOffered();
+	}
+
+	@Test
+	@DisplayName("While the handler collects a channel, its drops are logged quietly")
+	// A drop normally means data is lost and has to be visible. While a handler gathers a
+	// channel's payloads on purpose - to infer a model from them - one warning per payload turns
+	// commissioning a new sensor into what looks like an outage.
+	void ingest_whileHandlerIsCollecting_logsTheDropAtFineInsteadOfWarning() throws Exception {
+		inject(ingest, "unknownModelHandler", collectingHandler("sensors/collected"));
+		Logger logger = Logger.getLogger(PayloadIngestImpl.class.getName());
+		List<LogRecord> logged = new ArrayList<>();
+		Handler capture = new Handler() {
+
+			@Override
+			public void publish(LogRecord record) {
+				logged.add(record);
+			}
+
+			@Override
+			public void flush() {
+				// nothing is buffered
+			}
+
+			@Override
+			public void close() {
+				// nothing to release
+			}
+		};
+		capture.setLevel(Level.ALL);
+		Level previous = logger.getLevel();
+		logger.addHandler(capture);
+		logger.setLevel(Level.ALL);
+		try {
+			ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/collected");
+			ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/ignored");
+		} finally {
+			logger.removeHandler(capture);
+			logger.setLevel(previous);
+		}
+
+		assertEquals(List.of(Level.FINE, Level.WARNING),
+				logged.stream().filter(record -> record.getMessage().contains("is not available"))
+						.map(LogRecord::getLevel).toList(),
+				"The collected channel is logged at FINE, a channel nobody collects still warns");
+	}
+
+	@Test
+	@DisplayName("A handler that fails to answer isCollecting does not affect the ingest")
+	void ingest_whenIsCollectingThrows_stillReportsTheOutcome() {
+		inject(ingest, "unknownModelHandler", new UnknownModelHandler() {
+
+			@Override
+			public void onUnknownModel(UnknownPayload payload) {
+				// not what this test is about
+			}
+
+			@Override
+			public boolean isCollecting(String source) {
+				throw new IllegalStateException("handler is confused");
+			}
+		});
+
+		IngestResult result = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertEquals(Outcome.MODEL_UNKNOWN, result.outcome());
+		assertEquals(UNKNOWN_NS_URI, result.detail());
+	}
+
+	private static UnknownModelHandler collectingHandler(String collected) {
+		return new UnknownModelHandler() {
+
+			@Override
+			public void onUnknownModel(UnknownPayload payload) {
+				// this test is about the logging, not the hand-off
+			}
+
+			@Override
+			public boolean isCollecting(String source) {
+				return collected.equals(source);
+			}
+		};
 	}
 
 	@Test

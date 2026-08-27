@@ -74,4 +74,28 @@ public interface UnknownModelHandler {
 	 */
 	void onUnknownModel(UnknownPayload payload);
 
+	/**
+	 * Whether this handler is currently gathering payloads from <code>source</code>, and the
+	 * drops on that channel are therefore expected.
+	 * <p>
+	 * {@link PayloadIngest} logs every dropped payload at warning level, which is right when
+	 * the data is simply lost. A handler that collects a channel's payloads on purpose - to
+	 * gather enough of them to infer a model from - turns that into an incident report for
+	 * something that is going according to plan. While this answers <code>true</code>, ingest
+	 * logs the drops of that channel at {@code FINE} instead, so what remains in the log is
+	 * the handler's own line when it starts collecting and its line when it stops.
+	 * <p>
+	 * Called on the ingest thread, once per dropped payload, and before the payload is offered:
+	 * the first payload of a collection window is therefore always logged normally, since
+	 * nothing was collecting yet when it arrived. Implementations must answer cheaply and must
+	 * not throw - an exception here is treated as <code>false</code>.
+	 * @param source the channel, as it would reach {@link UnknownPayload#source()}. Parameter
+	 * is never <code>null</code>
+	 * @return <code>true</code> to have ingest log this channel's drops quietly. The default
+	 * is <code>false</code>: a handler that does not collect changes no logging
+	 */
+	default boolean isCollecting(String source) {
+		return false;
+	}
+
 }

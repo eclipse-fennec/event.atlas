@@ -1,0 +1,11 @@
+Bundle-Name: SensiNact Southbound Payload Sampling
+Bundle-Description: Collects the payloads a runtime has no model for into per-channel \
+ sample sets, so that model inference sees a set rather than a single payload: it binds \
+ the ingress' UnknownModelHandler hook, buffers a bounded ring of distinctly shaped \
+ payloads per channel, and hands the closed set to a PayloadSampleSetHandler once.
+
+-workingset: SensiNact
+
+-buildpath: \
+	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
+	tools.jackson.core.jackson-core;version=latest
