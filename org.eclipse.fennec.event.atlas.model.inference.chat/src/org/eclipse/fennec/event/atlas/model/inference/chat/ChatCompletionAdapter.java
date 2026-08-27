@@ -64,6 +64,17 @@ public class ChatCompletionAdapter implements ChatCompletion {
 			// The port's contract: an unchecked throw is what inference records as an
 			// unavailable receipt, which is exactly what a transport failure is.
 			throw new IllegalStateException("The chat completion could not be reached: " + describe(e), e);
+		} catch (RuntimeException e) {
+			// The client answers a non-2xx by failing to deserialize the body - an HTTP error
+			// payload is not a completion response - so this is where a rejected API key or a
+			// wrong endpoint arrives, with a message that says nothing about either. Name the
+			// two suspects here: the alternative is an operator reading "not of expected type"
+			// off an unavailable receipt and going looking for a model problem.
+			throw new IllegalStateException(String.format(
+					"The chat completion failed and its answer could not be read (%s). An HTTP error from the "
+							+ "provider looks exactly like this - check that api.key is set in the environment and "
+							+ "that base.url points at the provider's messages endpoint.",
+					describe(e)), e);
 		}
 		String usage = AnswerText.usageOf(response);
 		logger.log(Level.INFO, () -> String.format("The chat completion answered in %ss%s",

@@ -167,6 +167,27 @@ public class ChatCompletionAdapterTest {
 		assertTrue(failure.getMessage().contains("connection refused"));
 	}
 
+	@Test
+	@DisplayName("An unreadable answer names the configuration, not the model")
+	// The client reports a non-2xx by failing to deserialize the body, so this is the path a
+	// rejected API key takes. Its own message mentions neither the key nor the endpoint, and an
+	// operator reading "not of expected type ClaudeResponse" off an unavailable receipt would go
+	// looking for a model problem.
+	void adapter_explainsAnUnreadableAnswer() throws Exception {
+		ChatCompletionService service = mock(ChatCompletionService.class);
+		when(service.complete(anyString(), anyString()))
+				.thenThrow(new IllegalStateException("Response object is not of expected type ClaudeResponse"));
+		ChatCompletionAdapter adapter = adapter(service);
+
+		IllegalStateException failure = assertThrows(IllegalStateException.class,
+				() -> adapter.complete("system", "user"));
+
+		assertTrue(failure.getMessage().contains("api.key"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("base.url"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("not of expected type ClaudeResponse"),
+				"The client's own message must survive - it is what says which half failed");
+	}
+
 	private static ChatCompletionAdapter adapter(ChatCompletionService service) {
 		ChatCompletionAdapter adapter = new ChatCompletionAdapter();
 		try {

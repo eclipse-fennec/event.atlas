@@ -196,10 +196,18 @@ runtime resolves it on the next payload.
   by the slf4j-api already there. Those imports are mandatory even though `RemoteMCPEndpoint`
   itself only carries a name and a URL.
 - **Credentials come from the environment**, never from a config file: `api.key` is
-  `$[env:ANTHROPIC_API_KEY]`. `download.file.folder` is required by the shared OCD even though
-  only the batch service reads it — without it the component does not activate. `max.tokens`
-  must be raised well past the component's own 1024 default, which would truncate a turn that
-  authors a package.
+  `$[env:ANTHROPIC_API_KEY]`, interpolated at configuration delivery by
+  `org.apache.felix.configadmin.plugin.interpolation` (already in the runtime, enabled through
+  `felix.cm.config.plugins`). **An unset variable does not stop anything from starting**: the
+  metatype's `required` is documentation, not enforcement, so `ClaudeChatCompletionService`
+  activates and the first inference run fails at the provider. It surfaces as
+  `IllegalStateException: Response object is not of expected type ClaudeResponse` — the client
+  reports a non-2xx by failing to deserialize the body — which `ChatCompletionAdapter` rewrites
+  to name `api.key` and `base.url`, and which lands as an `UNAVAILABLE` receipt that is not
+  retried for `retryAfterUnavailableSeconds`. `download.file.folder` is required by the shared
+  OCD even though only the batch service reads it — without it the component does not activate.
+  `max.tokens` must be raised well past the component's own 1024 default, which would truncate a
+  turn that authors a package.
 - **`codecTypeMapId` on `event.atlas.model.inference` must match `codec.typeMapId` on
   `event.atlas.southbound.ingest`.** The agent annotates the model for *this* runtime's type map;
   a model annotated for another one deserializes nothing here. It is the one value duplicated
