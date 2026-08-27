@@ -150,5 +150,91 @@
     "mqtt.handler.id": "waterpark-broker",
     "format": "json",
     "name": "waterpark-mqtt"
+  },
+
+  /* --- model inference: a draft model for payloads this runtime has no model for ---------
+   *
+   * All of this is optional. Without these four configurations - or without the bundles they
+   * configure - unknown payloads are dropped exactly as they were before, and the sample
+   * collector below simply reports what it would have handed over.
+   *
+   * The chain is: PayloadIngest offers an unhandled payload to the collector, the collector
+   * gathers a set of distinctly shaped payloads per channel, and model inference spends one
+   * agentic completion on the closed set. The agent authors and publishes through the MCP
+   * server's own tools; what comes back is a receipt. Nothing here registers a model locally -
+   * a draft is promoted by a human, and the runtime resolves it on the next payload. */
+
+  /* The remote metamodel MCP server, registered as an addressable MCPEndpoint without this
+   * framework hosting an MCP server of its own. `server.name` is also the service property the
+   * chat completion's mcpServers.target filters on, and the name the request's mcp_toolset
+   * refers to - change it in both places or the completion will not activate. */
+  "RemoteMCPEndpoint~metamodel": {
+    "server.name": "metamodel",
+    "server.url": "$[env:METAMODEL_MCP_URL;default=http://localhost:8181/mcp/emf]"
+  },
+
+  /* The Claude client. Note `mcpServers.target`: the reference is 1..n and unfiltered by
+   * default, so without this it would bind ANY MCPEndpoint in the framework - including a
+   * co-hosted one - and the agent would be handed the wrong tool surface.
+   *
+   * `api.key` is read from the environment; the key itself never lives in configuration.
+   * `download.file.folder` is required even though only the batch service reads it: the shared
+   * OCD marks it mandatory, so the component does not activate without it.
+   *
+   * `max.tokens` is the per-answer output ceiling. The component's own default of 1024 is far
+   * too small for a turn that authors a package, and hitting it truncates the answer mid-way.
+   *
+   * `mcp.tools.enabled` is the allow-list, and it is deliberately task-scoped - see CLAUDE.md
+   * for the measured reason. 21 of the server's 38 tools: discovery, authoring, one validation
+   * tool, register and publish. Everything that manages datasets, deletes, replays a recipe or
+   * unregisters a package is left out, and nothing here can promote a draft to a released
+   * stage - that stays a human decision. */
+  "ClaudeChatCompletionService": {
+    "api.key": "$[env:ANTHROPIC_API_KEY]",
+    "base.url": "$[env:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]",
+    "model": "$[env:INFERENCE_MODEL;default=claude-opus-5]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=16000;type=Integer]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]",
+    "mcpServers.target": "(server.name=metamodel)",
+    "mcp.tools.enabled": [
+      "list_registry",
+      "list_metamodel",
+      "describe_eclass",
+      "export_package",
+      "find_class_by_name",
+      "find_classes_by_annotation",
+      "find_features_by_annotation",
+      "list_annotation_sources",
+      "create_epackage",
+      "add_eclass",
+      "add_eattribute",
+      "add_ereference",
+      "add_eannotation",
+      "add_eenum",
+      "add_eenum_literal",
+      "add_edatatype",
+      "modify_feature",
+      "create_from_json",
+      "describe_package_metadata",
+      "register_package",
+      "post_to_model_atlas"
+    ]
+  },
+
+  /* The namespace the agent may publish under, and the codec type map it must annotate for.
+   * codecTypeMapId has to match `codec.typeMapId` on event.atlas.southbound.ingest above: a
+   * model annotated for a different map deserializes nothing in this runtime. */
+  "event.atlas.model.inference": {
+    "namespace": "$[env:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]",
+    "codecTypeMapId": "jena-sensors",
+    "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=3;type=Integer]",
+    "intervalSeconds": 3600,
+    "timeoutSeconds": 600
+  },
+
+  /* Left at its defaults except for the wait: a dev broker publishes often, and half an hour
+   * is a long time to watch nothing happen. */
+  "event.atlas.southbound.sampling": {
+    "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=300;type=Integer]"
   }
 }

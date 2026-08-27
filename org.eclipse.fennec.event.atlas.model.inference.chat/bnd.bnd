@@ -1,0 +1,16 @@
+Bundle-Name: Event Atlas Model Inference Chat Completion Adapter
+Bundle-Description: Binds model inference's ChatCompletion port to a Fennec AI \
+ ChatCompletionService, and reads the agent's answer out of the response's content blocks. \
+ The whole reason it is a bundle of its own: it is the only place that depends on an AI \
+ stack, so a runtime without one simply does not deploy it - and the inference bundle stays \
+ free of both that dependency and of EMF.
+
+-workingset: SensiNact
+
+-library: enableEMF
+
+-buildpath: \
+	org.eclipse.fennec.event.atlas.model.inference;version=snapshot,\
+	org.eclipse.fennec.ai.chat.completion.api;version=latest,\
+	org.eclipse.fennec.ai.apis.meta.model;version=latest,\
+	org.osgi.util.promise;version=latest
