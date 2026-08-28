@@ -186,15 +186,25 @@ registers an inferred package into a running framework — a draft is promoted b
 runtime resolves it on the next payload.
 
 - **`cnf/local` is a temporary `LocalIndexedRepo`** (registered as `-plugin.0.Local` in
-  `cnf/build.bnd`) holding local builds of the chat-completion API/impl/models and an
-  `org.eclipse.fennec.mcp.api` that carries the `MCPServer`/`MCPEndpoint` split. Its `README.md`
-  says what to delete once those publish. `RemoteMCPEndpoint` (config `server.name` +
-  `server.url`) is what makes a *remote* MCP deployment addressable, so no MCP **server** bundle
-  is deployed here — that was the blocker recorded in #29.
-- **`cnf/ext/central.mvn` carries the MCP SDK closure** the `mcp.api` bundle needs to resolve at
-  all (`mcp-core` 2.0.0, `reactor-core`, `reactive-streams`); its `org.slf4j` import is satisfied
-  by the slf4j-api already there. Those imports are mandatory even though `RemoteMCPEndpoint`
-  itself only carries a name and a URL.
+  `cnf/build.bnd`) holding local builds of the chat-completion API/impl/models and
+  `org.eclipse.fennec.mcp.endpoint`. Its `README.md` says what to delete once those publish.
+  `RemoteMCPEndpoint` (config `server.name` + `server.url`) is what makes a *remote* MCP
+  deployment addressable, so no MCP **server** bundle is deployed here — that was the blocker
+  recorded in #29.
+- **The MCP server is reached by Anthropic, not by this runtime.** `ClaudeHelper` sends each
+  endpoint as an `mcp_servers` entry of type `url` (beta `mcp-client-2025-11-20`), so the API
+  connects to the MCP server from its own side. `server.url` therefore has to be **publicly
+  reachable over HTTPS** — a localhost URL is never dialled from here and fails at request time —
+  and `RemoteMCPEndpoint` never probes it, so a wrong URL first surfaces as a failed run. For a
+  local test, tunnel the metamodel runtime's servlet (`emf.osgi-mcp`, port 8099) and use the
+  tunnel's address.
+- **No MCP SDK is deployed, and none is indexed.** Until `emf.osgi-mcp#31` the `MCPEndpoint` API
+  shared a bundle with the MCP *server* API, so addressing a remote server dragged in `mcp-core`,
+  `reactor-core` and `reactive-streams` — three bundles that did nothing here except carry a
+  permanently `UNSATISFIED` `McpJsonDefaults` component. The split moved `MCPEndpoint` +
+  `RemoteMCPEndpoint` into `org.eclipse.fennec.mcp.endpoint`, whose `Import-Package` is
+  `java.lang` and nothing else. Both bndruns dropped all three (91 bundles in `inference.bndrun`,
+  down from 94) and `central.mvn` no longer declares them.
 - **Credentials come from the environment**, never from a config file: `api.key` is
   `$[env:ANTHROPIC_API_KEY]`, interpolated at configuration delivery by
   `org.apache.felix.configadmin.plugin.interpolation` (already in the runtime, enabled through
@@ -216,17 +226,31 @@ runtime resolves it on the next payload.
   committed copy to start from; the same pattern (and the same gitignore) is used in
   `eclipse-fennec/nsc`. A checkout without the file resolves, launches and exports exactly as
   before, which is why the include is optional.
-- **`codecTypeMapId` on `event.atlas.model.inference` must match `codec.typeMapId` on
-  `event.atlas.southbound.ingest`.** The agent annotates the model for *this* runtime's type map;
-  a model annotated for another one deserializes nothing here. It is the one value duplicated
-  across two configurations.
+- **`namespace` is the only thing `event.atlas.model.inference` tells the agent.** The prompt
+  names no model family, no annotation source and no tool — a prototype found all of those by
+  discovery, and naming them suppressed the discovery that found them. `codec.typeMapId` on
+  `event.atlas.southbound.ingest` is an *ingest-side* setting and is deliberately not mirrored
+  into the inference configuration.
 
 ### The MCP tool allow-list is task-scoped, and why
 
-`mcp.tools.enabled` in `configs/config.json` lists **21 of the metamodel server's 38 tools** —
-discovery, authoring, one validation tool, register, publish. Everything that manages or deletes
-datasets, replays a recipe, or unregisters a package is left out, and nothing in the list can
-promote a draft to a released stage.
+Scoping happens at **both** ends, and neither end is optional.
+
+*Server side*: `server.url` points at `/mcp/inference`, the metamodel runtime's task-scoped
+servlet, whose `inference_tool_provider` serves **21 tools** — discovery, authoring, validation,
+register, publish. The general-purpose `/mcp/emf` servlet on the same runtime serves all 38.
+Each servlet carries its own `server.instructions`, and `/mcp/inference`'s are written for this
+task, which matters because the prompt here deliberately names no tool.
+
+*Client side*: `mcp.tools.enabled` in `configs/config.json` repeats those 21 names, and it is
+**mandatory, not an optimisation**. `ClaudeHelper` always builds the toolset with
+`default_config {enabled:false}` and re-enables only what the array names, and
+`ClaudeChatCompletionConfig` declares `String[] mcp_tools_enabled()` with *no default* — so
+omitting the key disables every tool on the server and hands the agent nothing to call.
+
+Between them: nothing exposed manages or deletes datasets beyond authoring, replays a recipe, or
+unregisters a package, and nothing can promote a draft to a released stage. A name that drifts
+out of the server's provider stops being callable rather than silently widening the surface.
 
 The reason is cost, and it was measured on the prototype (same server, same prompt): a server's
 tool definitions are re-sent on **every** turn, and a run is ~100 turns.
@@ -239,19 +263,30 @@ tool definitions are re-sent on **every** turn, and a run is ~100 turns.
 That is 36 % off the server's footprint and 15 % off the whole prefix; the runs also converged
 faster (131 → 111 → 104 turns, $2.93 → $2.18 → $2.01).
 
-**Which mechanism, and the caveat.** The choice between a server-side scoped endpoint and
-per-request filtering is already made by the client: `ClaudeHelper` builds an `mcp_toolset` with
-`default_config {enabled:false, defer_loading:false}` plus one `configs` entry
-`{enabled:true, defer_loading:false}` per allow-listed name — i.e. the **per-request** option, which
-is the natural fit for one shared general-purpose server. What that guarantees is *behavioural*:
-only the 21 are callable. Whether `enabled:false` also keeps a tool's **definition** out of the
-context — and therefore delivers the token saving in the table — is **unverified here**: the flag
-that explicitly governs loading is `defer_loading`, and the client sets it to `false` everywhere.
-Settle it with the three-request experiment from #30 (same request, both tools loaded / one
-deferred / one disabled; compare `usage.input_tokens`) before relying on the numbers above, and
-if it turns out `enabled:false` only blocks calls, either set `defer_loading` on the disabled
-default or publish a task-scoped tool provider on its own MCP endpoint (the server-side option,
-already proven to work).
+**Where the saving comes from — measured 2026-08-28, no longer a caveat.** `enabled:false`
+does keep a tool's **definition** out of the request prefix, so per-request filtering delivers
+the saving on its own. Two otherwise-identical requests against `/mcp/inference` (same prompt,
+same server, one `list_registry` call):
+
+| `configs` entries with `enabled:true` | `usage.input_tokens` |
+|---|---:|
+| 1 (the other 20 left to `default_config {enabled:false}`) | 915 |
+| 21 | 14,021 |
+
+13,106 tokens for those 20 definitions, i.e. they are simply absent when disabled — `defer_loading`
+turned out not to be the flag that matters. This closes the three-request experiment #30 asked
+for. Pointing `server.url` at the task-scoped `/mcp/inference` is still worth doing (the server
+cannot serve what it does not expose, and that servlet's `server.instructions` are written for
+this task), but the prefix saving no longer depends on it.
+
+**Anthropic rejects an unknown field in a toolset outright**, with a 400 rather than by ignoring
+it: `tools.0.mcp_toolset.default_config.deferLoading: Extra inputs are not permitted`. So every
+camelCase EAttribute in `claude-chat-completion.ecore`'s MCP types carries an ExtendedMetaData
+`"name"` annotation giving its snake_case wire name (`mcpServerName` → `mcp_server_name`,
+`defaultConfig` → `default_config`, `deferLoading` → `defer_loading`) — all present and correct.
+Worth knowing because a request malformed this way fails as the usual
+`IllegalStateException: Response object is not of expected type ClaudeResponse` → `UNAVAILABLE`
+receipt, which names `api.key` and `base.url` and so points at the wrong thing entirely.
 
 ## The mapping domain (big picture)
 

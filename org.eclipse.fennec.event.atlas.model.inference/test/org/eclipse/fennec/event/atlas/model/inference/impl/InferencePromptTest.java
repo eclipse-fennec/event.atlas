@@ -38,7 +38,7 @@ public class InferencePromptTest {
 	@Test
 	@DisplayName("The system message states the order of work, the absence of a filesystem and the receipt")
 	void systemMessage_statesTheTaskAndTheReceipt() {
-		String message = InferencePrompt.systemMessage("dragino");
+		String message = InferencePrompt.systemMessage();
 
 		assertTrue(message.contains("Discover"), "Discovery comes first, and is what found the family");
 		assertTrue(message.contains("Validate it against every sample"));
@@ -50,20 +50,12 @@ public class InferencePromptTest {
 	}
 
 	@Test
-	@DisplayName("The runtime's codec type map id reaches the prompt")
-	// The agent must annotate for this runtime's type map, and it is the one thing it cannot
-	// discover from the payloads.
-	void systemMessage_carriesTheCodecTypeMapId() {
-		assertTrue(InferencePrompt.systemMessage("dragino").contains("'dragino'"));
-	}
-
-	@Test
-	@DisplayName("With no type map configured the prompt does not mention one")
-	void systemMessage_withoutATypeMap_saysNothingAboutIt() {
-		String message = InferencePrompt.systemMessage("  ");
-
-		assertFalse(message.contains("codec type map"), "An empty instruction is worse than none");
-		assertTrue(message.contains("RECEIPT: created <nsURI>"));
+	@DisplayName("The system message says nothing about a codec type map")
+	// The prompt names nothing the agent can discover for itself, and how this runtime types a
+	// JSON payload is not something it has to be told.
+	void systemMessage_saysNothingAboutACodecTypeMap() {
+		assertFalse(InferencePrompt.systemMessage().contains("codec type map"),
+				"An instruction the agent cannot act on is worse than none");
 	}
 
 	@Test

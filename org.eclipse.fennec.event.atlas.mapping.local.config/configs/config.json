@@ -84,9 +84,17 @@
 
   /* JSON payloads do not name their model; the codec types them through the discriminator
    * registry named here. One registry and one discriminator path per runtime - every JSON
-   * device family shares it (see docs/json-southbound-typing.md). */
+   * device family shares it (see docs/json-southbound-typing.md).
+   *
+   * The id must match the `http://eclipse.org/fennec/codec/typeMapping/{id}` annotation source
+   * the deployed models actually carry (AnnotationSources.TYPE_MAPPING_PREFIX plus the id) - an
+   * id no model annotates for types nothing at all, silently. Overridable because it is a
+   * property of the model set a runtime is loaded with, not of the runtime: `jena-sensors` is
+   * the m5airq/waterparc family, while the lorawan/em310udl fixtures in the jena atlas annotate
+   * for `lorawan`. Whatever an inference run's agent discovers from the sibling models it finds
+   * is the id it will annotate its draft for, which is why the prompt does not mention one. */
   "event.atlas.southbound.ingest": {
-    "codec.typeMapId": "jena-sensors"
+    "codec.typeMapId": "$[env:EVENTATLAS_CODEC_TYPE_MAP_ID;default=$[prop:EVENTATLAS_CODEC_TYPE_MAP_ID;default=jena-sensors]]"
   },
 
   /* --- local dev broker: weather simulator (XMI) + a generic JSON channel --- */
@@ -167,15 +175,23 @@
   /* The remote metamodel MCP server, registered as an addressable MCPEndpoint without this
    * framework hosting an MCP server of its own. `server.name` is also the service property the
    * chat completion's mcpServers.target filters on, and the name the request's mcp_toolset
-   * refers to - change it in both places or the completion will not activate. */
+   * refers to - change it in both places or the completion will not activate.
+   *
+   * `server.url` must be reachable FROM ANTHROPIC, not from this runtime. The client sends it as
+   * an `mcp_servers` entry of type `url`, i.e. through Anthropic's MCP connector, so the API
+   * dials the server itself and this framework never opens the connection. The localhost default
+   * below is a placeholder that cannot work in a real run - point it at a public HTTPS address
+   * for the metamodel runtime's servlet (a tunnel is enough for a test). Nothing validates it:
+   * RemoteMCPEndpoint never probes the URL, so a wrong one first shows up as a failed run. */
   "RemoteMCPEndpoint~metamodel": {
     "server.name": "metamodel",
-    "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=http://localhost:8181/mcp/emf]]"
+    "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=http://localhost:8099/mcp/inference]]"
   },
 
   /* The Claude client. Note `mcpServers.target`: the reference is 1..n and unfiltered by
    * default, so without this it would bind ANY MCPEndpoint in the framework - including a
-   * co-hosted one - and the agent would be handed the wrong tool surface.
+   * co-hosted one - and the agent would be handed the wrong tool surface. Which tool surface
+   * that is, is decided entirely by the endpoint's URL - see the note on scoping below.
    *
    * `api.key` is read from the environment; the key itself never lives in configuration.
    * `download.file.folder` is required even though only the batch service reads it: the shared
@@ -190,11 +206,25 @@
    * `max.tokens` is the per-answer output ceiling. The component's own default of 1024 is far
    * too small for a turn that authors a package, and hitting it truncates the answer mid-way.
    *
-   * `mcp.tools.enabled` is the allow-list, and it is deliberately task-scoped - see CLAUDE.md
-   * for the measured reason. 21 of the server's 38 tools: discovery, authoring, one validation
-   * tool, register and publish. Everything that manages datasets, deletes, replays a recipe or
-   * unregisters a package is left out, and nothing here can promote a draft to a released
-   * stage - that stays a human decision. */
+   * `mcp.authorization.token` is what Anthropic presents to the MCP server as
+   * `Authorization: Bearer <token>`, and it must equal `auth.token` on that servlet's
+   * HttpMCPServerComponent configuration. It is not optional once the endpoint is tunnelled:
+   * McpAuthenticationFilter trusts direct loopback callers only while no token is configured,
+   * and a tunnelled request arrives from loopback *carrying a forwarding header*, which it
+   * refuses by design. Empty here means the request goes out with no credential and the server
+   * answers 403 - which reads like a transport fault and is not one.
+   *
+   * `mcp.tools.enabled` is NOT optional, and it is not merely an allow-list: ClaudeHelper always
+   * builds the toolset with `default_config {enabled:false}` and re-enables only what this array
+   * names. Leaving it out leaves every tool on the server disabled - the agent gets a tool
+   * surface of nothing - so it has to be listed here even when the endpoint is already scoped.
+   *
+   * It mirrors the 21 tools `inference_tool_provider` serves on /mcp/inference, which is the
+   * task-scoped servlet: discovery, authoring, validation, register and publish. What manages
+   * datasets beyond authoring, deletes, replays a recipe or unregisters a package is not served
+   * there at all, and nothing on it can promote a draft to a released stage - that stays a human
+   * decision. Scoping at both ends means a name that drifts out of the server's provider stops
+   * being callable rather than silently widening the surface. */
   "ClaudeChatCompletionService": {
     "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
     "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
@@ -202,15 +232,16 @@
     "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
     "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=$[prop:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]]",
     "mcpServers.target": "(server.name=metamodel)",
+    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
     "mcp.tools.enabled": [
-      "list_registry",
       "list_metamodel",
       "describe_eclass",
       "export_package",
-      "find_class_by_name",
+      "list_annotation_sources",
       "find_classes_by_annotation",
       "find_features_by_annotation",
-      "list_annotation_sources",
+      "describe_aspects",
+      "create_dataset",
       "create_epackage",
       "add_eclass",
       "add_eattribute",
@@ -218,21 +249,19 @@
       "add_eannotation",
       "add_eenum",
       "add_eenum_literal",
-      "add_edatatype",
       "modify_feature",
       "create_from_json",
-      "describe_package_metadata",
+      "export_dataset",
       "register_package",
+      "list_registry",
       "post_to_model_atlas"
     ]
   },
 
-  /* The namespace the agent may publish under, and the codec type map it must annotate for.
-   * codecTypeMapId has to match `codec.typeMapId` on event.atlas.southbound.ingest above: a
-   * model annotated for a different map deserializes nothing in this runtime. */
+  /* The namespace the agent may publish under - the one thing it cannot work out for itself.
+   * Everything else about the model is left to discovery. */
   "event.atlas.model.inference": {
     "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]]",
-    "codecTypeMapId": "jena-sensors",
     "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=3]]",
     "intervalSeconds": 3600,
     "timeoutSeconds": 600

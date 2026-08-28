@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Mapping for the known lorawan sensor in inference.bndrun, so a payload on lorawan/known/# has
+  somewhere to go and is reported APPLIED rather than NO_MAPPING.
+
+  Two differences from model/examples/battery/em310udl-battery-mapping.xmi, both deliberate:
+
+  1. Every href is an nsURI href (<nsURI>#//<Name>), not a relative file path. A relative href
+     would load a second, private copy of the domain EPackage from disk; the payload is
+     deserialized against the copy the Model Atlas client registered in
+     EPackage.Registry.INSTANCE, and InstancePusher keys on EClass *identity* - so the two would
+     never match and the mapping would silently never apply.
+  2. No <profile> reference. The profile registry is configured but left empty in this runtime,
+     and a mapping whose profile cannot be resolved is skipped entirely rather than registered
+     profile-less.
+-->
+<mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="em310udl-battery-sensor">
+  <timestamp>
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/time"/>
+  </timestamp>
+  <name name="EM310UDL Battery Sensor">
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/deduplicationId"/>
+  </name>
+  <providerClasses
+      href="http://www.example.org/lorawan/specific/em310udl#//EM310UDLUplink"/>
+  <services
+      mid="battery">
+    <name name="Battery"/>
+    <resources
+        name="BatteryLevel"
+        unit="V"
+        timestamp="//@timestamp"
+        mid="level">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="http://www.example.org/lorawan/specific/em310udl#//EM310UDLUplink/object"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="http://www.example.org/lorawan/specific/em310udl#//DecodedObject/battery"/>
+    </resources>
+  </services>
+  <admin mid="admin">
+    <name name="Admin"/>
+    <friendlyNameFeature
+        xsi:type="ecore:EReference"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/deviceInfo"/>
+    <friendlyNameFeature
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//DeviceInfo/deviceProfileName"/>
+    <providerPackage
+        href="http://www.example.org/lorawan/specific/em310udl#/"/>
+  </admin>
+</mapping:ProviderMapping>

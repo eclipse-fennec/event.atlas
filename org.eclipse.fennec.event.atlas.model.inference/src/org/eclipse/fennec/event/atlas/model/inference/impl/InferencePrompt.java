@@ -31,11 +31,6 @@ import org.eclipse.fennec.event.atlas.southbound.sampling.PayloadSampleSet;
  * So this states the task, the namespace, the order of work and the absence of a filesystem, and
  * stops.
  * <p>
- * The one thing it must state, because it cannot be discovered from the payloads, is the id of
- * this runtime's codec type map: an untyped JSON payload is only ever deserialized here if the
- * model is annotated for <em>that</em> map. It gives the id and leaves the agent to find out
- * what to do with it.
- * <p>
  * The samples travel as their raw bodies. The agent has to validate its package against every
  * one of them, and it is the payloads it must validate against - the shapes this workspace
  * derives are for deciding what to collect, not for telling an agent what it is looking at.
@@ -49,10 +44,9 @@ final class InferencePrompt {
 	}
 
 	/**
-	 * @param codecTypeMapId this runtime's codec type map id, may be blank
 	 * @return the system message. Never <code>null</code>
 	 */
-	static String systemMessage(String codecTypeMapId) {
+	static String systemMessage() {
 		StringJoiner message = new StringJoiner("\n");
 		message.add("You are given sensor payloads that a running system cannot deserialize, "
 				+ "because no model for them exists yet. Your task is to produce one.");
@@ -65,13 +59,6 @@ final class InferencePrompt {
 		message.add("");
 		message.add("You have no filesystem. Everything you need is behind your tools; "
 				+ "discover before you author.");
-		if (codecTypeMapId != null && !codecTypeMapId.isBlank()) {
-			message.add("");
-			message.add(String.format(
-					"The system that will read these payloads types them through the codec type map '%s'. "
-							+ "A model that is not annotated for that map deserializes nothing there.",
-					codecTypeMapId));
-		}
 		message.add("");
 		message.add("Finish your answer with exactly one line, and nothing after it:");
 		message.add("RECEIPT: created <nsURI>     - you published a draft");

@@ -81,12 +81,11 @@ public class ModelInferenceServiceTest {
 	@DisplayName("A sample set is inferred once, with the samples and the namespace in the prompt")
 	void sampleSet_runsOneCompletion() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/dragino/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "dragino", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/dragino/1", false, sample("{\"temp\":21.5}")));
 
 		Call call = completion.awaitCall();
-		assertTrue(call.systemMessage().contains("'dragino'"), "The runtime's codec type map must reach the prompt");
 		assertTrue(call.userMessage().contains(NAMESPACE));
 		assertTrue(call.userMessage().contains("{\"temp\":21.5}"));
 		assertEquals(1, completion.calls());
@@ -99,7 +98,7 @@ public class ModelInferenceServiceTest {
 	// otherwise cost another agent run.
 	void repeatedShapes_doNotRunASecondTime() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
 		completion.awaitCall();
@@ -115,7 +114,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("A genuinely new shape is inferred again")
 	void newShapes_runAgain() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
 		completion.awaitCall();
@@ -129,7 +128,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("The run cap refuses further inferences and says so")
 	void rateLimit_refusesBeyondTheCapAndLogsIt() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 1);
+		ModelInferenceService service = service(completion, NAMESPACE, 1);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -157,7 +156,7 @@ public class ModelInferenceServiceTest {
 				Thread.currentThread().interrupt();
 			}
 			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
-		}, NAMESPACE, "", 5);
+		}, NAMESPACE, 5);
 
 		try {
 			service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -180,7 +179,7 @@ public class ModelInferenceServiceTest {
 		ModelInferenceService service = service((systemMessage, userMessage) -> {
 			ranOn.add(Thread.currentThread());
 			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
-		}, NAMESPACE, "", 5);
+		}, NAMESPACE, 5);
 		Thread caller = Thread.currentThread();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -197,7 +196,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("A created receipt is reported against the channel, review and all")
 	void createdReceipt_isReported() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -213,7 +212,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("A conflict is reported as normal, not as an error")
 	void conflictReceipt_isNotAnError() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: conflict " + NAMESPACE + "/a/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -232,7 +231,7 @@ public class ModelInferenceServiceTest {
 		ModelInferenceService service = service((systemMessage, userMessage) -> {
 			calls.incrementAndGet();
 			throw new IllegalStateException("connection refused");
-		}, NAMESPACE, "", 5);
+		}, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -255,7 +254,7 @@ public class ModelInferenceServiceTest {
 				Thread.currentThread().interrupt();
 			}
 			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
-		}, NAMESPACE, "", 5, 1);
+		}, NAMESPACE, 5, 1);
 		List<LogRecord> logged = captureLog();
 
 		try {
@@ -271,7 +270,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("An answer with no receipt is reported as unknown rather than as a rejection")
 	void unreadableAnswer_isReportedAsUnknown() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("All done, the model is published!");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -284,7 +283,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("A low-evidence sample set is recorded alongside the receipt")
 	void lowEvidence_travelsWithTheReceipt() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
-		ModelInferenceService service = service(completion, NAMESPACE, "", 5);
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", true, sample("{\"a\":1}")));
@@ -299,7 +298,7 @@ public class ModelInferenceServiceTest {
 	// A run that does not know where it may publish would fail at the end, or publish elsewhere.
 	void withoutANamespace_nothingRuns() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created x");
-		ModelInferenceService service = service(completion, "  ", "", 5);
+		ModelInferenceService service = service(completion, "  ", 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
 
@@ -309,7 +308,7 @@ public class ModelInferenceServiceTest {
 	@Test
 	@DisplayName("With no completion deployed the set is reported as unavailable, and can be retried")
 	void withoutACompletion_reportsUnavailable() throws Exception {
-		ModelInferenceService service = service(null, NAMESPACE, "", 5);
+		ModelInferenceService service = service(null, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -360,15 +359,14 @@ public class ModelInferenceServiceTest {
 		}
 	}
 
-	private ModelInferenceService service(ChatCompletion completion, String namespace, String codecTypeMapId,
-			int maxRuns) {
-		return service(completion, namespace, codecTypeMapId, maxRuns, 600);
+	private ModelInferenceService service(ChatCompletion completion, String namespace, int maxRuns) {
+		return service(completion, namespace, maxRuns, 600);
 	}
 
-	private ModelInferenceService service(ChatCompletion completion, String namespace, String codecTypeMapId,
-			int maxRuns, long timeoutSeconds) {
+	private ModelInferenceService service(ChatCompletion completion, String namespace, int maxRuns,
+			long timeoutSeconds) {
 		ModelInferenceService service = new ModelInferenceService();
-		service.activate(config(namespace, codecTypeMapId, maxRuns, timeoutSeconds));
+		service.activate(config(namespace, maxRuns, timeoutSeconds));
 		if (completion != null) {
 			// the field is DS-injected at runtime; set it directly here
 			inject(service, "chatCompletion", completion);
@@ -377,8 +375,7 @@ public class ModelInferenceServiceTest {
 		return service;
 	}
 
-	private static ModelInferenceService.Config config(String namespace, String codecTypeMapId, int maxRuns,
-			long timeoutSeconds) {
+	private static ModelInferenceService.Config config(String namespace, int maxRuns, long timeoutSeconds) {
 		return new ModelInferenceService.Config() {
 
 			@Override
@@ -389,11 +386,6 @@ public class ModelInferenceServiceTest {
 			@Override
 			public String namespace() {
 				return namespace;
-			}
-
-			@Override
-			public String codecTypeMapId() {
-				return codecTypeMapId;
 			}
 
 			@Override

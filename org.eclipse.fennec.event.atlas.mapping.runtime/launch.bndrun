@@ -82,10 +82,7 @@
 	org.eclipse.fennec.emf.osgi.component.minimal;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.model.info;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.eobject.registry;version='[1.1.0,1.1.1)',\
-	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.event.atlas.southbound.common;version=snapshot,\
-	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
-	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
 	org.eclipse.fennec.event.atlas.rest.southbound.adapter;version=snapshot,\
 	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)',\
 	com.fasterxml.jackson.core.jackson-core;version='[2.19.2,2.19.3)',\
@@ -125,8 +122,6 @@
 	org.eclipse.sensinact.gateway.filters.resource.selector;version='[0.0.2,0.0.3)',\
 	org.eclipse.sensinact.gateway.filters.resource.selector.impl;version='[0.0.2,0.0.3)',\
 	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
-	io.modelcontextprotocol.sdk.mcp-core;version='[2.0.0,2.0.1)',\
-	io.projectreactor.reactor-core;version='[3.7.0,3.7.1)',\
 	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
 	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
 	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
@@ -134,8 +129,10 @@
 	org.eclipse.fennec.event.atlas.model.inference;version=snapshot,\
 	org.eclipse.fennec.event.atlas.model.inference.chat;version=snapshot,\
 	org.eclipse.fennec.event.atlas.southbound.sampling;version=snapshot,\
-	org.eclipse.fennec.mcp.api;version='[0.1.0,0.1.1)',\
-	reactive-streams;version='[1.0.4,1.0.5)'
+	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
+	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
+	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
+	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)'
 
 # org.eclipse.fennec.codec is the EMF JSON codec (the Resource.Factory for the `json` file
 # extension PayloadIngest selects for a JSON channel) - see eventatlas.runtime_docker.bndrun.
@@ -153,7 +150,6 @@
 	bnd.identity;id='org.apache.aries.typedevent.bus',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.gogo-shell',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.session.session-impl',\
-	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.sensorthings.mqtt',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.sensorthings.rest.gateway',\
@@ -164,7 +160,8 @@
 	bnd.identity;id='org.eclipse.fennec.event.atlas.model.inference',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.model.inference.chat',\
 	bnd.identity;id='org.eclipse.fennec.ai.chat.completion.impl.claude',\
-	bnd.identity;id='org.eclipse.fennec.mcp.api'
+	bnd.identity;id='org.eclipse.fennec.mcp.endpoint',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter'
 
 -runee: JavaSE-21
 -runfw: org.apache.felix.framework;version='[7.0.5,7.0.5]'

@@ -244,15 +244,9 @@ org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.eobject.provider:0
 #Mqtt
 org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5
 
-# The MCP Java SDK, for org.eclipse.fennec.mcp.api (cnf/local): it imports
-# io.modelcontextprotocol.{json,json.schema,server,server.transport,spec} at [2.0,3), all of
-# which mcp-core exports. Mandatory imports, so the whole bundle fails to resolve without them
-# even though RemoteMCPEndpoint itself only carries a name and a URL. mcp-json-jackson3 is
-# indexed but not resolved into any bndrun: the SDK looks up a JSON mapper only when something
-# actually speaks MCP in-process, which a remote endpoint and an HTTP chat client do not.
-io.modelcontextprotocol.sdk:mcp-core:2.0.0
-io.modelcontextprotocol.sdk:mcp-json-jackson3:2.0.0
-# mcp-core's own closure: reactor (mandatory), which needs reactive-streams. Its org.slf4j
-# import is satisfied by the slf4j-api already above; micrometer and blockhound are optional.
-io.projectreactor:reactor-core:3.7.0
-org.reactivestreams:reactive-streams:1.0.4
+# No MCP SDK here on purpose. It used to be mandatory: org.eclipse.fennec.mcp.api carried both
+# the MCP server API and MCPEndpoint in one bundle, so a consumer that only wanted to *address*
+# a remote MCP server still had to resolve mcp-core, reactor-core and reactive-streams.
+# emf.osgi-mcp#31 split MCPEndpoint + RemoteMCPEndpoint into org.eclipse.fennec.mcp.endpoint,
+# whose Import-Package is java.lang and nothing else - so this workspace needs no part of the
+# SDK closure. Deploying an MCP *server* would; nothing here does.

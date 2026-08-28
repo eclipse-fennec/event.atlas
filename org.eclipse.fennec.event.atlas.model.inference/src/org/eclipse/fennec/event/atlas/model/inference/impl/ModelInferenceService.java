@@ -87,14 +87,6 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 		String namespace() default "";
 
 		/**
-		 * The codec type map id this runtime deserializes JSON payloads with, so the agent can
-		 * annotate the model for it. Must be the same value as {@code codec.typeMapId} on the
-		 * {@code event.atlas.southbound.ingest} configuration - a model annotated for a
-		 * different map deserializes nothing here.
-		 */
-		String codecTypeMapId() default "";
-
-		/**
 		 * How many inference runs {@link #intervalSeconds()} allows. A misconfigured sensor can
 		 * emit unknown payloads at high frequency; at the cost of a run that matters.
 		 */
@@ -180,9 +172,8 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 					PID));
 		} else {
 			logger.info(String.format(
-					"Model inference is on: publishing drafts under '%s', %s, timeout %ss, codec type map '%s'",
-					resolved.namespace(), rateLimiter, resolved.timeout().toSeconds(),
-					resolved.codecTypeMapId().isBlank() ? "<none>" : resolved.codecTypeMapId()));
+					"Model inference is on: publishing drafts under '%s', %s, timeout %ss",
+					resolved.namespace(), rateLimiter, resolved.timeout().toSeconds()));
 		}
 	}
 
@@ -259,7 +250,7 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 		if (completion == null) {
 			return new InferenceReceipt(Outcome.UNAVAILABLE, "no chat completion is deployed");
 		}
-		String systemMessage = InferencePrompt.systemMessage(current.codecTypeMapId());
+		String systemMessage = InferencePrompt.systemMessage();
 		String userMessage = InferencePrompt.userMessage(sampleSet, current.namespace(), current.maxPayloadChars());
 		Future<String> call = calls.submit(() -> completion.complete(systemMessage, userMessage));
 		try {
@@ -348,19 +339,17 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 	 * The configuration as validated values, taken once per sample set so that a change halfway
 	 * through a run cannot move the namespace or the timeout under it.
 	 * @param namespace the namespace a draft may be published under
-	 * @param codecTypeMapId this runtime's codec type map id
 	 * @param maxRunsPerInterval the run cap
 	 * @param interval the window the cap applies to
 	 * @param timeout how long to wait for a completion
 	 * @param retryAfterUnavailable how long an unreachable completion blocks a retry
 	 * @param maxPayloadChars how much of a payload body reaches the prompt
 	 */
-	private record Settings(String namespace, String codecTypeMapId, int maxRunsPerInterval, Duration interval,
-			Duration timeout, Duration retryAfterUnavailable, int maxPayloadChars) {
+	private record Settings(String namespace, int maxRunsPerInterval, Duration interval, Duration timeout,
+			Duration retryAfterUnavailable, int maxPayloadChars) {
 
 		static Settings of(Config config) {
 			return new Settings(config.namespace() == null ? "" : config.namespace().strip(),
-					config.codecTypeMapId() == null ? "" : config.codecTypeMapId().strip(),
 					Math.max(0, config.maxRunsPerInterval()), atLeastASecond(config.intervalSeconds()),
 					atLeastASecond(config.timeoutSeconds()), atLeastASecond(config.retryAfterUnavailableSeconds()),
 					Math.max(0, config.maxPayloadChars()));
@@ -384,11 +373,6 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 
 		@Override
 		public String namespace() {
-			return "";
-		}
-
-		@Override
-		public String codecTypeMapId() {
 			return "";
 		}
 
