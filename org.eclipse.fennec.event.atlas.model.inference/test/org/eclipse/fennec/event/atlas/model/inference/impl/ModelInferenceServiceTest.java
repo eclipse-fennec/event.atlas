@@ -111,17 +111,106 @@ public class ModelInferenceServiceTest {
 	}
 
 	@Test
-	@DisplayName("A genuinely new shape is inferred again")
-	void newShapes_runAgain() throws Exception {
+	@DisplayName("A genuinely new shape is inferred again, once the run before it has finished")
+	void newShapes_runAgainOnceTheChannelIsFree() throws Exception {
 		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
 		completion.awaitCall();
-		service.onSampleSet(set("sensors/a", false, sampleWithShape("{\"temp\":21.5,\"rssi\":-70}", "rssi:int")));
 
-		assertNotNull(completion.awaitCall());
+		// A channel that is still producing keeps handing sets over; the guard refuses only while
+		// a run is in flight, so one gets through as soon as the first has finished. Retrying is
+		// what the channel does anyway - a dropped set is dropped, not queued.
+		PayloadSampleSet newShape = set("sensors/a", false,
+				sampleWithShape("{\"temp\":21.5,\"rssi\":-70}", "rssi:int"));
+		long deadline = System.currentTimeMillis() + 5000;
+		while (completion.calls() < 2 && System.currentTimeMillis() < deadline) {
+			service.onSampleSet(newShape);
+			Thread.sleep(20);
+		}
+
 		assertEquals(2, completion.calls());
+	}
+
+	@Test
+	@DisplayName("A second set for a channel already being inferred is dropped, not queued")
+	// Serializing the runs prevents two agents authoring at once but not one straight after
+	// another, and a later window on the same channel has a different fingerprint as soon as one
+	// payload carries a field the earlier window never saw - so neither the fingerprint claim nor
+	// the rate limiter stops it. The second run would not be better informed for having waited: a
+	// window can just as easily miss a shape the first one had.
+	void secondSetForAChannelBeingInferred_isDropped() throws Exception {
+		CountDownLatch entered = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0") {
+			@Override
+			public String complete(String systemMessage, String userMessage) {
+				String answer = super.complete(systemMessage, userMessage);
+				entered.countDown();
+				try {
+					release.await(5, TimeUnit.SECONDS);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+				return answer;
+			}
+		};
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
+
+		try {
+			service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
+			assertTrue(entered.await(5, TimeUnit.SECONDS), "The first run should be under way");
+			completion.awaitCall(); // drain it, so a later poll can only see a second run
+
+			service.onSampleSet(set("sensors/a", false,
+					sampleWithShape("{\"temp\":21.5,\"rssi\":-70}", "rssi:int")));
+
+			assertNull(completion.pollCall(), "The second set must not start a run of its own");
+			assertEquals(1, completion.calls());
+		} finally {
+			release.countDown();
+		}
+	}
+
+	@Test
+	@DisplayName("The guard is per channel: another channel is inferred while one is busy")
+	// Per channel rather than global, because once each model publishes under its own derived
+	// namespace two channels inferring at once is legitimate rather than a collision. The runs
+	// are still serialized by the single runner thread - that is a cost decision, not a safeguard.
+	void anotherChannel_isNotBlockedByTheOneInFlight() throws Exception {
+		CountDownLatch entered = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0") {
+			@Override
+			public String complete(String systemMessage, String userMessage) {
+				String answer = super.complete(systemMessage, userMessage);
+				if (entered.getCount() > 0) {
+					entered.countDown();
+					try {
+						release.await(5, TimeUnit.SECONDS);
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+				}
+				return answer;
+			}
+		};
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
+
+		try {
+			service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
+			assertTrue(entered.await(5, TimeUnit.SECONDS), "The first run should be under way");
+			completion.awaitCall(); // drain it, so a later await can only see the other channel's
+
+			service.onSampleSet(set("sensors/b", false, sampleWithShape("{\"pressure\":1013}", "pressure:int")));
+			release.countDown();
+
+			assertNotNull(completion.awaitCall(), "The other channel's set must be accepted");
+			assertEquals(2, completion.calls());
+		} finally {
+			release.countDown();
+		}
 	}
 
 	@Test

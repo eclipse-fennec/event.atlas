@@ -697,3 +697,48 @@ Still to verify against a live run: that the agent actually picks a sensible seg
 different channels no longer collide. The previous four runs all produced
 `nsURI="https://fennec.eclipse.org/event.atlas/inferred"` exactly, so any run under this prompt
 that produces something longer is the signal.
+
+## 2026-08-31 — one run per channel at a time
+
+The second refinement, narrowed on purpose: while a run for a channel is queued or in progress,
+further sets for that channel are dropped rather than queued.
+
+**What "a different fingerprint" actually covers**, since that was the question the design turned
+on. `SampleSetFingerprint` hashes the format, the declared nsURI and the sorted union of the
+samples' *shapes* — not the channel, not the values, not the counts, not the timestamps. So a
+second set differs whenever the *set of shapes* differs, which happens in two ways:
+
+- a genuinely different device on the same topic — real, but rare, since a topic usually carries
+  one family;
+- far more commonly, the same device in a later window, where one payload carries a field the
+  earlier window never saw, or where the later window *misses* a variant the earlier one had.
+
+The second case is the one that matters, and it cuts both ways: the later set is not necessarily
+better evidence. A window closing on `quietSamples` or `maxWaitSeconds` sees whatever arrived in
+it, so a second run could just as easily be authored from *less* variety than the first. Waiting
+for it buys nothing, which is why the first run is simply left to finish.
+
+Note that a pure type-widening difference does **not** produce a new fingerprint: `ShapeFingerprint`
+treats int and double as one token, still open from 2026-08-28. So the case this guard fires on is
+a field appearing or disappearing, not a value growing.
+
+Implementation notes:
+
+- The key is the **MQTT topic** (`PayloadSampleSet.source()`), not the configured channel name.
+- The in-flight claim is taken **before** the fingerprint claim and the rate limiter, so a set
+  dropped by this guard has not spent either on the way in.
+- Per channel rather than global. Now that each model publishes under its own derived namespace,
+  two channels inferring at once is legitimate rather than a collision; the runs are still
+  serialized by the single runner thread, but that is a cost decision, not a safeguard, and can be
+  relaxed without touching this.
+
+**A pre-existing leak came out with it.** The queue-full rejection handler logged the drop but
+released neither the fingerprint claim nor the rate-limiter token, so a set dropped that way was
+never inferred again and had still spent a run against the cap. The handler is given the task now
+— a named `QueuedRun` rather than a lambda, since the handler is handed the task and nothing else
+— and undoes both.
+
+One existing test changed meaning: "a genuinely new shape is inferred again" fired the second set
+while the first run was still in flight, which is exactly what is now refused. It asserts the same
+thing across the run boundary instead, and two new tests cover the guard itself and its
+per-channel scope.

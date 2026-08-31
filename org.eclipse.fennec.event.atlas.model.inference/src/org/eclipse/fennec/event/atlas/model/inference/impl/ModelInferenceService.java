@@ -15,7 +15,9 @@ package org.eclipse.fennec.event.atlas.model.inference.impl;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -138,7 +140,25 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 	 */
 	private final ExecutorService runs = new ThreadPoolExecutor(0, 1, 60L, TimeUnit.SECONDS,
 			new ArrayBlockingQueue<>(RUN_QUEUE_CAPACITY), runnable -> thread(runnable, "event.atlas-model-inference"),
-			(task, executor) -> rejectedRun());
+			(task, executor) -> rejectedRun(task));
+
+	/**
+	 * The channels with a run queued or in progress, so a second set for the same channel is
+	 * dropped rather than queued behind the first.
+	 * <p>
+	 * Serializing the runs prevents two agents authoring at once but not one authoring straight
+	 * after another: a later window on the same channel carries a <em>different</em> set of
+	 * shapes as soon as one payload has a field the earlier window never saw, so neither the
+	 * fingerprint claim (different shapes, different fingerprint) nor the rate limiter (which
+	 * only counts) stops it. The second run is not better informed for having waited - a window
+	 * can just as easily miss a shape the first one had - so the first one is left to finish and
+	 * the rest are dropped.
+	 * <p>
+	 * The key is {@link PayloadSampleSet#source()}, which is the MQTT topic
+	 * ({@code lorawan/unknown/dragino}) and not the configured channel name - measured, and easy
+	 * to get wrong.
+	 */
+	private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Carries the blocking completion call, so that the runner can stop waiting for it. A pool
@@ -202,11 +222,21 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 			logger.fine(() -> "No namespace configured - not inferring a model for " + sampleSet.source());
 			return;
 		}
+		// Claimed first, because it is the only guard that touches no other state: a set dropped
+		// here must not have spent a fingerprint claim or a rate-limiter token on the way.
+		if (!inFlight.add(sampleSet.source())) {
+			logger.info(String.format(
+					"Channel '%s' is already being inferred - dropping this sample set rather than queueing it "
+							+ "behind the run in progress.",
+					sampleSet.source()));
+			return;
+		}
 		String fingerprint = SampleSetFingerprint.of(sampleSet);
 		Instant now = Instant.now();
 		// Claimed before the run starts, not after: a run takes minutes, and the sets arriving
 		// meanwhile carry the same shapes again because nothing has been promoted yet.
 		if (!attempts.claim(fingerprint, now)) {
+			inFlight.remove(sampleSet.source());
 			logger.info(String.format(
 					"Channel '%s' has handed over payloads that were already inferred (%s) - not running again. "
 							+ "The draft is waiting for review, or was declined.",
@@ -215,6 +245,7 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 		}
 		if (!rateLimiter.tryRun(now)) {
 			attempts.release(fingerprint);
+			inFlight.remove(sampleSet.source());
 			logger.warning(String.format(
 					"Refusing to infer a model for channel '%s' - the run cap is reached (%s). "
 							+ "The next run is allowed at %s.",
@@ -222,11 +253,45 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 			return;
 		}
 		try {
-			runs.execute(() -> run(sampleSet, fingerprint, current));
+			runs.execute(new QueuedRun(sampleSet, fingerprint, current));
 		} catch (RuntimeException e) {
 			// only reachable while shutting down; the rejection handler takes the queue-full case
+			inFlight.remove(sampleSet.source());
 			giveBack(fingerprint);
 			logger.log(Level.FINE, "Model inference is shutting down - not running one for " + sampleSet.source(), e);
+		}
+	}
+
+	/**
+	 * A run that has been queued. A named type rather than a lambda so that the rejection
+	 * handler, which is handed the task and nothing else, can undo the guards a dropped run had
+	 * already claimed.
+	 */
+	private final class QueuedRun implements Runnable {
+
+		private final PayloadSampleSet sampleSet;
+		private final String fingerprint;
+		private final Settings settings;
+
+		QueuedRun(PayloadSampleSet sampleSet, String fingerprint, Settings settings) {
+			this.sampleSet = sampleSet;
+			this.fingerprint = fingerprint;
+			this.settings = settings;
+		}
+
+		@Override
+		public void run() {
+			try {
+				ModelInferenceService.this.run(sampleSet, fingerprint, settings);
+			} finally {
+				inFlight.remove(sampleSet.source());
+			}
+		}
+
+		/** This run will never happen: release what it was holding. */
+		void dropped() {
+			inFlight.remove(sampleSet.source());
+			giveBack(fingerprint);
 		}
 	}
 
@@ -337,12 +402,16 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 	/**
 	 * The queue of pending runs is full. Dropping the set is right: with a handful of runs
 	 * allowed per interval, a set that cannot even be queued would be refused by the rate
-	 * limiter long before its turn came.
+	 * limiter long before its turn came. What it must not do is drop the set while keeping its
+	 * claims - a fingerprint held by a run that never happened is never inferred again.
 	 */
-	private void rejectedRun() {
+	private void rejectedRun(Runnable task) {
 		logger.warning(String.format(
 				"Not inferring a model - %s inference(s) are already queued or running. The sample set is dropped.",
 				RUN_QUEUE_CAPACITY));
+		if (task instanceof QueuedRun queued) {
+			queued.dropped();
+		}
 	}
 
 	/** Undoes both guards for a run that never happened. */
