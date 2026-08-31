@@ -30,10 +30,33 @@
 -runblacklist: \
 	bnd.identity;id='org.apache.aries.spifly.dynamic.framework.extension'
 
+# EVENTATLAS_{MAPPINGS,PROFILES}_DIR: where the file providers read from, as absolute paths
+# pinned to this project.
+#
+# config.json defaults them to `runtime/mappings` and `runtime/profiles`, which are resolved
+# against the JVM's working directory - fine for `run.inference` (Gradle runs it here), silently
+# empty for the exported inference.jar started from anywhere else. FileEObjectProvider logs one
+# WARNING for a location that does not exist and then syncs an empty state, so the registry comes
+# up with zero entries and every subsequent payload is reported NO_MAPPING. That is what happened
+# on 2026-08-28, where a known EM310-UDL payload deserialized correctly and matched nothing.
+#
+# Two bnd details, both load-bearing, both verified by exporting and reading launcher.properties:
+#
+#  - -runproperties, NOT -runvm -D. bnd bakes -runproperties into the exported jar's
+#    launcher.properties, while -runvm is a set of JVM arguments and there are no JVM arguments
+#    left to set once `java -jar` is running. The interpolation plugin's $[prop:...] reads a
+#    framework property, so the value arrives whichever way the framework was started.
+#  - ${.}, NOT ${basedir}. An export processes a staged copy of this file, so ${basedir} and
+#    ${project} both expand to generated/tmp/export.inference/... - a directory that does not
+#    survive the build. ${.} is the directory of the file itself and expands to this project.
+#
+# The docker bndrun needs none of this: its config names absolute paths under /opt/eventatlas.
 -runproperties: \
 	org.osgi.service.http.port=-1,\
 	felix.cm.config.plugins=org.apache.felix.configadmin.plugin.interpolation,\
-	org.osgi.framework.bootdelegation='sun.*,com.sun.*'
+	org.osgi.framework.bootdelegation='sun.*,com.sun.*',\
+	EVENTATLAS_MAPPINGS_DIR=${.}/runtime/mappings,\
+	EVENTATLAS_PROFILES_DIR=${.}/runtime/profiles
 
 -runrequires: \
 	bnd.identity;id='org.eclipse.fennec.emf.osgi.component.minimal',\
