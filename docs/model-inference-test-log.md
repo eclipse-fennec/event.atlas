@@ -508,10 +508,7 @@ widened to a small outcome record that carries no EMF types.
   review, so it was not done as part of this test. Afterwards the expected signal is the ingest
   outcome moving from `EMPTY` to `NO_MAPPING`; `APPLIED` additionally needs a Dragino
   `ProviderMapping`.
-- **`NO_MAPPING` on the known payload.** A known `EM310-UDL` payload deserialized correctly
-  (`1 object(s) of type EM310UDLUplink`) but matched no mapping, despite a mapping file being
-  present. Untested hypothesis: the `key.feature: "mid"` property that the docker config carries
-  and `inference.config` omits.
+- ~~**`NO_MAPPING` on the known payload.**~~ Closed 2026-08-31 - see below.
 - **One namespace holds one draft.** The inferred package took the configured `namespace` verbatim
   as its nsURI, so a second inferred model would collide — which is what
   `RECEIPT: conflict <nsURI>` anticipates, but it means the namespace is per-model, not per-runtime.
@@ -544,3 +541,80 @@ docker exec -i eventatlas-mosquitto mosquitto_pub -h localhost -p 1883 \
 
 Credentials and endpoints come from the gitignored `…mapping.runtime/secrets.bndrun`; see
 `secrets.bndrun.template`.
+
+## 2026-08-31 — why the known payload reported `NO_MAPPING`
+
+Two independent causes, neither of them the `key.feature` hypothesis, which is wrong: neither
+registry reads the entry key (`ProviderMappingRegistryImpl` indexes by `mapping.getMid()`,
+`MappingProfileRegistryImpl` by `profile.getProfileId()`; `entry.key()` appears only in log
+messages), and setting it could only ever *lose* entries, because `FileEObjectProvider` skips an
+object whose key feature is absent while the default `<fileName>#<uriFragment>` key always exists.
+
+**Cause 1 — the mapping directory was never read.** `config.json` defaults `locations` to the
+cwd-relative `runtime/mappings`, but the skeleton lives in the runtime project. Running the
+exported jar from the workspace root:
+
+```
+WARNING: Provider mapping-files: location runtime/mappings does not exist - skipping
+INFO: Registry sensinact-mappings: initial load complete (0 entries) - services published
+```
+
+So the registry came up empty and `NO_MAPPING` was strictly correct — there was no mapping.
+`run.inference` hid it, because Gradle's working directory *is* the runtime project.
+
+Fixed by pinning both directories in `inference.bndrun`'s `-runproperties`. Two bnd details,
+both established by exporting and reading `launcher.properties`, both easy to get wrong:
+`-runvm -D` never reaches an exported jar (there are no JVM arguments left to set once
+`java -jar` is running) — only `-runproperties` are baked in; and `${basedir}`/`${project}`
+expand to the export's staging copy, so `${.}`, the directory of the file itself, is the macro
+that survives. Guarded by `InferenceRuntimeLocationsTest`.
+
+**Cause 2 — the mapping lost a race with the Atlas, permanently.** With the directory fixed the
+mapping was found and then rejected, because a file provider loads and validates synchronously at
+activation while the Atlas publishes its EPackages after an HTTP round trip:
+
+| line | |
+|---:|---|
+| 177 | `Registry sensinact-mappings: initial load complete (1 entries)` |
+| 191 | `SEVERE: ... has missing or unresolved provider classes [...em310udl#//EM310UDLUplink] — Skipping` |
+| 264 | `Published remote EPackage http://www.example.org/lorawan/specific/em310udl` |
+
+73 lines too late, and a file provider never re-loads, so the mapping was gone for the life of the
+runtime. Fixed by parking such an entry instead of dropping it: `ProviderMappingRegistryImpl` now
+holds entries that are well-formed but not yet resolvable and retries them as EPackages arrive,
+bound as a dynamic multiple `EPackage` reference. Malformed entries — not a mapping, no `mid`, no
+provider classes at all — are still dropped on the spot.
+
+Two things that fell out of implementing it:
+
+- **`dispose()` is both the `@Deactivate` method and a public interface method** that six tests
+  call to reset a *running* registry. Shutting the retry executor down there left the component
+  alive but permanently unable to retry. Deactivation is now its own method.
+- **Resolving only `providerClasses` is not enough.** The first live run after the fix registered
+  the mapping and then failed on the payload with `the feature 'null' is not a valid feature`:
+  `valueFeature`, `featurePath` and the admin references are nsURI proxies too, and the file
+  provider's resource set cannot see an EPackage published after it was created either. The
+  resolution pass therefore sweeps every non-containment reference of the whole mapping, walking
+  the `#/`, `#//Name` and `#//Name/feature` fragment forms itself rather than handing them to
+  `EcoreUtil.resolve`, which would treat an unknown nsURI as a URL and try to fetch it.
+
+**Verified end to end** against the jena Atlas on 8080 and a mosquitto on 1883, with the exported
+`inference.jar`:
+
+```
+INFO: Registering provider mapping for 'em310udl-battery-sensor' into registry
+INFO: Model for provider 'EM310UDL Battery Sensor' -> 'em310udl-battery-sensor' successfully registered.
+INFO: Pushed payload from 'lorawan/known/em310' - 1 object(s), 1 mapping(s) applied
+```
+
+`NO_MAPPING` -> `APPLIED`, with no `Error getting raw value`. `LateModelMappingTest` is the
+regression guard (69 OSGi tests now, up from 68).
+
+Two smaller things noticed while doing it, neither fixed:
+
+- `runtime/profiles/.keep` is loaded like any other file and logs a SAX warning with a stack trace
+  at every start — `FileEObjectProvider.filesOf` walks every regular file with no extension
+  filter. `runtime/mappings/.keep` was removed, the directory having a real mapping in it now.
+- The paho MQTT client writes its persistence directory relative to the working directory, so
+  running the jar from the workspace root leaves a `paho<n>-tcplocalhost1883/` behind — which bnd
+  then sweeps into the Gradle build as a project. Run it from a scratch directory.
