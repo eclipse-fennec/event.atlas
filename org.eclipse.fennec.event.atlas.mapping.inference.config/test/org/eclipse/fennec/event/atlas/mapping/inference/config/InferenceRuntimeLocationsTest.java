@@ -13,7 +13,9 @@
  */
 package org.eclipse.fennec.event.atlas.mapping.inference.config;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -66,10 +68,9 @@ class InferenceRuntimeLocationsTest {
 		Map<String, String> overrides = propertiesSetBy(read(root.resolve(BNDRUN)));
 
 		Map<String, String> declared = declaredLocations(read(root.resolve(CONFIG)));
-		assertThat(declared)
-				.as("The inference config must declare a mappings and a profiles location - if this fails the "
-						+ "regex below has drifted from the file, not the config from the contract")
-				.hasSize(2);
+		assertEquals(2, declared.size(),
+				"The inference config must declare a mappings and a profiles location - if this fails the "
+						+ "regex below has drifted from the file, not the config from the contract");
 
 		declared.forEach((provider, location) -> {
 			String variable = variableOf(location);
@@ -78,17 +79,15 @@ class InferenceRuntimeLocationsTest {
 			String effective = variable == null ? defaultOf(location)
 					: overrides.getOrDefault(variable, defaultOf(location));
 
-			assertThat(effective)
-					.as("Provider '%s' resolves to '%s'. A relative path is resolved against the JVM's working "
+			assertTrue(effective.startsWith(PROJECT_DIR + "/"), String.format(
+					"Provider '%s' resolves to '%s'. A relative path is resolved against the JVM's working "
 							+ "directory, so the exported inference.jar loads nothing unless it happens to be "
-							+ "started from the runtime project. Set %s in the -runproperties of %s.", provider,
-							effective, variable, BNDRUN)
-					.startsWith(PROJECT_DIR + "/");
+							+ "started from the runtime project. Set %s in the -runproperties of %s.",
+					provider, effective, variable, BNDRUN));
 
 			Path onDisk = root.resolve(BNDRUN).getParent().resolve(effective.substring(PROJECT_DIR.length() + 1));
-			assertThat(onDisk)
-					.as("Provider '%s' points at a directory this workspace does not ship", provider)
-					.isDirectory();
+			assertTrue(Files.isDirectory(onDisk),
+					String.format("Provider '%s' points at a directory this workspace does not ship", provider));
 		});
 	}
 
@@ -142,8 +141,8 @@ class InferenceRuntimeLocationsTest {
 		while (candidate != null && !Files.isRegularFile(candidate.resolve("cnf/build.bnd"))) {
 			candidate = candidate.getParent();
 		}
-		assertThat(candidate).as("No cnf/build.bnd above %s - cannot locate the workspace root",
-				Path.of("").toAbsolutePath()).isNotNull();
+		assertNotNull(candidate, String.format("No cnf/build.bnd above %s - cannot locate the workspace root",
+				Path.of("").toAbsolutePath()));
 		return candidate;
 	}
 }
