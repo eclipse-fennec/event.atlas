@@ -80,9 +80,15 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 	public @interface Config {
 
 		/**
-		 * The namespace the agent may publish a draft under - the one thing it cannot work out
-		 * for itself. Blank switches inference off: a run that does not know where it may
-		 * publish would either fail at the end or, worse, publish somewhere else.
+		 * The namespace <em>prefix</em> a draft must be published beneath - the one thing the
+		 * agent cannot work out for itself. Blank switches inference off: a run that does not
+		 * know where it may publish would either fail at the end or, worse, publish somewhere
+		 * else.
+		 * <p>
+		 * A prefix, not the nsURI: the agent extends it with a segment identifying the model it
+		 * authored, so a second device family does not land on the first one's namespace. The
+		 * nsURI it settles on comes back in the receipt. Keep whatever allow-list guards
+		 * publication prefix-shaped ({@code …/inferred*}) so the sub-namespaces pass.
 		 */
 		String namespace() default "";
 
@@ -172,7 +178,7 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 					PID));
 		} else {
 			logger.info(String.format(
-					"Model inference is on: publishing drafts under '%s', %s, timeout %ss",
+					"Model inference is on: publishing drafts beneath '%s', %s, timeout %ss",
 					resolved.namespace(), rateLimiter, resolved.timeout().toSeconds()));
 		}
 	}
@@ -236,7 +242,7 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 				shortFingerprint(fingerprint)));
 		InferenceReceipt receipt = complete(sampleSet, current);
 		attempts.completed(fingerprint, receipt.outcome(), Instant.now());
-		report(sampleSet, receipt, Duration.between(started, Instant.now()));
+		report(sampleSet, receipt, Duration.between(started, Instant.now()), current.namespace());
 	}
 
 	/**
@@ -272,11 +278,37 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 	}
 
 	/**
+	 * The agent chooses the nsURI beneath the configured prefix, so this is the only place that
+	 * can notice it did not.
+	 * <p>
+	 * A warning rather than a failure, for two reasons: the draft is already published by the
+	 * time the receipt is read, so there is nothing left to prevent; and publication is guarded
+	 * on the server by a prefix allow-list, which means a draft that landed outside this prefix
+	 * says the allow-list is wider than the prefix, or that the agent named an nsURI it did not
+	 * publish to. Either is an operator's problem, not this run's.
+	 */
+	private static void warnIfOutsideThePrefix(InferenceReceipt receipt, String namespacePrefix) {
+		String nsUri = receipt.detail();
+		boolean namesANamespace = receipt.outcome() == InferenceReceipt.Outcome.CREATED
+				|| receipt.outcome() == InferenceReceipt.Outcome.CONFLICT;
+		if (!namesANamespace || nsUri == null || nsUri.startsWith(namespacePrefix)) {
+			return;
+		}
+		logger.warning(String.format(
+				"The agent reported the namespace '%s', which is not beneath the configured '%s'. Either the "
+						+ "publication allow-list is wider than that prefix, or the draft is not where this says "
+						+ "it is - check before promoting it.",
+				nsUri, namespacePrefix));
+	}
+
+	/**
 	 * Logs the receipt against the channel. Only two outcomes are anybody's problem: a
 	 * conflict is what a channel that keeps handing over sets while its draft waits for review
 	 * looks like, and a rejection is the agent's judgement about the payloads.
 	 */
-	private static void report(PayloadSampleSet sampleSet, InferenceReceipt receipt, Duration took) {
+	private static void report(PayloadSampleSet sampleSet, InferenceReceipt receipt, Duration took,
+			String namespacePrefix) {
+		warnIfOutsideThePrefix(receipt, namespacePrefix);
 		String evidence = sampleSet.lowEvidence()
 				? String.format(" Evidence was thin: %s sample(s), the window closed on its maximum wait.",
 						sampleSet.sampleCount())

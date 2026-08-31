@@ -73,6 +73,33 @@ public class InferencePromptTest {
 	}
 
 	@Test
+	@DisplayName("The namespace is asked for as a prefix to extend, not as the nsURI to use")
+	// Handing the configured value over as the whole nsURI made it one slot for one model: every
+	// run published to the same nsURI, so a second device family collided with the first.
+	void userMessage_asksForANamespaceBeneathThePrefix() {
+		String message = InferencePrompt.userMessage(set(false, sample("{}", 1)), "https://example.org/inferred",
+				4096);
+
+		assertTrue(message.contains("beneath 'https://example.org/inferred'"),
+				"The prefix has to be stated as a prefix: " + message);
+		assertTrue(message.contains("identifies this model and no other"),
+				"Why it must be extended is the part the agent has to act on");
+	}
+
+	@Test
+	@DisplayName("The prompt does not say what the appended segment should be")
+	// Same finding as the codec type map: the agent derives the family and the sibling
+	// conventions by discovery, and naming a scheme invites it to skip the discovery that would
+	// have found the right one.
+	void userMessage_doesNotPrescribeANamingScheme() {
+		String message = InferencePrompt.userMessage(set(false, sample("{}", 1)), "https://example.org/inferred",
+				4096);
+
+		assertFalse(message.contains("discriminator"), "That is the agent's to find, not ours to dictate");
+		assertFalse(message.contains("device family"));
+	}
+
+	@Test
 	@DisplayName("A low-evidence set tells the agent its evidence is thin")
 	void userMessage_flagsLowEvidence() {
 		String thin = InferencePrompt.userMessage(set(true, sample("{\"temp\":21.5}", 1)), "urn:x", 4096);

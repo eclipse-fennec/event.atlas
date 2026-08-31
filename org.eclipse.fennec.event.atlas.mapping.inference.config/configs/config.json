@@ -126,7 +126,12 @@
   /* --- inference ---------------------------------------------------------------------------
    *
    * The namespace is the only thing the agent is told; everything else about the model it has to
-   * discover. maxRunsPerInterval defaults to 1 here rather than 3: a run costs real money, and
+   * discover. It is a PREFIX, not the nsURI: the agent extends it with a segment identifying the
+   * model it authored, so a second device family does not land on the first one's namespace, and
+   * the nsURI it settles on comes back in the receipt. The MCP server's EMFPackageRegistry
+   * nsuri.allowlist and ModelAtlasPublisher publish.nsuri.allowlist must therefore stay
+   * prefix-shaped - `https://fennec.eclipse.org/event.atlas/inferred*`, which is what they
+   * already carry. maxRunsPerInterval defaults to 1 here rather than 3: a run costs real money, and
    * a test runtime that is restarted often should not be able to spend three of them by
    * accident. A fingerprint whose run came back UNAVAILABLE is claimed for
    * retryAfterUnavailableSeconds, in memory - so restart the framework to retry, do not wait. */

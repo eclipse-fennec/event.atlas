@@ -661,3 +661,39 @@ Exhaustion gets its own message naming the bound and the configuration to raise,
 falling back to the "failed: null" this set out to fix. `BatchChatCompletionAdapterTest` covers
 the five cases: finished, paused-then-finished, paused past the bound, continuation disabled, and
 a genuine failure that must not be resumed.
+
+## 2026-08-31 — the namespace is a prefix the agent extends
+
+The first of the three refinements, implemented as written up above, with the open question
+("who appends the segment") decided in favour of the agent.
+
+The prompt now asks for a namespace *beneath* the configured value rather than handing the value
+over as the nsURI, and says why — that the namespace must identify this model and no other,
+because a different model published later must not land on it, and that it is the identity a
+reviewer promotes and a runtime resolves. What the segment should be is deliberately not stated.
+That is the same finding as the codec type map: the agent already derives the family, the sibling
+conventions and the discriminator by discovery, and it can see how the namespaces it finds are
+built, so naming a scheme here would invite it to skip the discovery that would have found the
+better one. `InferencePromptTest` asserts both halves — that the prefix is stated as a prefix, and
+that the words "discriminator" and "device family" do not appear.
+
+**Nothing changes on the MCP server.** Both `EMFPackageRegistry.nsuri.allowlist` and
+`ModelAtlasPublisher.publish.nsuri.allowlist` already carry
+`https://fennec.eclipse.org/event.atlas/inferred*`, and `NsUriPatterns` treats a trailing `*` as a
+prefix match, so a derived sub-namespace passes as it stands. Checked rather than assumed.
+
+**What this costs.** The nsURI is no longer known before the run, which promotes the receipt from
+informative to load-bearing: it is now the only thing that says where the draft went. That raises
+the value of the third refinement (a structured receipt) without changing its shape.
+
+`ModelInferenceService` therefore warns when a `created` or `conflict` receipt names a namespace
+outside the configured prefix. A warning, not a failure: the draft is already published by the
+time the receipt is read, so there is nothing left to prevent, and since publication is guarded
+server-side by that same prefix allow-list, a draft landing outside it means either the allow-list
+is wider than the prefix or the agent named an nsURI it did not publish to. Both are an operator's
+problem, and both are worth knowing before promoting the draft.
+
+Still to verify against a live run: that the agent actually picks a sensible segment, and that two
+different channels no longer collide. The previous four runs all produced
+`nsURI="https://fennec.eclipse.org/event.atlas/inferred"` exactly, so any run under this prompt
+that produces something longer is the signal.

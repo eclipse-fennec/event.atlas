@@ -28,8 +28,16 @@ import org.eclipse.fennec.event.atlas.southbound.sampling.PayloadSampleSet;
  * value was still free - <em>including when all of those lived only in a model atlas and nothing
  * was deployed locally</em>. Naming the family, the annotation source or which tool to call
  * produced no better model and invited the agent to skip the discovery that found those things.
- * So this states the task, the namespace, the order of work and the absence of a filesystem, and
- * stops.
+ * So this states the task, the namespace prefix, the order of work and the absence of a
+ * filesystem, and stops.
+ * <p>
+ * <b>The namespace is a prefix, and the agent completes it.</b> Handing over the configured value
+ * as the whole nsURI made it one slot for one model: every run published to the same nsURI, so a
+ * second device family or a re-inference after a promotion collided. What the segment should be
+ * is deliberately not specified, for the reason above - the agent already derives the family and
+ * the sibling conventions by discovery, and it can see how the namespaces it finds are built. The
+ * cost is that the nsURI is no longer known before the run, which is what makes the receipt's
+ * nsURI load-bearing rather than merely informative.
  * <p>
  * The samples travel as their raw bodies. The agent has to validate its package against every
  * one of them, and it is the payloads it must validate against - the shapes this workspace
@@ -69,14 +77,17 @@ final class InferencePrompt {
 
 	/**
 	 * @param sampleSet the samples to infer from. Parameter must not be <code>null</code>
-	 * @param namespace the namespace the agent may publish under. Parameter must not be
-	 * <code>null</code>
+	 * @param namespacePrefix the prefix the agent's namespace must start with. Parameter must not
+	 * be <code>null</code>
 	 * @param maxPayloadChars how much of each payload body to include
 	 * @return the user message. Never <code>null</code>
 	 */
-	static String userMessage(PayloadSampleSet sampleSet, String namespace, int maxPayloadChars) {
+	static String userMessage(PayloadSampleSet sampleSet, String namespacePrefix, int maxPayloadChars) {
 		StringJoiner message = new StringJoiner("\n");
-		message.add(String.format("Publish under the namespace '%s'.", namespace));
+		message.add(String.format("Publish under a namespace beneath '%s'. Extend that prefix so the namespace "
+				+ "identifies this model and no other - a different model published later must not land on it. "
+				+ "It is the identity a reviewer promotes and a runtime resolves, so choose one you would "
+				+ "choose again for these payloads.", namespacePrefix));
 		message.add("");
 		message.add(String.format("%s sample(s), collected from one channel over %s second(s).",
 				sampleSet.sampleCount(), sampleSet.duration().toSeconds()));

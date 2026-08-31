@@ -226,9 +226,15 @@ runtime resolves it on the next payload.
   committed copy to start from; the same pattern (and the same gitignore) is used in
   `eclipse-fennec/nsc`. A checkout without the file resolves, launches and exports exactly as
   before, which is why the include is optional.
-- **`namespace` is the only thing `event.atlas.model.inference` tells the agent.** The prompt
-  names no model family, no annotation source and no tool — a prototype found all of those by
-  discovery, and naming them suppressed the discovery that found them. `codec.typeMapId` on
+- **`namespace` is the only thing `event.atlas.model.inference` tells the agent, and it is a
+  prefix.** The prompt names no model family, no annotation source and no tool — a prototype found
+  all of those by discovery, and naming them suppressed the discovery that found them. The agent
+  extends the prefix with a segment identifying the model it authored and reports the resulting
+  nsURI in its receipt; handing the configured value over as the whole nsURI made it one slot for
+  one model, so a second device family collided with the first. Nothing here says what the segment
+  should be, for the same reason nothing names the tools. Both allow-lists on the MCP server
+  (`EMFPackageRegistry.nsuri.allowlist`, `ModelAtlasPublisher.publish.nsuri.allowlist`) are
+  prefix-shaped (`…/inferred*`) and need no change. `codec.typeMapId` on
   `event.atlas.southbound.ingest` is an *ingest-side* setting and is deliberately not mirrored
   into the inference configuration.
 
