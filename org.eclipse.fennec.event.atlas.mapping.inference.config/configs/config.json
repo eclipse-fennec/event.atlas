@@ -271,8 +271,17 @@
     ]
   },
 
-  /* Poll cadence for the batch above. A run is minutes, so polling hard buys nothing. */
+  /* Poll cadence for the batch above, and how many times a paused turn may be resumed.
+   *
+   * Batch raises the provider's server-side iteration ceiling but does not remove it: three
+   * measured runs went 21, 15 and 22 iterations, the last coming back `stop_reason: pause_turn`.
+   * A paused result is neither success nor failure - isSuccessful() is false and it carries no
+   * error - so before continuation was wired in it was reported as "failed: null" and the work
+   * was thrown away. maxContinuations is deliberately low: each continuation is a whole new batch
+   * with its own queueing, so INFERENCE_TIMEOUT above is usually what stops a run first. 0
+   * restores the submit-once behaviour. */
   "event.atlas.model.inference.chat.batch": {
-    "pollSeconds": "$[env:INFERENCE_BATCH_POLL;default=$[prop:INFERENCE_BATCH_POLL;default=20]]"
+    "pollSeconds": "$[env:INFERENCE_BATCH_POLL;default=$[prop:INFERENCE_BATCH_POLL;default=20]]",
+    "maxContinuations": "$[env:INFERENCE_MAX_CONTINUATIONS;default=$[prop:INFERENCE_MAX_CONTINUATIONS;default=2]]"
   }
 }

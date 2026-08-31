@@ -618,3 +618,46 @@ Two smaller things noticed while doing it, neither fixed:
 - The paho MQTT client writes its persistence directory relative to the working directory, so
   running the jar from the workspace root leaves a `paho<n>-tcplocalhost1883/` behind — which bnd
   then sweeps into the Gradle build as a project. Run it from a scratch directory.
+
+## 2026-08-31 — a paused turn is resumed instead of reported as a failure
+
+Finding 2 measured that batch raises the provider's server-side iteration ceiling without
+removing it — 21, 15 and 22 iterations across three runs, the last coming back `pause_turn` — and
+concluded that "continuation is required whatever the transport". `nsc` has since grown the two
+pieces that make it possible, `isPaused` and `continueMessageBatch`, and
+`BatchChatCompletionAdapter` now uses them.
+
+What it was doing before is worth stating plainly, because it is worse than "missing feature". A
+paused result is neither success nor failure: `isSuccessful()` is false and `getErrorMessage()`
+is null. The adapter tested success first, so a paused turn came out as
+
+```
+Completion batch 'msgbatch_…' failed: null
+```
+
+which model inference records as an `UNAVAILABLE` receipt and then refuses to retry for
+`retryAfterUnavailableSeconds` — an hour by default. So a run that had done most of the work was
+reported as a provider outage, and the fingerprint was locked out afterwards.
+
+The adapter now checks `isPaused` **before** success and, when a turn is paused, submits a fresh
+batch carrying the assistant content so far, up to `maxContinuations` times (default 2), joining
+what each turn said with a newline. The join is insurance: the receipt is emitted at the end, so
+the final turn should carry it, but a pause that lands mid-sentence would otherwise split it.
+
+Two things that fall out of how the API is shaped:
+
+- **The continuation is built from the same prompt, not replayed from the paused batch.** A batch
+  result carries the assistant turn but not the request that produced it, so the caller supplies
+  the system and user message again. Ours is a pure function of the sample set, so rebuilding
+  yields the identical turn — nsc's own plan flagged this as its one open design question, because
+  `TREND_ANALYSIS_PROMPT` embeds `LocalDateTime.now()` and cannot be rebuilt faithfully. Everything
+  else (model, tools, MCP servers and their authorization) comes from the current configuration on
+  purpose: a token has to be minted fresh, not replayed from a batch that may be hours old.
+- **The bound is deliberately low.** Each continuation is a whole new batch with its own queueing,
+  so `timeoutSeconds` on the inference configuration is usually what stops a long run first, not
+  this. `maxContinuations: 0` restores the submit-once behaviour.
+
+Exhaustion gets its own message naming the bound and the configuration to raise, rather than
+falling back to the "failed: null" this set out to fix. `BatchChatCompletionAdapterTest` covers
+the five cases: finished, paused-then-finished, paused past the bound, continuation disabled, and
+a genuine failure that must not be resumed.
