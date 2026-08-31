@@ -427,6 +427,9 @@ dataset, would cut both the dataset churn and the iteration count the way nestin
 
 ### Refinement: the namespace must be derived per model, not shared
 
+> **Implemented 2026-08-31**, agent-derived, and confirmed on the wire the same day — see
+> *the chain end to end with a structured receipt* below.
+
 `event.atlas.model.inference`'s `namespace` is handed to the agent as the namespace to publish
 under, and the agent uses it **verbatim** as the package nsURI. Every run so far produced:
 
@@ -455,6 +458,8 @@ from the payloads — the discriminator value, the device family, something stab
 
 ### Refinement: don't start a second inference for a channel already being inferred
 
+> **Implemented 2026-08-31**, per channel — see *one run per channel at a time* below.
+
 Runs are already serialized — `ThreadPoolExecutor(0, 1, …)` with a bounded queue, deliberately, on
 the grounds that "two agents authoring into the same namespace at once is how a conflict receipt is
 manufactured". Two guards also exist already: `AttemptRegistry` claims a sample-set fingerprint
@@ -478,6 +483,10 @@ queueing them. Two notes for whoever implements it:
   the guard is per channel (allowing parallel channels later) or global (simpler now).
 
 ### Refinement: ask for a structured receipt instead of parsing prose
+
+> **Implemented 2026-08-31.** It cost more than this section assumed: the schema never
+> reached the wire because of a codec regression, and once it did it stopped the agent
+> working. Both are written up below.
 
 The receipt is currently a **line of prose** the agent is asked to end with, which the runtime
 greps for. Findings 17 and 2 are both symptoms of that: a receipt can be lost in the wrong text
@@ -509,9 +518,8 @@ widened to a small outcome record that carries no EMF types.
   outcome moving from `EMPTY` to `NO_MAPPING`; `APPLIED` additionally needs a Dragino
   `ProviderMapping`.
 - ~~**`NO_MAPPING` on the known payload.**~~ Closed 2026-08-31 - see below.
-- **One namespace holds one draft.** The inferred package took the configured `namespace` verbatim
-  as its nsURI, so a second inferred model would collide — which is what
-  `RECEIPT: conflict <nsURI>` anticipates, but it means the namespace is per-model, not per-runtime.
+- ~~**One namespace holds one draft.**~~ Closed 2026-08-31: the configured value is a prefix the
+  agent extends, and a run has published `…/inferred/dragino-lse01` under it.
 
 ### Reproducing
 
@@ -742,3 +750,133 @@ One existing test changed meaning: "a genuinely new shape is inferred again" fir
 while the first run was still in flight, which is exactly what is now refused. It asserts the same
 thing across the run boundary instead, and two new tests cover the guard itself and its
 per-channel scope.
+
+## 2026-08-31 — the chain end to end with a structured receipt
+
+Four batches, of which two cost nothing, one was wasted and one did the job. What they cost is
+worth stating plainly, because two of the three failures were free and that changes how cautiously
+this is worth iterating on: a request Anthropic rejects at validation is billed for nothing at all.
+
+| # | outcome | tokens in | what it taught |
+|---|---|---:|---|
+| 1 | 401 at submission | — | the exported jar never gets `secrets.bndrun` |
+| 2 | rejected at validation | — | the schema went out as a `$ref` |
+| 3 | rejected at validation | — | deploying `codec.jsonschema` does not fix that |
+| 4 | discovery only, `end_turn` | 114,625 | a schema leaves the agent no way to narrate |
+| 5 | **published** | 370,699 | — |
+
+### The schema never reached the wire, because of a codec regression
+
+`OutputFormat.schema` in `claude-chat-completion.ecore` is annotated
+`valueWriterName="eClassToJsonSchema"`, and `ClaudeHelper` sets the matching
+`CodecJsonSchemaOptions`. Both ends expect that writer. It was not reachable, so the codec fell
+back to writing the `EClass` as an EMF reference:
+
+```json
+"schema":{"_type":"…Ecore#//EClass","$ref":"//fennec.eclipse.org/event.atlas/inference/1.0#//InferenceResult"}
+```
+
+which Anthropic refuses outright — *"External schema references are not supported"*.
+
+The cause is `fennec-codec` `6147ee4` (2026-08-11, *"public resource factories for non-OSGi use
+(#147)"*), which removed `@Component(service = CodecValueWriter.class)` from eight value handlers
+across the jsonschema and openapi bundles and made them plain objects, filled into a **copy** of
+the shared registry by the factories. They therefore only reach resources those factories create;
+a completion request, serialized as ordinary `application/json`, never sees them. Deploying
+`org.eclipse.fennec.codec.jsonschema` changes nothing, which run 3 confirmed.
+
+This is not specific to event.atlas — `TrendAnalysis` in `nsc` uses the same annotated feature and
+the same `application/json` request resource, so its structured output should be failing the same
+way, appearing as a batch that "ended as FAILED" with no reason. Written up as
+`nsc/docs/issue-codec-value-handler-services.md`; being fixed in the codec.
+
+Meanwhile `SchemaValueWriter` in `…model.inference.chat` republishes the writer as a service — the
+same annotation #147 deleted, from the bundle that needs it. The shared registry's own javadoc
+documents that whiteboard as the way to contribute a handler, and its `removeValueWriter` gives
+exactly the lifecycle safety `registry.copy()` was reaching for. Delete it when the codec ships
+the fix.
+
+### A schema leaves the agent no way to think out loud
+
+With the schema finally on the wire, run 4 came back `end_turn` after 13 tool calls — all
+discovery, no authoring, nothing published — and said so itself:
+
+```json
+{"status":"NOT_INFERRED","nsUri":null,"message":"Discovery complete. Now authoring the Dragino LSE01 package."}
+```
+
+It intended to continue. `output_config` constrains **every** text block to the schema, so the
+model has no channel for narration: the progress note it wrote *was* a final answer, and the turn
+ended on it. Structured output and an agentic loop pull against each other, and nothing but a live
+run shows it — the request was well formed and every unit test passed.
+
+The prompt now says there is no way to speak in passing:
+
+> Anything you write is your final answer and ends the run — there is no way to say something in
+> passing. So write nothing at all until the work above is done: no plan, no progress note, no
+> summary of what you are about to do next. Keep working.
+
+That was the whole fix. Run 5, same payloads, same everything else: 32 tool calls, silent
+throughout, one answer at the end. `InferencePromptTest` pins the sentence so it cannot be tidied
+away.
+
+The fallback if it had not worked was two-phase — the agentic turn with no schema, then a second
+cheap completion converting its final text into `InferenceResult` — which keeps determinism
+without constraining the loop. Not needed, but it is the answer if this recurs.
+
+### Run 5
+
+```
+stop_reason end_turn · 32 tool calls · 370,699 in / 6,009 out
+list_registry → list_annotation_sources → find_classes_by_annotation → list_metamodel →
+describe_eclass ×9 → export_package → describe_aspects → find_classes_by_annotation →
+export_package → describe_aspects → create_dataset → create_epackage → register_package →
+create_from_json ×5 → export_dataset ×5 → post_to_model_atlas
+```
+
+```json
+{"status":"PUBLISHED",
+ "nsUri":"https://fennec.eclipse.org/event.atlas/inferred/dragino-lse01",
+ "message":"Package lse01 published as a draft under the Dragino LSE01 soil-sensor namespace; a
+            reviewer should promote it to promote the LoRaWAN type-discriminator 'Dragino_LSE01'
+            and verify that temp_DS18B20 is correctly modelled as an optional EString (it is
+            absent in sample 3 but present as '0.00' in others)."}
+```
+
+Three things proven at once:
+
+- **The namespace is the agent's.** `…/inferred/dragino-lse01`, where all four runs of 2026-08-28
+  produced the bare `…/inferred` verbatim. No scheme was suggested to it, and the server-side
+  prefix allow-list passed the longer nsURI unchanged, as designed.
+- **The receipt is structured.** The nsURI arrives in its own field rather than scraped out of
+  prose — which matters more than it did this morning, since the agent now chooses that nsURI and
+  nothing else records it.
+- **The draft is in the Atlas**: `lse01 -> https://fennec.eclipse.org/event.atlas/inferred/dragino-lse01`.
+
+The package reuses what it found rather than re-modelling it: `LSE01Uplink` extends
+`lorawan#//UplinkMessage`, and carries `typeDiscriminator: Dragino_LSE01` under
+`typeMapping/lorawan`. Neither the supertype nor the annotation source is mentioned anywhere in
+the prompt. The string/double distinctions are all correct — `water_SOIL` EString against
+`water_SOIL_f` EDouble, `temp_DS18B20` EString because it arrives as `"0.00"`.
+
+Two things it did not do, both worth knowing:
+
+- **No `unsettable="true"` anywhere.** The runs of 2026-08-28 marked the sometimes-absent fields;
+  this one did not, though its message shows it *noticed* the absence and told the reviewer
+  instead. The same knowledge in a weaker form, and a candidate for the prompt if it recurs.
+- **The `uplinkId` overflow trap never reached it.** `uplinkId` lives on `UplinkMessage` in the
+  released `lorawan` package, which the agent reused rather than re-modelled, so there was nothing
+  to type. The trap was misplaced, not missed — a trap has to sit on a field the new model will
+  actually own.
+
+### Two things about running it at all
+
+- **`secrets.bndrun` does not reach an exported jar.** It delivers everything through
+  `-runvm -D`, and bnd bakes only `-runproperties` into an exported jar — the same finding as the
+  mapping directories earlier the same day. Run 1's 401 was an empty `api.key`, and its
+  `mcp_servers[0].url` was empty too. Launch through Gradle/bndtools and it works; run the jar and
+  the values have to come from the environment instead, which `config.json` reads first anyway.
+  `secrets.bndrun.template` still implies otherwise.
+- **A batch that "ended as FAILED" says nothing about why.** `BatchChatCompletionAdapter` reports
+  only the status; the reason sat in the results endpoint the whole time and had to be fetched by
+  hand with curl. Fetching and logging it would have turned two rounds of guesswork into one line.
