@@ -18,18 +18,26 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EClass;
+import org.eclipse.emf.ecore.EClassifier;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
+import org.eclipse.emf.ecore.EReference;
 import org.eclipse.emf.ecore.InternalEObject;
+import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryListener;
@@ -59,8 +67,11 @@ import org.osgi.util.promise.PromiseFactory;
  * component property): published as an {@link EObjectRegistryListener} whiteboard
  * service, the registry binds it and replays the current content, so late binding is
  * indistinguishable from early binding. Entries are validated here - uniformly for
- * every content source (files, model atlas, ...): non-ProviderMapping content, a blank
- * {@code mid} or missing/unresolved provider classes skip the entry with a log.
+ * every content source (files, model atlas, ...) - and the outcome is one of three:
+ * registered; dropped with a log, for content that can never become a mapping
+ * (non-ProviderMapping content, a blank {@code mid}, no provider classes at all); or
+ * <em>parked</em>, for a well-formed mapping whose model or profile has not arrived yet,
+ * which is retried as EPackages are registered.
  *
  * @author Mark Hoffmann
  * @since 04.07.2025
@@ -72,6 +83,22 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	private static final Logger logger = Logger.getLogger(ProviderMappingRegistryImpl.class.getName());
 
 	private final Map<EClass, List<ProviderMapping>> registry = new ConcurrentHashMap<>();
+	/**
+	 * Entries that are well-formed but not registrable yet, keyed by registry key. A mapping
+	 * routinely arrives before the model it maps: a file provider loads and validates
+	 * synchronously at activation, while a Model Atlas publishes its EPackages after an HTTP
+	 * round trip. Dropping such an entry makes it unrecoverable, because a file provider never
+	 * re-loads - so it is parked here and retried as EPackages arrive.
+	 */
+	private final Map<String, EObjectRegistryEntry> deferred = new LinkedHashMap<>();
+	/** Every EPackage in the framework, by nsURI: what a parked entry's proxies resolve against. */
+	private final Map<String, EPackage> boundPackages = new ConcurrentHashMap<>();
+	/**
+	 * Retries run here rather than on the DS bind thread, which must not block - and
+	 * {@link #registerModelMapping(ProviderMapping)} waits on the gateway. Single-threaded, so
+	 * two retries never register the same parked entry twice.
+	 */
+	private volatile ExecutorService retries;
 	private ProviderModelSensinactMapper.Factory mapperFactory;
 	@Reference
 	private GatewayThread gatewayThread;
@@ -85,14 +112,84 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	@Activate
 	public void activate() {
 		mapperFactory = new ProviderModelSensinactMapper.Factory(profileRegistry);
+		retries = Executors.newSingleThreadExecutor(runnable -> {
+			Thread thread = new Thread(runnable, "event-atlas-mapping-retry");
+			thread.setDaemon(true);
+			return thread;
+		});
+		// EPackages bound before activation found no executor to retry on.
+		retryDeferred();
 	}
 
+	/**
+	 * Component shutdown, which {@link #dispose()} deliberately is not: dispose is also the
+	 * interface method a caller uses to reset a <em>running</em> registry, so tearing the retry
+	 * executor down there would leave the component alive but unable to ever retry again.
+	 */
 	@Deactivate
+	void deactivate() {
+		ExecutorService executor = retries;
+		retries = null;
+		if (executor != null) {
+			executor.shutdownNow();
+		}
+		dispose();
+	}
+
+	@Override
 	public void dispose() {
+		synchronized (deferred) {
+			deferred.clear();
+		}
 		synchronized (registry) {
 			registry.values().stream().flatMap(List::stream).collect(Collectors.toSet()).forEach(this::unregisterModelMapping);
 			registry.clear();
 		}
+	}
+
+	/**
+	 * Bound for the side effect: every EPackage that appears is a chance for a parked mapping to
+	 * become registrable. Unfiltered on purpose - a mapping may name any model in the framework,
+	 * and the retry is a no-op while nothing is parked.
+	 */
+	@Reference(cardinality = ReferenceCardinality.MULTIPLE, policy = ReferencePolicy.DYNAMIC, //
+			policyOption = ReferencePolicyOption.GREEDY)
+	void bindEPackage(EPackage ePackage) {
+		if (ePackage.getNsURI() == null) {
+			return;
+		}
+		boundPackages.put(ePackage.getNsURI(), ePackage);
+		retryDeferred();
+	}
+
+	void unbindEPackage(EPackage ePackage) {
+		if (ePackage.getNsURI() != null) {
+			boundPackages.remove(ePackage.getNsURI(), ePackage);
+		}
+	}
+
+	/**
+	 * Re-validates every parked entry. Entries that are still not registrable stay parked and,
+	 * having already been reported once, stay silent - this runs on every EPackage in the
+	 * framework, which at startup is dozens of times.
+	 */
+	private void retryDeferred() {
+		ExecutorService executor = retries;
+		if (executor == null) {
+			return;
+		}
+		synchronized (deferred) {
+			if (deferred.isEmpty()) {
+				return;
+			}
+		}
+		executor.execute(() -> {
+			List<EObjectRegistryEntry> parked;
+			synchronized (deferred) {
+				parked = new ArrayList<>(deferred.values());
+			}
+			parked.forEach(entry -> validMapping(entry, false).ifPresent(this::registerModelMapping));
+		});
 	}
 
 	/*
@@ -125,6 +222,9 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	 */
 	@Override
 	public void entryRemoved(EObjectRegistryEntry entry) {
+		// Also while parked: an entry withdrawn by its source must not be registered by a
+		// later retry.
+		undefer(entry);
 		validMapping(entry, true).ifPresent(this::unregisterModelMapping);
 	}
 
@@ -147,17 +247,159 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			}
 			return Optional.empty();
 		}
-		List<EClass> unresolved = mapping.getProviderClasses().stream().filter(EObject::eIsProxy).toList();
-		if (mapping.getProviderClasses().isEmpty() || !unresolved.isEmpty()) {
+		if (mapping.getProviderClasses().isEmpty()) {
 			if (!quiet) {
-				logger.severe(String.format("ProviderMapping '%s' (%s) has missing or unresolved provider classes %s - is the sensor model available? Skipping", entry.key(), mapping.getMid(), unresolved));
+				logger.severe(String.format("ProviderMapping '%s' (%s) names no provider classes - skipping",
+						entry.key(), mapping.getMid()));
 			}
 			return Optional.empty();
 		}
-		if (!resolveProfile(mapping, quiet)) {
+		// From here every failure is recoverable: the mapping is well-formed and only the model
+		// or the profile it points at is missing, both of which may still arrive. Reported once,
+		// on the first park - a retry runs per EPackage bind and must not repeat itself.
+		boolean report = !quiet && !isDeferred(entry);
+		List<EClass> unresolved = resolveProviderClasses(mapping);
+		if (!unresolved.isEmpty()) {
+			if (!quiet) {
+				defer(entry, report, String.format("its provider classes are not resolvable yet %s - is the sensor "
+						+ "model deployed?", unresolved.stream().map(ProviderMappingRegistryImpl::proxyUriOf).toList()));
+			}
 			return Optional.empty();
 		}
+		if (!resolveProfile(mapping, !report)) {
+			if (!quiet) {
+				defer(entry, report, "its profile is neither reachable as a document nor registered yet");
+			}
+			return Optional.empty();
+		}
+		if (!quiet) {
+			undefer(entry);
+		}
 		return Optional.of(mapping);
+	}
+
+	/**
+	 * Resolves every nsURI proxy the mapping carries against the bound EPackages, and answers
+	 * the provider classes that are still proxies afterwards.
+	 * <p>
+	 * EMF's own resolution is tried first, by reading each value - enough whenever the mapping's
+	 * resource set can see the model. It cannot when the model was published as an EPackage
+	 * service <em>after</em> that resource set was created, which is the case this exists for,
+	 * and the consequence reaches further than validation: a mapping whose provider class was
+	 * resolved by hand would still register and then fail on every payload, because
+	 * {@code valueFeature}, {@code featurePath} and the admin references are proxies too and
+	 * {@link ValueMapperImpl} reports them as "the feature 'null' is not a valid feature". So
+	 * the whole mapping is swept, not just the reference validation happens to look at.
+	 * <p>
+	 * Only {@code providerClasses} gates registration, exactly as before: a reference that
+	 * cannot be resolved here is left as the proxy it was, and {@code profile} keeps its own
+	 * treatment in {@link #resolveProfile(ProviderMapping, boolean)}.
+	 */
+	private List<EClass> resolveProviderClasses(ProviderMapping mapping) {
+		if (!boundPackages.isEmpty()) {
+			resolveAgainstBoundPackages(mapping);
+		}
+		return mapping.getProviderClasses().stream().filter(EObject::eIsProxy).toList();
+	}
+
+	/** Replaces resolvable proxies in every non-containment reference of the whole mapping tree. */
+	private void resolveAgainstBoundPackages(ProviderMapping mapping) {
+		Iterator<EObject> objects = EcoreUtil.getAllContents(List.of(mapping), false);
+		while (objects.hasNext()) {
+			EObject object = objects.next();
+			for (EReference reference : object.eClass().getEAllReferences()) {
+				if (reference.isContainment() || reference.isDerived() || !object.eIsSet(reference)) {
+					continue;
+				}
+				if (reference.isMany()) {
+					@SuppressWarnings("unchecked")
+					List<EObject> values = (List<EObject>) object.eGet(reference, false);
+					for (int i = 0; i < values.size(); i++) {
+						EObject resolved = resolved(values.get(i));
+						if (resolved != null) {
+							values.set(i, resolved);
+						}
+					}
+				} else {
+					EObject resolved = resolved((EObject) object.eGet(reference, false));
+					if (resolved != null) {
+						object.eSet(reference, resolved);
+					}
+				}
+			}
+		}
+	}
+
+	/** The object a proxy stands for, or <code>null</code> when it is not one or cannot be resolved. */
+	private EObject resolved(EObject value) {
+		if (value == null || !value.eIsProxy()) {
+			return null;
+		}
+		return fromBoundPackages(((InternalEObject) value).eProxyURI());
+	}
+
+	/**
+	 * The {@code <nsURI>#<fragment>} form an nsURI href leaves behind, resolved against the
+	 * bound EPackages.
+	 * <p>
+	 * The fragment is walked here rather than handed to EMF, because
+	 * {@code EcoreUtil.resolve(proxy, resourceSet)} would treat an unknown nsURI as a URL and
+	 * try to fetch it. Three forms occur in a mapping and no others: {@code /} for the package
+	 * itself (an admin's {@code providerPackage}), {@code //Name} for a classifier (a provider
+	 * class), and {@code //Name/feature} for a structural feature (every feature path).
+	 */
+	private EObject fromBoundPackages(URI proxyUri) {
+		if (proxyUri == null) {
+			return null;
+		}
+		EPackage ePackage = boundPackages.get(proxyUri.trimFragment().toString());
+		String fragment = proxyUri.fragment();
+		if (ePackage == null || fragment == null) {
+			return null;
+		}
+		if ("/".equals(fragment)) {
+			return ePackage;
+		}
+		if (!fragment.startsWith("//")) {
+			return null;
+		}
+		String[] path = fragment.substring(2).split("/");
+		EClassifier classifier = ePackage.getEClassifier(path[0]);
+		if (path.length == 1) {
+			return classifier;
+		}
+		if (path.length != 2 || !(classifier instanceof EClass eClass)) {
+			return null;
+		}
+		return eClass.getEStructuralFeature(path[1]);
+	}
+
+	private static String proxyUriOf(EClass proxy) {
+		URI proxyUri = ((InternalEObject) proxy).eProxyURI();
+		return proxyUri == null ? proxy.toString() : proxyUri.toString();
+	}
+
+	/** Parks an entry for a later retry, reporting it the first time only. */
+	private void defer(EObjectRegistryEntry entry, boolean report, String reason) {
+		synchronized (deferred) {
+			deferred.put(entry.key(), entry);
+		}
+		if (report) {
+			logger.warning(String.format("ProviderMapping '%s' cannot be registered yet: %s. Parked - it will be "
+					+ "retried as further EPackages are registered.", entry.key(), reason));
+		}
+	}
+
+	private void undefer(EObjectRegistryEntry entry) {
+		synchronized (deferred) {
+			deferred.remove(entry.key());
+		}
+	}
+
+	private boolean isDeferred(EObjectRegistryEntry entry) {
+		synchronized (deferred) {
+			return deferred.containsKey(entry.key());
+		}
 	}
 
 	/**
