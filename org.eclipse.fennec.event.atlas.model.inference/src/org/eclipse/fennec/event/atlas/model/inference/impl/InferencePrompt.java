@@ -68,10 +68,14 @@ final class InferencePrompt {
 		message.add("You have no filesystem. Everything you need is behind your tools; "
 				+ "discover before you author.");
 		message.add("");
-		message.add("Finish your answer with exactly one line, and nothing after it:");
-		message.add("RECEIPT: created <nsURI>     - you published a draft");
-		message.add("RECEIPT: conflict <nsURI>    - a draft for that namespace already existed");
-		message.add("RECEIPT: rejected <reason>   - you did not author a model, and why");
+		message.add("Anything you write is your final answer and ends the run - there is no way to say "
+				+ "something in passing. So write nothing at all until the work above is done: no plan, "
+				+ "no progress note, no summary of what you are about to do next. Keep working.");
+		message.add("");
+		message.add("When you have finished, report what you did in the structure you are given: the "
+				+ "status, the namespace you published under, and one sentence a human can act on. "
+				+ "Report it even when the run went badly - an outcome nobody records is an outcome "
+				+ "that gets paid for twice.");
 		return message.toString();
 	}
 

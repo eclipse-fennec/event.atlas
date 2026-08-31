@@ -36,17 +36,29 @@ import org.junit.jupiter.api.Test;
 public class InferencePromptTest {
 
 	@Test
-	@DisplayName("The system message states the order of work, the absence of a filesystem and the receipt")
-	void systemMessage_statesTheTaskAndTheReceipt() {
+	@DisplayName("The system message states the order of work, the absence of a filesystem and the report")
+	void systemMessage_statesTheTaskAndTheReport() {
 		String message = InferencePrompt.systemMessage();
 
 		assertTrue(message.contains("Discover"), "Discovery comes first, and is what found the family");
 		assertTrue(message.contains("Validate it against every sample"));
 		assertTrue(message.contains("publish it as a draft for human review"));
 		assertTrue(message.contains("no filesystem"));
-		assertTrue(message.contains("RECEIPT: created <nsURI>"), "Without the receipt a run's outcome is unknown");
-		assertTrue(message.contains("RECEIPT: conflict <nsURI>"));
-		assertTrue(message.contains("RECEIPT: rejected <reason>"));
+		assertTrue(message.contains("report what you did"), "Without an outcome a run's result is unknown");
+		assertTrue(message.contains("ends the run"),
+				"Measured 2026-08-31: with a schema set, a progress note IS the final answer - the agent "
+						+ "stopped after discovery having said 'Now authoring the Dragino LSE01 package'");
+		assertTrue(message.contains("even when the run went badly"),
+				"The outcomes worth having are the ones an agent would rather not report");
+	}
+
+	@Test
+	@DisplayName("The system message no longer dictates a receipt line")
+	// The outcome is a schema now. Asking for a line of prose as well is a contradictory
+	// instruction, and the prose parser survives only as the adapter's fallback.
+	void systemMessage_doesNotAskForAReceiptLine() {
+		assertFalse(InferencePrompt.systemMessage().contains("RECEIPT:"),
+				"A schema and a marker line are two answers to one question");
 	}
 
 	@Test

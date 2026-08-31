@@ -18,7 +18,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.eclipse.fennec.event.atlas.model.inference.impl.InferenceReceipt.Outcome;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
 
 /**
  * Remembers which sample-set fingerprints have already been inferred, so that a channel that
@@ -32,10 +32,10 @@ import org.eclipse.fennec.event.atlas.model.inference.impl.InferenceReceipt.Outc
  * <p>
  * Where it differs: that registry keeps a fingerprint claimed even when the generation failed,
  * with a comment that retrying would mean releasing it. Here, only the outcomes that say
- * something about the payloads are permanent. An {@link Outcome#UNAVAILABLE} run - the
- * completion was unreachable - is released again after a configurable delay, because a network
- * outage must neither cause a retry storm nor permanently poison a model that was never given a
- * chance.
+ * something about the payloads are permanent, which is the line {@link Status#isRetryable()}
+ * draws - a completion that was unreachable, or an agent that authored a model and could not
+ * publish it, decided nothing about these payloads and is released again after a configurable
+ * delay. The delay is what keeps that from becoming a retry storm.
  * @author Ilenia Salvadori
  * @since 27.08.2026
  */
@@ -89,8 +89,8 @@ class AttemptRegistry {
 	 * @param outcome what the run ended in. Parameter must not be <code>null</code>
 	 * @param now the current instant. Parameter must not be <code>null</code>
 	 */
-	void completed(String fingerprint, Outcome outcome, Instant now) {
-		if (outcome == Outcome.UNAVAILABLE) {
+	void completed(String fingerprint, Status outcome, Instant now) {
+		if (outcome.isRetryable()) {
 			claims.put(fingerprint, now.plus(retryAfterUnavailable));
 		}
 		// every other outcome is a decision about these payloads and stands

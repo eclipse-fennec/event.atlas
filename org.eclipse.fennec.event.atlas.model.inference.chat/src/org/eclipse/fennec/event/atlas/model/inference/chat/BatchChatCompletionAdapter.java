@@ -13,20 +13,34 @@
  */
 package org.eclipse.fennec.event.atlas.model.inference.chat;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.eclipse.emf.common.util.URI;
+import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.resource.Resource;
+import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.BatchResponse;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.BatchResult;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.BatchStatusType;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.MessageBatch;
 import org.eclipse.fennec.ai.chat.completion.api.BatchChatCompletionService;
+import org.eclipse.fennec.codec.resource.CodecResource;
 import org.eclipse.fennec.event.atlas.model.inference.ChatCompletion;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
+import org.eclipse.fennec.event.atlas.model.inference.chat.result.InferenceResult;
+import org.eclipse.fennec.event.atlas.model.inference.chat.result.InferenceResultPackage;
+import org.eclipse.fennec.event.atlas.model.inference.chat.result.InferenceStatus;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
@@ -115,6 +129,10 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 	@Reference
 	private BatchChatCompletionService<?> batchService;
 
+	/** Used only to turn the agent's structured answer back into an {@link InferenceResult}. */
+	@Reference
+	private ResourceSet resourceSet;
+
 	private volatile Duration poll = Duration.ofSeconds(20);
 	private volatile int maxContinuations = 2;
 
@@ -134,11 +152,11 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 	 * @see org.eclipse.fennec.event.atlas.model.inference.ChatCompletion#complete(java.lang.String, java.lang.String)
 	 */
 	@Override
-	public String complete(String systemMessage, String userMessage) {
+	public InferenceOutcome complete(String systemMessage, String userMessage) {
 		Instant started = Instant.now();
 		StringJoiner answer = new StringJoiner("\n");
 		String customId = newCustomId();
-		String batchId = submit(batchService.createMessageBatch(customId, systemMessage, userMessage), customId);
+		String batchId = submit(createBatch(customId, systemMessage, userMessage), customId);
 
 		for (int continuation = 0;; continuation++) {
 			Turn turn = awaitTurn(batchId, customId, started);
@@ -146,7 +164,7 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 				answer.add(turn.text());
 			}
 			if (!turn.paused()) {
-				return answer.length() == 0 ? null : answer.toString();
+				return outcomeOf(turn, answer.toString());
 			}
 			if (continuation == maxContinuations) {
 				throw new IllegalStateException(String.format(
@@ -163,7 +181,7 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 			String pausedCustomId = customId;
 			String pausedBatchId = batchId;
 			customId = newCustomId();
-			MessageBatch next = batchService.createMessageBatch(customId, systemMessage, userMessage);
+			MessageBatch next = createBatch(customId, systemMessage, userMessage);
 			batchService.continueMessageBatch(next, turn.result(), pausedCustomId);
 			batchId = submit(next, customId);
 			String resumedBatchId = batchId;
@@ -181,6 +199,72 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 
 	private static String newCustomId() {
 		return "event-atlas-inference-" + UUID.randomUUID();
+	}
+
+	/**
+	 * The batch, carrying the schema of the answer we want back. Asking for a structure rather
+	 * than a line of prose is what makes the outcome deterministic - and the namespace, which
+	 * the agent now chooses for itself, is the one field nothing else records.
+	 */
+	private MessageBatch createBatch(String customId, String systemMessage, String userMessage) {
+		try {
+			return batchService.createMessageBatch(customId, systemMessage, userMessage,
+					InferenceResultPackage.Literals.INFERENCE_RESULT);
+		} catch (IOException e) {
+			throw new IllegalStateException("The completion batch could not be built: " + describe(e), e);
+		}
+	}
+
+	/**
+	 * The agent's structured answer, or its prose if the structure cannot be recovered.
+	 * <p>
+	 * The fallback matters more than it looks: a turn that exhausts its continuations has text
+	 * but never reached its structured answer, and reporting that as unreadable prose is far
+	 * better than reporting it as a failure.
+	 */
+	private InferenceOutcome outcomeOf(Turn turn, String text) {
+		try {
+			return map(read(turn.text()));
+		} catch (IOException | RuntimeException e) {
+			logger.log(Level.FINE, "The structured answer could not be read - falling back to the text", e);
+			return ReceiptText.read(text);
+		}
+	}
+
+	private InferenceResult read(String json) throws IOException {
+		if (json == null || json.isBlank()) {
+			throw new IOException("the answer carried no text");
+		}
+		// The .json extension is what picks the codec's resource factory, exactly as it does for
+		// an ingested payload. CodecResource.CODEC_ROOT_TYPE is a compile-time String constant, so
+		// javac inlines it and this bundle carries no runtime import of the codec - the buildpath
+		// entry is not dead weight, but the manifest will not show it.
+		Resource resource = resourceSet.createResource(URI.createURI("event-atlas-inference-result.json"));
+		try (InputStream in = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))) {
+			resource.load(in, Map.of(CodecResource.CODEC_ROOT_TYPE, InferenceResultPackage.Literals.INFERENCE_RESULT));
+		}
+		EObject root = resource.getContents().isEmpty() ? null : resource.getContents().get(0);
+		if (!(root instanceof InferenceResult result)) {
+			throw new IOException("the answer did not deserialize into an InferenceResult but into " + root);
+		}
+		return result;
+	}
+
+	/**
+	 * The generated status onto the port's, which carries two more that no agent can report:
+	 * a completion that never answered, and an answer nothing could be read out of.
+	 */
+	private static InferenceOutcome map(InferenceResult result) {
+		InferenceStatus status = result.getStatus();
+		if (status == null) {
+			return InferenceOutcome.of(Status.UNREADABLE, "the agent's answer named no status");
+		}
+		return new InferenceOutcome(switch (status) {
+		case PUBLISHED -> Status.PUBLISHED;
+		case ALREADY_EXISTS -> Status.ALREADY_EXISTS;
+		case NOT_PUBLISHED -> Status.NOT_PUBLISHED;
+		case NOT_INFERRED -> Status.NOT_INFERRED;
+		}, result.getNsUri(), result.getMessage());
 	}
 
 	private String submit(MessageBatch batch, String customId) {

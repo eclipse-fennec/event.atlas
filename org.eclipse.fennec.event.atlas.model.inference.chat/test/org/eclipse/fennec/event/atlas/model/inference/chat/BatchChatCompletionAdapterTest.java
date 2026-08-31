@@ -13,8 +13,9 @@
  */
 package org.eclipse.fennec.event.atlas.model.inference.chat;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,19 +23,30 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
+import org.eclipse.emf.common.util.BasicEList;
+import org.eclipse.emf.ecore.EClass;
+import org.eclipse.emf.ecore.resource.Resource;
+import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.BatchResponse;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.BatchResult;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.BatchStatusType;
 import org.eclipse.fennec.ai.apis.meta.model.aiapismeta.MessageBatch;
 import org.eclipse.fennec.ai.chat.completion.api.BatchChatCompletionService;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
+import org.eclipse.fennec.event.atlas.model.inference.chat.result.InferenceResult;
+import org.eclipse.fennec.event.atlas.model.inference.chat.result.InferenceResultFactory;
+import org.eclipse.fennec.event.atlas.model.inference.chat.result.InferenceStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +69,7 @@ public class BatchChatCompletionAdapterTest {
 
 	private BatchChatCompletionService<?> batchService;
 	private BatchChatCompletionAdapter adapter;
+	private Resource resource;
 	private final Deque<BatchResult> paused = new ArrayDeque<>();
 
 	@BeforeEach
@@ -66,39 +79,91 @@ public class BatchChatCompletionAdapterTest {
 		MessageBatch batch = mock(MessageBatch.class);
 		BatchResponse completed = mock(BatchResponse.class);
 		when(completed.getBatchStatus()).thenReturn(BatchStatusType.COMPLETED);
-		when(batchService.createMessageBatch(anyString(), anyString(), anyString())).thenReturn(batch);
+		when(batchService.createMessageBatch(anyString(), anyString(), anyString(), any(EClass.class)))
+				.thenReturn(batch);
 		when(batchService.getBatch(anyString())).thenReturn(completed);
 		// Every result the service is asked about is paused if the test queued it as such.
 		when(batchService.isPaused(any(), anyString())).thenAnswer(call -> paused.contains(call.getArgument(0)));
+		// The codec is not on a unit test's classpath, so the resource is stubbed: what is under
+		// test here is the loop and the mapping, not the JSON parse - that the schema round-trips
+		// is the live run's job to show.
+		resource = mock(Resource.class);
+		ResourceSet resourceSet = mock(ResourceSet.class);
+		when(resourceSet.createResource(any())).thenReturn(resource);
+		when(resource.getContents()).thenReturn(new BasicEList<>());
+
 		adapter = new BatchChatCompletionAdapter();
 		inject("batchService", batchService);
+		inject("resourceSet", resourceSet);
 		adapter.activate(config(2));
 	}
 
 	@Test
-	@DisplayName("A finished turn is returned as it stands")
-	void finishedTurn_isReturned() throws Exception {
-		answerWith(finished("RECEIPT: created https://example.org/inferred"));
+	@DisplayName("The agent's structured answer becomes the outcome, field for field")
+	void structuredAnswer_becomesTheOutcome() throws Exception {
+		answerWith(finished("{\"status\":\"PUBLISHED\"}"));
+		agentAnswers(InferenceStatus.PUBLISHED, "https://example.org/inferred/dragino/lse01", "five samples, one model");
 
-		assertThat(adapter.complete(SYSTEM, USER)).isEqualTo("RECEIPT: created https://example.org/inferred");
+		InferenceOutcome outcome = adapter.complete(SYSTEM, USER);
+
+		assertEquals(Status.PUBLISHED, outcome.status());
+		assertEquals("https://example.org/inferred/dragino/lse01", outcome.nsUri(),
+				"The namespace is the one field nothing else records");
+		assertEquals("five samples, one model", outcome.message());
 		verify(batchService, never()).continueMessageBatch(any(), any(), anyString());
 	}
 
 	@Test
-	@DisplayName("A paused turn is resumed, and what each turn said is joined")
-	void pausedTurn_isResumedAndJoined() throws Exception {
-		BatchResult first = pausedResult("I'll discover the existing models first");
-		answerWith(first, finished("RECEIPT: created https://example.org/inferred"));
+	@DisplayName("Every status the agent can report maps onto the port's")
+	void everyAgentStatus_maps() throws Exception {
+		for (InferenceStatus reported : InferenceStatus.values()) {
+			answerWith(finished("{}"));
+			agentAnswers(reported, "https://example.org/inferred/x", "because");
 
-		String answer = adapter.complete(SYSTEM, USER);
+			assertEquals(reported.getName(), adapter.complete(SYSTEM, USER).status().name(),
+					"The two enums have to stay in step, and nothing else checks that");
+		}
+	}
 
-		assertThat(answer).isEqualTo("""
-				I'll discover the existing models first
-				RECEIPT: created https://example.org/inferred""");
+	@Test
+	@DisplayName("An answer the schema cannot be read out of falls back to the agent's prose")
+	// A turn that exhausts its continuations has text but never reached its structured answer.
+	// Reporting that as prose is far better than reporting it as a failure.
+	void unreadableStructuredAnswer_fallsBackToTheText() throws Exception {
+		answerWith(finished("I published it. RECEIPT: created https://example.org/inferred/dragino/lse01"));
+		doThrow(new IOException("not json")).when(resource).load(any(InputStream.class), any());
+
+		InferenceOutcome outcome = adapter.complete(SYSTEM, USER);
+
+		assertEquals(Status.PUBLISHED, outcome.status());
+		assertEquals("https://example.org/inferred/dragino/lse01", outcome.nsUri());
+	}
+
+	@Test
+	@DisplayName("A paused turn is resumed, and the resumed turn's answer is the outcome")
+	void pausedTurn_isResumed() throws Exception {
+		answerWith(pausedResult("I'll discover the existing models first"), finished("{}"));
+		agentAnswers(InferenceStatus.PUBLISHED, "https://example.org/inferred/dragino/lse01", "done");
+
+		InferenceOutcome outcome = adapter.complete(SYSTEM, USER);
+
+		assertEquals(Status.PUBLISHED, outcome.status());
 		// The result carries the assistant turn but not the prompt, so the continuation is built
 		// from the same system and user message - not replayed from the paused batch.
-		verify(batchService, times(2)).createMessageBatch(anyString(), eq(SYSTEM), eq(USER));
+		verify(batchService, times(2)).createMessageBatch(anyString(), eq(SYSTEM), eq(USER), any(EClass.class));
 		verify(batchService).continueMessageBatch(any(), any(), anyString());
+	}
+
+	@Test
+	@DisplayName("Falling back to prose joins what every turn said")
+	// The structured answer lives in the final turn only; the joined text is the fallback's
+	// material, and a receipt that landed before a pause would otherwise be lost.
+	void proseFallback_joinsTheTurns() throws Exception {
+		answerWith(pausedResult("RECEIPT: created https://example.org/inferred/dragino/lse01"),
+				finished("and that is all"));
+		doThrow(new IOException("not json")).when(resource).load(any(InputStream.class), any());
+
+		assertEquals("https://example.org/inferred/dragino/lse01", adapter.complete(SYSTEM, USER).nsUri());
 	}
 
 	@Test
@@ -106,10 +171,11 @@ public class BatchChatCompletionAdapterTest {
 	void pausedForever_isGivenUpOnWithAnActionableMessage() throws Exception {
 		answerWith(pausedResult("still working"), pausedResult("still working"), pausedResult("still working"));
 
-		assertThatThrownBy(() -> adapter.complete(SYSTEM, USER))
-				.isInstanceOf(IllegalStateException.class)
-				.hasMessageContaining("still paused after 2 continuation(s)")
-				.hasMessageContaining("maxContinuations");
+		IllegalStateException failure = assertThrows(IllegalStateException.class,
+				() -> adapter.complete(SYSTEM, USER));
+		assertTrue(failure.getMessage().contains("still paused after 2 continuation(s)"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("maxContinuations"),
+				"The message has to name the setting to raise: " + failure.getMessage());
 		verify(batchService, times(2)).continueMessageBatch(any(), any(), anyString());
 	}
 
@@ -119,9 +185,9 @@ public class BatchChatCompletionAdapterTest {
 		adapter.activate(config(0));
 		answerWith(pausedResult("still working"));
 
-		assertThatThrownBy(() -> adapter.complete(SYSTEM, USER))
-				.isInstanceOf(IllegalStateException.class)
-				.hasMessageContaining("still paused after 0 continuation(s)");
+		IllegalStateException failure = assertThrows(IllegalStateException.class,
+				() -> adapter.complete(SYSTEM, USER));
+		assertTrue(failure.getMessage().contains("still paused after 0 continuation(s)"), failure.getMessage());
 		verify(batchService, never()).continueMessageBatch(any(), any(), anyString());
 	}
 
@@ -133,10 +199,22 @@ public class BatchChatCompletionAdapterTest {
 		when(failed.getErrorMessage()).thenReturn("overloaded_error");
 		answerWith(failed);
 
-		assertThatThrownBy(() -> adapter.complete(SYSTEM, USER))
-				.isInstanceOf(IllegalStateException.class)
-				.hasMessageContaining("overloaded_error");
+		IllegalStateException failure = assertThrows(IllegalStateException.class,
+				() -> adapter.complete(SYSTEM, USER));
+		assertTrue(failure.getMessage().contains("overloaded_error"),
+				"A real error must still be reported as one: " + failure.getMessage());
 		verify(batchService, never()).continueMessageBatch(any(), any(), anyString());
+	}
+
+	/** What the stubbed codec yields when the adapter reads the final turn's answer. */
+	private void agentAnswers(InferenceStatus status, String nsUri, String message) {
+		InferenceResult result = InferenceResultFactory.eINSTANCE.createInferenceResult();
+		result.setStatus(status);
+		result.setNsUri(nsUri);
+		result.setMessage(message);
+		BasicEList<org.eclipse.emf.ecore.EObject> contents = new BasicEList<>();
+		contents.add(result);
+		when(resource.getContents()).thenReturn(contents);
 	}
 
 	/** Queues the results the service hands back, one per batch, in order. */

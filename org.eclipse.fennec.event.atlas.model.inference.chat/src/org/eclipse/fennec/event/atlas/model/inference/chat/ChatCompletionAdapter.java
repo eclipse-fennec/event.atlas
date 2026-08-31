@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.fennec.ai.chat.completion.api.ChatCompletionService;
 import org.eclipse.fennec.event.atlas.model.inference.ChatCompletion;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
@@ -55,7 +56,7 @@ public class ChatCompletionAdapter implements ChatCompletion {
 	 * @see org.eclipse.fennec.event.atlas.model.inference.ChatCompletion#complete(java.lang.String, java.lang.String)
 	 */
 	@Override
-	public String complete(String systemMessage, String userMessage) {
+	public InferenceOutcome complete(String systemMessage, String userMessage) {
 		Instant started = Instant.now();
 		EObject response;
 		try {
@@ -79,7 +80,9 @@ public class ChatCompletionAdapter implements ChatCompletion {
 		String usage = AnswerText.usageOf(response);
 		logger.log(Level.INFO, () -> String.format("The chat completion answered in %ss%s",
 				Duration.between(started, Instant.now()).toSeconds(), usage == null ? "" : " (" + usage + ")"));
-		return AnswerText.of(response);
+		// No schema on this path: a synchronous turn cannot finish an agentic run anyway (it
+		// stops at the provider's iteration budget), so its answer is read as prose.
+		return ReceiptText.read(AnswerText.of(response));
 	}
 
 	private static String describe(Throwable e) {

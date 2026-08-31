@@ -36,6 +36,8 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 import org.eclipse.fennec.event.atlas.model.inference.ChatCompletion;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult.Outcome;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
 import org.eclipse.fennec.event.atlas.southbound.sampling.PayloadSample;
@@ -80,7 +82,7 @@ public class ModelInferenceServiceTest {
 	@Test
 	@DisplayName("A sample set is inferred once, with the samples and the namespace in the prompt")
 	void sampleSet_runsOneCompletion() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/dragino/1.0");
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/dragino/1.0"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/dragino/1", false, sample("{\"temp\":21.5}")));
@@ -97,7 +99,7 @@ public class ModelInferenceServiceTest {
 	// A channel whose draft is waiting for review keeps handing over sample sets; each one would
 	// otherwise cost another agent run.
 	void repeatedShapes_doNotRunASecondTime() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
@@ -113,7 +115,7 @@ public class ModelInferenceServiceTest {
 	@Test
 	@DisplayName("A genuinely new shape is inferred again, once the run before it has finished")
 	void newShapes_runAgainOnceTheChannelIsFree() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"temp\":21.5}")));
@@ -143,10 +145,10 @@ public class ModelInferenceServiceTest {
 	void secondSetForAChannelBeingInferred_isDropped() throws Exception {
 		CountDownLatch entered = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0") {
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0")) {
 			@Override
-			public String complete(String systemMessage, String userMessage) {
-				String answer = super.complete(systemMessage, userMessage);
+			public InferenceOutcome complete(String systemMessage, String userMessage) {
+				InferenceOutcome answer = super.complete(systemMessage, userMessage);
 				entered.countDown();
 				try {
 					release.await(5, TimeUnit.SECONDS);
@@ -181,10 +183,10 @@ public class ModelInferenceServiceTest {
 	void anotherChannel_isNotBlockedByTheOneInFlight() throws Exception {
 		CountDownLatch entered = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0") {
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0")) {
 			@Override
-			public String complete(String systemMessage, String userMessage) {
-				String answer = super.complete(systemMessage, userMessage);
+			public InferenceOutcome complete(String systemMessage, String userMessage) {
+				InferenceOutcome answer = super.complete(systemMessage, userMessage);
 				if (entered.getCount() > 0) {
 					entered.countDown();
 					try {
@@ -216,7 +218,7 @@ public class ModelInferenceServiceTest {
 	@Test
 	@DisplayName("The run cap refuses further inferences and says so")
 	void rateLimit_refusesBeyondTheCapAndLogsIt() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0"));
 		ModelInferenceService service = service(completion, NAMESPACE, 1);
 		List<LogRecord> logged = captureLog();
 
@@ -244,7 +246,7 @@ public class ModelInferenceServiceTest {
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
-			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
+			return published(NAMESPACE + "/a/1.0");
 		}, NAMESPACE, 5);
 
 		try {
@@ -267,7 +269,7 @@ public class ModelInferenceServiceTest {
 		BlockingQueue<Thread> ranOn = new LinkedBlockingQueue<>();
 		ModelInferenceService service = service((systemMessage, userMessage) -> {
 			ranOn.add(Thread.currentThread());
-			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
+			return published(NAMESPACE + "/a/1.0");
 		}, NAMESPACE, 5);
 		Thread caller = Thread.currentThread();
 
@@ -284,7 +286,7 @@ public class ModelInferenceServiceTest {
 	@Test
 	@DisplayName("A created receipt is reported against the channel, review and all")
 	void createdReceipt_isReported() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
@@ -300,7 +302,7 @@ public class ModelInferenceServiceTest {
 	@Test
 	@DisplayName("A conflict is reported as normal, not as an error")
 	void conflictReceipt_isNotAnError() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: conflict " + NAMESPACE + "/a/1.0");
+		RecordingCompletion completion = new RecordingCompletion(new InferenceOutcome(Status.ALREADY_EXISTS, NAMESPACE + "/a/1.0", "waiting for review"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
@@ -342,7 +344,7 @@ public class ModelInferenceServiceTest {
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
-			return "RECEIPT: created " + NAMESPACE + "/a/1.0";
+			return published(NAMESPACE + "/a/1.0");
 		}, NAMESPACE, 5, 1);
 		List<LogRecord> logged = captureLog();
 
@@ -356,22 +358,42 @@ public class ModelInferenceServiceTest {
 	}
 
 	@Test
-	@DisplayName("An answer with no receipt is reported as unknown rather than as a rejection")
+	@DisplayName("An unreadable answer is reported as unknown rather than as a rejection")
+	// The run happened and was paid for; what it decided is simply not known. Reporting that as
+	// "the agent declined" would blame the payloads for a prompt or schema problem.
 	void unreadableAnswer_isReportedAsUnknown() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("All done, the model is published!");
+		RecordingCompletion completion = new RecordingCompletion(
+				InferenceOutcome.of(Status.UNREADABLE, "All done, the model is published!"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
 		completion.awaitCall();
 
-		assertTrue(awaitLog(logged, Level.WARNING, "carried no receipt"));
+		assertTrue(awaitLog(logged, Level.WARNING, "could not be read as an outcome"));
+	}
+
+	@Test
+	@DisplayName("A model that was authored but not published is a warning, and is retried")
+	// The one agent-reported outcome that says nothing about the payloads.
+	void notPublished_isWarnedAboutAndRetried() throws Exception {
+		RecordingCompletion completion = new RecordingCompletion(new InferenceOutcome(Status.NOT_PUBLISHED,
+				NAMESPACE + "/a/1.0", "post_to_model_atlas returned 503"));
+		ModelInferenceService service = service(completion, NAMESPACE, 5);
+		List<LogRecord> logged = captureLog();
+
+		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
+		completion.awaitCall();
+
+		assertTrue(awaitLog(logged, Level.WARNING, "could not be published"));
+		assertTrue(logged.stream().anyMatch(record -> record.getMessage().contains("will try again")),
+				"An operator has to know the shapes are not written off");
 	}
 
 	@Test
 	@DisplayName("A low-evidence sample set is recorded alongside the receipt")
 	void lowEvidence_travelsWithTheReceipt() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created " + NAMESPACE + "/a/1.0");
+		RecordingCompletion completion = new RecordingCompletion(published(NAMESPACE + "/a/1.0"));
 		ModelInferenceService service = service(completion, NAMESPACE, 5);
 		List<LogRecord> logged = captureLog();
 
@@ -386,7 +408,7 @@ public class ModelInferenceServiceTest {
 	@DisplayName("With no namespace configured nothing is inferred")
 	// A run that does not know where it may publish would fail at the end, or publish elsewhere.
 	void withoutANamespace_nothingRuns() throws Exception {
-		RecordingCompletion completion = new RecordingCompletion("RECEIPT: created x");
+		RecordingCompletion completion = new RecordingCompletion(published("x"));
 		ModelInferenceService service = service(completion, "  ", 5);
 
 		service.onSampleSet(set("sensors/a", false, sample("{\"a\":1}")));
@@ -412,18 +434,23 @@ public class ModelInferenceServiceTest {
 	/**
 	 * Answers every completion with the same canned agent message, and records what it was asked.
 	 */
+	/** What a run that published a draft under {@code nsUri} now answers. */
+	private static InferenceOutcome published(String nsUri) {
+		return new InferenceOutcome(Status.PUBLISHED, nsUri, "authored from the samples");
+	}
+
 	private static class RecordingCompletion implements ChatCompletion {
 
 		private final BlockingQueue<Call> received = new LinkedBlockingQueue<>();
 		private final AtomicInteger calls = new AtomicInteger();
-		private final String answer;
+		private final InferenceOutcome answer;
 
-		RecordingCompletion(String answer) {
+		RecordingCompletion(InferenceOutcome answer) {
 			this.answer = answer;
 		}
 
 		@Override
-		public String complete(String systemMessage, String userMessage) {
+		public InferenceOutcome complete(String systemMessage, String userMessage) {
 			calls.incrementAndGet();
 			received.add(new Call(systemMessage, userMessage));
 			return answer;

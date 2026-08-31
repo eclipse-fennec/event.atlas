@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.time.Instant;
 
-import org.eclipse.fennec.event.atlas.model.inference.impl.InferenceReceipt.Outcome;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -49,8 +49,8 @@ public class AttemptRegistryTest {
 	@Test
 	@DisplayName("A decision about the payloads stands for good")
 	void terminalOutcomes_areNeverRetried() {
-		for (Outcome outcome : new Outcome[] { Outcome.CREATED, Outcome.CONFLICT, Outcome.REJECTED,
-				Outcome.UNREADABLE }) {
+		for (Status outcome : new Status[] { Status.PUBLISHED, Status.ALREADY_EXISTS, Status.NOT_INFERRED,
+				Status.UNREADABLE }) {
 			AttemptRegistry registry = new AttemptRegistry(Duration.ofSeconds(1));
 			registry.claim(FINGERPRINT, NOON);
 			registry.completed(FINGERPRINT, outcome, NOON);
@@ -67,12 +67,26 @@ public class AttemptRegistryTest {
 	void unavailable_isRetriedAfterTheDelay() {
 		AttemptRegistry registry = new AttemptRegistry(Duration.ofHours(1));
 		registry.claim(FINGERPRINT, NOON);
-		registry.completed(FINGERPRINT, Outcome.UNAVAILABLE, NOON);
+		registry.completed(FINGERPRINT, Status.UNAVAILABLE, NOON);
 
 		assertFalse(registry.claim(FINGERPRINT, NOON.plusSeconds(60)), "Not straight away");
 		assertFalse(registry.claim(FINGERPRINT, NOON.plusSeconds(3599)));
 		assertTrue(registry.claim(FINGERPRINT, NOON.plusSeconds(3601)), "But eventually");
 		assertFalse(registry.claim(FINGERPRINT, NOON.plusSeconds(3602)), "And then it is claimed again");
+	}
+
+	@Test
+	@DisplayName("A model that was authored but not published is retried, like an unreachable one")
+	// The line is not "did the run succeed" but "did it decide anything about these payloads".
+	// A publish that failed decided nothing, so the shapes deserve another attempt - after the
+	// same delay, because whatever refused the publication may still be refusing it.
+	void notPublished_isRetriedAfterTheDelay() {
+		AttemptRegistry registry = new AttemptRegistry(Duration.ofHours(1));
+		registry.claim(FINGERPRINT, NOON);
+		registry.completed(FINGERPRINT, Status.NOT_PUBLISHED, NOON);
+
+		assertFalse(registry.claim(FINGERPRINT, NOON.plusSeconds(60)), "Not straight away");
+		assertTrue(registry.claim(FINGERPRINT, NOON.plusSeconds(3601)), "But eventually");
 	}
 
 	@Test

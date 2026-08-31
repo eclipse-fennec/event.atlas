@@ -36,8 +36,10 @@ import org.osgi.annotation.versioning.ConsumerType;
  * own runner thread and never on an ingest or collector thread, and the caller applies its own
  * timeout, so the implementation does not need one.
  * <p>
- * The answer is the agent's final message. Inference reads a receipt line out of it - what the
- * agent did, not a metamodel document; nothing here ever transports an Ecore package.
+ * The answer is an account of what the agent did, not a metamodel document; nothing here ever
+ * transports an Ecore package. Turning whatever the provider actually returned - a structured
+ * object, a line of prose - into that account is the implementation's job, which is what keeps
+ * this bundle free of EMF.
  * @author Ilenia Salvadori
  * @since 27.08.2026
  */
@@ -45,15 +47,15 @@ import org.osgi.annotation.versioning.ConsumerType;
 public interface ChatCompletion {
 
 	/**
-	 * Runs one completion and returns the agent's final message.
+	 * Runs one completion and reports what the agent did.
 	 * @param systemMessage the instructions. Parameter is never <code>null</code>
 	 * @param userMessage the task, carrying the payload samples. Parameter is never
 	 * <code>null</code>
-	 * @return the agent's answer, or <code>null</code> if it produced none - which inference
-	 * records as an unreadable receipt rather than as a failure
+	 * @return what became of the model. Never <code>null</code>; an answer that cannot be read
+	 * as an outcome is {@link InferenceOutcome.Status#UNREADABLE} rather than a failure
 	 * @throws RuntimeException if the completion could not be run at all; inference records
-	 * that as an unavailable receipt and does not retry it in a storm
+	 * that as {@link InferenceOutcome.Status#UNAVAILABLE} and does not retry it in a storm
 	 */
-	String complete(String systemMessage, String userMessage);
+	InferenceOutcome complete(String systemMessage, String userMessage);
 
 }

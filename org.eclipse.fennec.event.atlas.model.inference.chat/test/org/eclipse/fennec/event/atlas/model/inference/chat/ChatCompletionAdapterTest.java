@@ -34,6 +34,8 @@ import org.eclipse.emf.ecore.EcoreFactory;
 import org.eclipse.emf.ecore.EcorePackage;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.ai.chat.completion.api.ChatCompletionService;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome;
+import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
 import org.eclipse.emf.ecore.EAttribute;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -142,13 +144,16 @@ public class ChatCompletionAdapterTest {
 	}
 
 	@Test
-	@DisplayName("The adapter hands the two messages to the service and returns its answer")
-	void adapter_delegatesAndReturnsTheAnswer() throws Exception {
+	@DisplayName("The adapter hands the two messages to the service and reads its answer")
+	void adapter_delegatesAndReadsTheAnswer() throws Exception {
 		ChatCompletionService service = mock(ChatCompletionService.class);
 		when(service.complete(anyString(), anyString())).thenReturn(null);
 
-		// a service that answers nothing must read as "no answer" rather than throw
-		assertNull(adapter(service).complete("system", "user"));
+		// A service that answers nothing must read as "unreadable" rather than throw: the run
+		// happened, and saying so is not the same as saying the agent declined.
+		InferenceOutcome outcome = adapter(service).complete("system", "user");
+
+		assertEquals(Status.UNREADABLE, outcome.status());
 		verify(service).complete("system", "user");
 	}
 

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ecore:EPackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore" name="result" nsURI="https://fennec.eclipse.org/event.atlas/inference/1.0"
+    nsPrefix="inference">
+  <eAnnotations source="http://www.eclipse.org/OCL/Import">
+    <details key="ecore" value="http://www.eclipse.org/emf/2002/Ecore"/>
+  </eAnnotations>
+  <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+    <details key="copyrightText" value="Copyright (c) 2012 - 2025 Data In Motion and others.&#xA;All rights reserved. &#xA;&#xA;This program and the accompanying materials are made&#xA;available under the terms of the Eclipse Public License 2.0&#xA;which is available at https://www.eclipse.org/legal/epl-2.0/&#xA;&#xA;SPDX-License-Identifier: EPL-2.0&#xA;&#xA;Contributors:&#xA;     Mark Hoffmann - initial API and implementation"/>
+    <details key="oSGiCompatible" value="true"/>
+    <details key="basePackage" value="org.eclipse.fennec.event.atlas.model.inference.chat"/>
+    <details key="resource" value="XMI"/>
+  </eAnnotations>
+  <eClassifiers xsi:type="ecore:EClass" name="InferenceResult">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="What an inference run did. This is the structured answer the agent returns instead of a line of prose, and it is the only record the runtime has of where a draft went."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="status" lowerBound="1" eType="#//InferenceStatus">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="What became of the model. Always required, even when the run went badly."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="nsUri" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/ExtendedMetaData">
+        <details key="name" value="ns_uri"/>
+      </eAnnotations>
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The nsURI of the package you authored, exactly as you registered it. Required for PUBLISHED and ALREADY_EXISTS, and give it for NOT_PUBLISHED too if you got as far as choosing one - nothing else tells a reviewer which model this was about."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="message" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="One sentence for a human reading the log. For PUBLISHED, what the model covers; for anything else, what stopped you, specifically enough to act on."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="InferenceStatus">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The four things that can become of an inference run, as the agent sees them. A run that never reached the agent at all is not in here - the runtime records that itself."/>
+    </eAnnotations>
+    <eLiterals name="PUBLISHED">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="You authored a package and published it as a draft. Give its nsURI."/>
+      </eAnnotations>
+    </eLiterals>
+    <eLiterals name="ALREADY_EXISTS" value="1">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="A draft for that namespace was already there, so you published nothing. Normal, not a failure: it is waiting for review. Give its nsURI."/>
+      </eAnnotations>
+    </eLiterals>
+    <eLiterals name="NOT_PUBLISHED" value="2">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="You authored a model but could not publish it - a tool failed, a namespace was refused, something outside your control. Say what in the message: this is the one outcome the runtime will try again."/>
+      </eAnnotations>
+    </eLiterals>
+    <eLiterals name="NOT_INFERRED" value="3">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="You did not author a model, and that was your judgement rather than an accident - the payloads are not a sensor reading, or they are too thin to model honestly. Say which in the message."/>
+      </eAnnotations>
+    </eLiterals>
+  </eClassifiers>
+</ecore:EPackage>
