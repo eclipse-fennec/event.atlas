@@ -66,6 +66,7 @@
 	bnd.identity;id='org.eclipse.fennec.event.atlas.mqtt.southbound.adapter',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.mapping.inference.config',\
 	bnd.identity;id='org.eclipse.fennec.codec',\
+	bnd.identity;id='org.eclipse.fennec.codec.jsonschema',\
 	bnd.identity;id='org.eclipse.fennec.model.atlas.rest.client.impl',\
 	bnd.identity;id='org.eclipse.fennec.model.atlas.rest.client.osgi',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.core.impl',\
@@ -171,4 +172,5 @@
 	slf4j.simple;version='[2.0.17,2.0.18)',\
 	tools.jackson.core.jackson-core;version='[3.2.2,3.2.3)',\
 	tools.jackson.core.jackson-databind;version='[3.2.2,3.2.3)',\
-	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)'
+	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)'

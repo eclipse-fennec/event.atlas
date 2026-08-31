@@ -31,5 +31,6 @@ src: src-gen,src
 	org.eclipse.fennec.ai.chat.completion.api;version=latest,\
 	org.eclipse.fennec.ai.apis.meta.model;version=latest,\
 	org.eclipse.fennec.codec;version=latest,\
+	org.eclipse.fennec.codec.jsonschema;version=latest,\
 	org.eclipse.fennec.codec.api;version=latest,\
 	org.osgi.util.promise;version=latest
