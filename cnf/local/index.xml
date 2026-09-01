@@ -329,60 +329,6 @@
     <capability namespace="osgi.identity">
       <attribute name="license" value="Eclipse Public License 2.0"/>
       <attribute name="copyright" value="Data In Motion Consulting GmbH - All rights reserved"/>
-      <attribute name="osgi.identity" value="org.eclipse.fennec.mcp.endpoint"/>
-      <attribute name="documentation" value="https://github.com/eclipse-fennec/emf.osgi-mcp"/>
-      <attribute name="description" value="The client half of the MCP whiteboard: an addressable MCP server (name + URL) and a configuration-only publisher for one hosted elsewhere. Depends on OSGi alone — a consumer that only has to reach an MCP server never deploys the MCP SDK."/>
-      <attribute name="type" value="osgi.bundle"/>
-      <attribute name="version" value="0.1.0.202608281122-SNAPSHOT" type="Version"/>
-    </capability>
-    <capability namespace="osgi.wiring.package">
-      <attribute name="bundle-symbolic-name" value="org.eclipse.fennec.mcp.endpoint"/>
-      <attribute name="bundle-version" value="0.1.0.202608281122-SNAPSHOT" type="Version"/>
-      <attribute name="osgi.wiring.package" value="org.eclipse.fennec.mcp.endpoint"/>
-      <attribute name="version" value="1.0.0" type="Version"/>
-      <attribute name="bnd.hashes" value="2030473519,-1677192951,347329963,-1923478059" type="List&lt;Long&gt;"/>
-    </capability>
-    <capability namespace="osgi.wiring.bundle">
-      <attribute name="bundle-version" value="0.1.0.202608281122-SNAPSHOT" type="Version"/>
-      <attribute name="osgi.wiring.bundle" value="org.eclipse.fennec.mcp.endpoint"/>
-    </capability>
-    <capability namespace="osgi.wiring.host">
-      <attribute name="bundle-version" value="0.1.0.202608281122-SNAPSHOT" type="Version"/>
-      <attribute name="osgi.wiring.host" value="org.eclipse.fennec.mcp.endpoint"/>
-    </capability>
-    <capability namespace="osgi.content">
-      <attribute name="size" value="18026" type="Long"/>
-      <attribute name="mime" value="application/vnd.osgi.bundle"/>
-      <attribute name="url" value="org.eclipse.fennec.mcp.endpoint/org.eclipse.fennec.mcp.endpoint-0.1.0.jar"/>
-      <attribute name="osgi.content" value="6A61CCD9D9AF2A3DF92D6DBFDA2F24A15652F96B640061615602EC58A985C436"/>
-    </capability>
-    <capability namespace="osgi.service">
-      <directive name="uses" value="org.eclipse.fennec.mcp.endpoint"/>
-      <attribute name="objectClass" value="org.eclipse.fennec.mcp.endpoint.MCPEndpoint" type="List&lt;String&gt;"/>
-    </capability>
-    <requirement namespace="osgi.wiring.package">
-      <directive name="filter" value="(osgi.wiring.package=java.lang)"/>
-      <attribute name="osgi.wiring.package" value="java.lang"/>
-    </requirement>
-    <requirement namespace="osgi.wiring.package">
-      <directive name="filter" value="(osgi.wiring.package=java.lang.annotation)"/>
-      <attribute name="osgi.wiring.package" value="java.lang.annotation"/>
-    </requirement>
-    <requirement namespace="osgi.wiring.package">
-      <directive name="filter" value="(&amp;(osgi.wiring.package=org.eclipse.fennec.mcp.endpoint)(version&gt;=1.0.0)(!(version&gt;=2.0.0)))"/>
-      <attribute name="osgi.wiring.package" value="org.eclipse.fennec.mcp.endpoint"/>
-    </requirement>
-    <requirement namespace="osgi.ee">
-      <directive name="filter" value="(&amp;(osgi.ee=JavaSE)(version=21))"/>
-    </requirement>
-    <requirement namespace="osgi.extender">
-      <directive name="filter" value="(&amp;(osgi.extender=osgi.component)(version&gt;=1.5.0)(!(version&gt;=2.0.0)))"/>
-    </requirement>
-  </resource>
-  <resource>
-    <capability namespace="osgi.identity">
-      <attribute name="license" value="Eclipse Public License 2.0"/>
-      <attribute name="copyright" value="Data In Motion Consulting GmbH - All rights reserved"/>
       <attribute name="osgi.identity" value="org.eclipse.fennec.ai.chat.completion.claude.model"/>
       <attribute name="documentation" value="https://github.com/${github_org}/${github_repository}"/>
       <attribute name="type" value="osgi.bundle"/>

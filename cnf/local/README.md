@@ -10,9 +10,10 @@ workspace and they **shadow** any released artifact with the same bundle symboli
 | `org.eclipse.fennec.ai.apis.meta.model` | ” | ” |
 | `org.eclipse.fennec.ai.chat.completion.claude.model` | ” | ” |
 | `org.eclipse.fennec.ai.chat.completion.impl.claude` | ” | ” |
-| `org.eclipse.fennec.mcp.endpoint` | `eclipse-fennec/emf.osgi-mcp` | it publishes a release |
 
-`mcp.endpoint` is here rather than from the `fennecMCP` library because no release carries it yet:
+`mcp.endpoint` **is no longer here** — since 2026-09-01 it resolves from the published
+`org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT` declared in
+`cnf/ext/central.mvn`. It was here originally because no release carried it:
 `emf.osgi-mcp#31` split `MCPEndpoint` + `RemoteMCPEndpoint` out of `mcp.api` so that a consumer
 which only *addresses* a remote MCP server needs none of the MCP SDK. Its `Import-Package` is
 `java.lang` and nothing else, which is why this workspace deploys no `mcp-core`, `reactor-core` or

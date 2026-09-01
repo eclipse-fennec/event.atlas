@@ -250,3 +250,4 @@ org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5
 # emf.osgi-mcp#31 split MCPEndpoint + RemoteMCPEndpoint into org.eclipse.fennec.mcp.endpoint,
 # whose Import-Package is java.lang and nothing else - so this workspace needs no part of the
 # SDK closure. Deploying an MCP *server* would; nothing here does.
+org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT
