@@ -30,6 +30,53 @@
     "mode": "EAGER",
     "eager.scopes": ["jena"],
     "register.in.global.registry": true,
+
+    /* Never let the Atlas overwrite a package this framework already generates itself.
+     *
+     * `register.in.global.registry` mirrors via RemoteEPackagePublisher.mirrorToGlobal, which
+     * does an unconditional EPackage.Registry.INSTANCE.put(nsUri, ePackage) - not putIfAbsent.
+     * The jena scope inherits its parent `atlas` scope, whose listing carries the platform's own
+     * system packages, so an eager sweep replaces the GENERATED EPackage from a bundle with a
+     * DYNAMIC one fetched over REST. Generated code then fails the moment it runs its standard
+     * `(XFactory) EPackage.Registry.INSTANCE.getEFactory(eNS_URI)` init:
+     *
+     *   ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory
+     *       at ScopeApiFactoryImpl.init / ScopeApiFactory.<clinit>
+     *       at RemoteReadableScopeService.parseScopeInfo
+     *       at AtlasObjectSync.syncRegistry
+     *
+     * It is order-dependent and therefore latent: a factory's <clinit> runs once, so whichever
+     * happens first - the class being touched, or the sweep clobbering the registry - decides
+     * for the life of the framework. Adding the Atlas EObject provider above is what made this
+     * runtime touch ScopeApiFactory *after* the sweep, turning a dormant bug into a hard failure.
+     *
+     * The gate is applied in RemoteEPackageProviderImpl.isPublishable, before the cache and on
+     * every path (getEPackage / ensureAvailable / resolve / refresh), so it covers the eager
+     * sweep and the drift watcher alike. Matching is exact `contains`, not prefix - which is why
+     * this is a deny-list of the 17 stable system nsURIs rather than an allow-list of domain
+     * ones: an inferred package's nsURI is different on every run and could not be listed ahead
+     * of time. The jena-scope domain packages (lorawan, em310udl, buerger and any inferred one)
+     * are untouched and still mirrored, which is what ingest needs. */
+    "nsuri.deny.list": [
+      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/rest/1.0",
+      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
+      "http://www.eclipse.org/emf/2002/Ecore",
+      "http://www.eclipse.org/emf/2003/XMLType",
+      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
+      "http://www.eclipse.org/uml2/5.0.0/Types",
+      "http://www.eclipse.org/uml2/5.0.0/UML",
+      "http://www.gme.org/cocl/1.0",
+      "http://www.gme.org/datagen/1.0",
+      "http://www.w3.org/XML/1998/namespace",
+      "https://dg.de/1.0",
+      "https://eclipse.org/fennec/codec/1.0.0",
+      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    ],
+
     "drift.check.interval.ms": 10000
   },
 
