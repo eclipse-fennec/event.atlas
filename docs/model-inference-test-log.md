@@ -790,11 +790,20 @@ the same `application/json` request resource, so its structured output should be
 way, appearing as a batch that "ended as FAILED" with no reason. Written up as
 `nsc/docs/issue-codec-value-handler-services.md`; being fixed in the codec.
 
-Meanwhile `SchemaValueWriter` in `…model.inference.chat` republishes the writer as a service — the
+Meanwhile `SchemaValueWriter` in `…model.inference.chat` republished the writer as a service — the
 same annotation #147 deleted, from the bundle that needs it. The shared registry's own javadoc
 documents that whiteboard as the way to contribute a handler, and its `removeValueWriter` gives
-exactly the lifecycle safety `registry.copy()` was reaching for. Delete it when the codec ships
-the fix.
+exactly the lifecycle safety `registry.copy()` was reaching for.
+
+> **Resolved 2026-09-01.** The codec snapshot restores the components: the
+> `0.1.0-SNAPSHOT` jsonschema jar again ships
+> `OSGI-INF/…v2.value.EClassValueWriter.xml` providing
+> `org.eclipse.fennec.codec.value.CodecValueWriter`, along with the matching reader and the two
+> `EPackage` handlers. `SchemaValueWriter` and the bundle's `org.eclipse.fennec.codec.jsonschema`
+> buildpath entry are deleted; the chat bundle no longer imports the package at all. Note that
+> `inference.bndrun` still needs `bnd.identity;id='org.eclipse.fennec.codec.jsonschema'` in
+> `-runrequires` — with the import gone, nothing else would pull the bundle in, and the resolver
+> does not see the DS service that now registers the writer.
 
 ### A schema leaves the agent no way to think out loud
 
@@ -880,3 +889,142 @@ Two things it did not do, both worth knowing:
 - **A batch that "ended as FAILED" says nothing about why.** `BatchChatCompletionAdapter` reports
   only the status; the reason sat in the results endpoint the whole time and had to be fetched by
   hand with curl. Fetching and logging it would have turned two rounds of guesswork into one line.
+
+---
+
+## 2026-09-01 — promote-and-reingest, all the way to a value in the twin
+
+### Objective
+
+The one link the chain had never been driven through: take a *published draft*, promote it, and
+show a runtime ingesting the payload it was inferred from — not just deserializing it, but writing
+mapped values into the twin. Everything before this had stopped at the receipt.
+
+Run from a **clean** Atlas: yesterday's `lse01` draft was deleted, not promoted, so the inference
+ran from scratch against a `jena` scope holding only `lorawan`, `em310udl` and `Buerger`.
+
+### The run
+
+Same five trap payloads as 2026-08-28 (rebuilt — they live in a scratchpad and do not survive).
+
+| | |
+|---|---|
+| duration | **1m30s** to a published draft; the batch itself answered in 247s |
+| tool calls | **30**, `end_turn` |
+| discovery | found `extends lorawan#//UplinkMessage` and `typeDiscriminator: Dragino_LSE01` unaided |
+| namespace | `…/inferred/lorawan/dragino-lse01/1.0` — deeper than 08-31's `…/inferred/dragino-lse01`, and again entirely the agent's choice |
+| type traps | **7/7 correct** — `conduct_SOIL` EDouble, `pulse_total` ELong, `temp_DS18B20` EString, `hum_SOIL` EDouble, `ec_SOIL` EInt, `s_flag` EInt (control), `water_SOIL` EString |
+
+The receipt was structured and genuinely useful — it flagged `pulse_total as ELong` against "the
+observed 32-bit unsigned range seen in sample 4", i.e. it explained the trap back to the reviewer.
+
+**`ShapeFingerprint` now keeps `int` and `float` apart** (`VALUE_NUMBER_INT` vs
+`VALUE_NUMBER_FLOAT`), so Finding 3's collapse is fixed: the traps supply their own shape
+distinctness and the window closed on `targetSamples`, not on `MAX_WAIT`, with no `LOW EVIDENCE`.
+Array indices still collapse, so duplicating an `rxInfo` entry does *not* make a payload distinct.
+
+### The result, end to end
+
+Provider `LST25628782`, model `dragino-lse01-soil`, read back through the Gogo shell:
+
+| service | resource | after p1 | after p4 |
+|---|---|---|---|
+| `soil` | `temperature` | 13.25 | 13.25 |
+| `soil` | `moisture` | 13.74 | 13.74 |
+| `soil` | `conductivity` | 35.0 | **40.0** |
+| `soil` | `pulseTotal` | 1200 | **3221225472** |
+| `battery` | `level` | 3.301 | 3.301 |
+
+**`pulseTotal` = 3221225472 is the headline.** It is `2^31 + 2^30` and does not fit a signed
+32-bit int; the agent widened the field to `ELong` on the strength of one sample in five, and that
+type survived JSON → inferred ecore → Model Atlas → promotion → mapping → sensinact resource. The
+`conductivity` change also confirms the twin is updated per payload, not populated once.
+
+It also settles a worry: every one of those values arrives *through* the inferred `object`
+containment reference, whose eType the agent wrote as a **relative** href
+(`draginolse01.ecore#//DecodedObject`). It resolves. `admin/friendlyName` would have been the only
+populated resource had it not.
+
+### Findings
+
+**20. Promoting a package does not reach a running runtime; promoting a mapping does.** The
+central finding, and an asymmetry worth internalising. After `draft → approved → release` the
+runtime kept answering `No EClass found for discriminator: Dragino_LSE01`, and the Atlas served
+**zero** content requests — while `HEAD /scopes/jena` showed `Last-Modified` at the moment of the
+promotion, so the ETag gate opened and the drift check *did* run. The client filtered the package
+out: `DriftWatcher.handleChangedNsUris` skips on `!held.contains(nsUri)` and
+`handleChangedObjects` on `!anyHeld`. Drift refreshes what you hold; it does not discover. Nor is
+there a polling counterpart for EPackages — `EagerPrefetch` runs once at activation. A restart
+fixed it instantly (21 packages fetched instead of 20).
+
+LAZY mode is not the missing switch either: `FeaturePathTypeResolver.scan` searches *registered*
+packages for a matching discriminator and never asks for an nsURI, so a lazy registry has nothing
+to resolve. Discovery has to be pushed by the client.
+
+*Mappings escape this* because `AtlasObjectSync.syncRegistry` re-runs `listObjectIds()` every
+pass. A `ProviderMapping` POSTed to `jena/registries/sensinactmapping` went from `NO_MAPPING` at
+10:08:16 to `1 mapping(s) applied` at 10:09:14 **with no restart** — the only change in between
+was the POST. `inference.bndrun` gained
+`org.eclipse.fennec.model.atlas.eobject.provider` and an `AtlasEObjectProvider~jena` block
+(`registries: [sensinactmapping]`, `key.feature: mid`, `refresh.interval.ms: 15000`) for this;
+`FileEObjectProvider` cannot, as it walks its directory once at activation.
+Sketched: `nsc/docs/issue-atlas-drift-ignores-new-packages.md`.
+
+**21. `register.in.global.registry` was silently corrupting the EPackage registry.** Adding the
+Atlas EObject provider turned this from dormant to fatal:
+
+```
+ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory
+    at ScopeApiFactoryImpl.init / ScopeApiFactory.<clinit>
+    at RemoteReadableScopeService.parseScopeInfo … at AtlasObjectSync.syncRegistry
+```
+
+`RemoteEPackagePublisher.mirrorToGlobal` does an unconditional
+`EPackage.Registry.INSTANCE.put(nsUri, ePackage)`, and the `jena` scope inherits the root `atlas`
+scope's **17 system packages** — so the eager sweep had been replacing *generated* EPackages with
+*dynamic* ones all along, `Ecore`, the codec and `event.atlas/mapping/1.0` among them. Nothing
+complained because a generated factory's `<clinit>` runs **once**: whichever happens first, the
+class being touched or the sweep, decides for the life of the framework. `AtlasObjectSync` was
+simply the first thing to touch `ScopeApiFactory` *after* the sweep.
+
+Worked around with a 17-entry `nsuri.deny.list` (the gate in
+`RemoteEPackageProviderImpl.isPublishable` runs before the cache and on every path, so it covers
+the eager sweep and the drift watcher alike). Verify it is live by counting the sweep in the Atlas
+log — **4 domain packages, not 21**. A deny-list rather than an allow-list because matching is
+exact `contains` with no prefix support, and an inferred nsURI differs on every run.
+Sketched: `nsc/docs/issue-atlas-global-registry-clobber.md`.
+
+**22. An empty `providers` is not an empty twin.** With no `sensinact.session.manager` config the
+session manager denies everything, and the Gogo commands split two ways: `get` and `services`
+raise `NotPermittedException: The user <ANONYMOUS> …`, but **`providers` returns empty**, because
+an unreadable provider is filtered out of the listing rather than reported. That reads exactly
+like a mapping that never applied. `inference.bndrun` needs both
+`org.eclipse.sensinact.gateway.northbound.gogo-shell` and
+`"sensinact.session.manager": {"auth.policy": "ALLOW_ALL"}` — the policy both deployed runtimes
+already set in their `sensinact.json`.
+
+**23. The Atlas object registry does not rewrite hrefs.** All 22 nsURI hrefs in the uploaded
+`ProviderMapping` came back intact from `jena/registries/sensinactmapping/content`. The rewrite
+described in `nsc/docs/issue-atlas-href-rewrite.md` affects the *schema* content endpoint, not
+object registries.
+
+### Reproducing
+
+As 2026-08-28, plus:
+
+```bash
+# promote the inferred package (schema registry: TWO hops)
+curl -X POST "$B/jena/schema/stages/draft/actions/transition"    -H 'Content-Type: application/json' -d '{"_type":"…#//StageTransitionRequest","objectId":"<uuid>","targetStage":"approved"}'
+curl -X POST "$B/jena/schema/stages/approved/actions/transition" -H 'Content-Type: application/json' -d '{"_type":"…#//StageTransitionRequest","objectId":"<uuid>","targetStage":"release"}'
+# then RESTART the runtime - the package will not arrive any other way
+
+# the mapping, by contrast, is picked up live (objectId = the mapping's mid)
+curl -X POST "$B/jena/registries/sensinactmapping/stages/release/dragino-lse01-soil?name=dragino-lse01-soil&override=true" \
+     -H 'Content-Type: application/xmi' --data-binary @dragino-lse01-soil-mapping.xmi
+```
+
+Watching a run without the Eclipse console: **ngrok's local API**
+(`http://127.0.0.1:4040/api/requests/http`) lists every MCP tool call with the request body in
+`raw`, which is the best progress signal available. The Atlas container log has no access log and
+does not log object-registry reads, so silence there proves nothing — but it does log two records
+per EPackage served, which is what makes the sweep countable.

@@ -182,12 +182,33 @@ PayloadIngest ──UnknownModelHandler──▶ PayloadSampleCollector ──Pa
 
 The agent behind the completion **authors and publishes the package itself**, through the
 metamodel MCP server's tools; what returns is a receipt line. Nothing in this repository
-registers an inferred package into a running framework — a draft is promoted by a human, and the
-runtime resolves it on the next payload.
+registers an inferred package into a running framework — a draft is promoted by a human.
+
+**Promoting it is not enough for a *running* runtime, though: the package arrives on the next
+restart, not the next payload.** Verified end to end on 2026-09-01 (see
+`docs/model-inference-test-log.md`). The Atlas client's `DriftWatcher` only refreshes entries it
+already holds — `handleChangedNsUris` skips on `!held.contains(nsUri)`, `handleChangedObjects` on
+`!anyHeld` — so a newly published nsURI is filtered out even though the scope's ETag moved and the
+check fired. There is no polling counterpart for EPackages either: `EagerPrefetch` runs once at
+activation. LAZY mode does not help, because a discriminator lookup
+(`FeaturePathTypeResolver.scan`) searches *registered* packages and never asks for a specific
+nsURI, so there is nothing for a lazy registry to resolve. Sketched as
+`nsc/docs/issue-atlas-drift-ignores-new-packages.md`.
+
+**Mappings are the exception, and that asymmetry is the useful part.**
+`AtlasObjectSync.syncRegistry` re-runs `listObjectIds()` on every pass, so with
+`refresh.interval.ms > 0` an Atlas-fed `ProviderMapping` added after start-up *is* discovered — no
+restart. `inference.bndrun` now carries `org.eclipse.fennec.model.atlas.eobject.provider` and its
+`AtlasEObjectProvider~jena` block for exactly this; a `FileEObjectProvider` cannot do it, because
+it walks its directory once at activation and never again.
 
 - **`cnf/local` is a temporary `LocalIndexedRepo`** (registered as `-plugin.0.Local` in
-  `cnf/build.bnd`) holding local builds of the chat-completion API/impl/models and
-  `org.eclipse.fennec.mcp.endpoint`. Its `README.md` says what to delete once those publish.
+  `cnf/build.bnd`) holding local builds of the chat-completion API/impl/models — **four bundles
+  now, all from the AI workspace**, which publishes nowhere. `org.eclipse.fennec.mcp.endpoint`
+  left it on 2026-09-01 and resolves from
+  `org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT` in `central.mvn`. Its
+  `README.md` says what to delete once the rest publish; the repo is a `LocalIndexedRepo`, so
+  adding or removing a jar means regenerating `index.xml`.
   `RemoteMCPEndpoint` (config `server.name` + `server.url`) is what makes a *remote* MCP
   deployment addressable, so no MCP **server** bundle is deployed here — that was the blocker
   recorded in #29.
@@ -237,6 +258,27 @@ runtime resolves it on the next payload.
   prefix-shaped (`…/inferred*`) and need no change. `codec.typeMapId` on
   `event.atlas.southbound.ingest` is an *ingest-side* setting and is deliberately not mirrored
   into the inference configuration.
+
+- **`register.in.global.registry: true` needs an `nsuri.deny.list`, or it breaks the framework.**
+  The mirror is an unconditional `EPackage.Registry.INSTANCE.put`
+  (`RemoteEPackagePublisher.mirrorToGlobal`), and a scope inherits its parent `atlas` scope — whose
+  listing carries the platform's own 17 system packages. An eager sweep therefore replaces
+  *generated* EPackages with *dynamic* ones, `Ecore`, the codec and
+  `event.atlas/mapping/1.0` included. Generated code then dies on its standard init:
+  `ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory`. It is **order-dependent
+  and so latent** — a factory's `<clinit>` runs once, so it only bites when something touches the
+  class after the sweep, which is why adding the Atlas EObject provider is what finally exposed
+  it. `inference.bndrun`'s config carries the 17-entry deny-list; the quickest check that it is
+  live is to count the eager sweep in the Atlas log — **4 domain packages, not 21**. Sketched as
+  `nsc/docs/issue-atlas-global-registry-clobber.md`.
+- **Reading the twin in `inference.bndrun` means the Gogo shell, and it needs two things.** That
+  runtime deploys no northbound REST, no SensorThings and sets `org.osgi.service.http.port=-1`, so
+  the twin is write-only over HTTP. Add `org.eclipse.sensinact.gateway.northbound.gogo-shell` *and*
+  `"sensinact.session.manager": {"auth.policy": "ALLOW_ALL"}` — both deployed runtimes set that
+  policy in their `sensinact.json`, and without it every command answers
+  `NotPermittedException: The user <ANONYMOUS> …` **except `providers`, which silently returns
+  empty**, because an unreadable provider is filtered out of the listing rather than reported. An
+  empty `providers` is therefore not evidence that a mapping failed to apply.
 
 ### The MCP tool allow-list is task-scoped, and why
 
