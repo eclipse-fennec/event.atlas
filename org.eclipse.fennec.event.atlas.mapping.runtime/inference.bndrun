@@ -80,7 +80,8 @@
 	bnd.identity;id='org.apache.felix.gogo.shell',\
 	bnd.identity;id='org.apache.felix.gogo.command',\
 	bnd.identity;id='org.eclipse.fennec.mcp.endpoint',\
-	bnd.identity;id='org.eclipse.fennec.model.atlas.eobject.provider'
+	bnd.identity;id='org.eclipse.fennec.model.atlas.eobject.provider',\
+	bnd.identity;id='org.eclipse.sensinact.gateway.northbound.gogo-shell'
 
 -runbundles: \
 	com.fasterxml.jackson.core.jackson-annotations;version='[2.22.0,2.22.1)',\
@@ -175,4 +176,8 @@
 	tools.jackson.core.jackson-databind;version='[3.2.2,3.2.3)',\
 	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)',\
-	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)'
+	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)',\
+	org.eclipse.sensinact.gateway.northbound.gogo-shell;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.security.security-api;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.session.session-api;version='[0.0.2,0.0.3)',\
+	org.eclipse.sensinact.gateway.northbound.session.session-impl;version='[0.0.2,0.0.3)'

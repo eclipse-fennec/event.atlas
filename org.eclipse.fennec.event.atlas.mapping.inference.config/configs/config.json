@@ -16,6 +16,17 @@
    * GatewayThread. Nothing northbound of the twin is deployed, so the twin is write-only here -
    * you observe outcomes through the ingest log, not through a REST provider list. */
 
+  /* Without this the session manager denies everything and the gogo commands answer
+   *   NotPermittedException: The user <ANONYMOUS> does not have permission to read resource ...
+   * with `providers` coming back empty rather than erroring, because an unreadable provider is
+   * filtered out of the listing rather than reported. This runtime has no northbound REST and no
+   * authentication of any kind, so there is no user to be anything other than anonymous; the two
+   * deployed runtimes set exactly the same policy in their sensinact.json. It is what makes the
+   * twin readable from the Gogo shell, which is the only way to see a value in this runtime. */
+  "sensinact.session.manager": {
+    "auth.policy": "ALLOW_ALL"
+  },
+
   /* EPackages come from the Atlas, and only from there: the codec must deserialize a payload
    * into the same EPackage instance a mapping resolved its providerClasses against, since
    * InstancePusher keys on EClass identity. register.in.global.registry mirrors them into
