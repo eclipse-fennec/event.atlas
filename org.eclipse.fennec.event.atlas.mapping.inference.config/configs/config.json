@@ -97,6 +97,44 @@
     "initialProvider.target": "(emf.eobject.provider.name=mapping-files)"
   },
 
+  /* Mappings from the Model Atlas, alongside the files above - this is the half of
+   * promote-and-reingest the file provider cannot do.
+   *
+   * FileEObjectProvider walks its directory once at activation and never again, so a mapping
+   * added after start-up needs a restart. This provider does not replace it: it binds the
+   * registry as a `writer` and adds to it, so em310udl-battery-mapping.xmi keeps working while
+   * new mappings can arrive over REST.
+   *
+   * `refresh.interval.ms` is what makes that live, and it is the whole point of the block:
+   * AtlasObjectSync.syncRegistry re-runs `listObjectIds()` on every pass, so an object that did
+   * not exist at the previous pass IS discovered. That is unlike the client's DriftWatcher,
+   * which only refreshes nsURIs/objects it already holds (`!held.contains(...)`) and therefore
+   * never sees a newly published one. 15s rather than local.config's 60s because this runtime
+   * exists to be watched by hand.
+   *
+   * `key.feature` is `mid` - the mapping's own registry key, which is what
+   * ProviderMappingRegistryImpl indexes by.
+   *
+   * `required.nsuris` is a GATE, not a loader: a listed nsURI that is not registered postpones
+   * the WHOLE pass, because fetched objects would otherwise materialize as dynamic EObjects.
+   * Deliberately only the mapping metamodel and the stable lorawan base package - NOT any
+   * inferred nsURI. An inferred package is exactly the thing that may not exist yet, and gating
+   * on it would stop every other mapping from syncing; a mapping whose providerClasses cannot
+   * resolve is parked and retried by ProviderMappingRegistryImpl as EPackages arrive, which is
+   * the mechanism that already handles this. */
+  "AtlasEObjectProvider~jena": {
+    "atlasScope.target": "(atlas.scope=jena)",
+    "writer.target": "(emf.eobject.registry.name=sensinact-mappings)",
+    "emf.eobject.provider.name": "atlas-jena",
+    "registries": ["sensinactmapping"],
+    "key.feature": "mid",
+    "required.nsuris": [
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0",
+      "https://eclipse.org/fennec/lorawan"
+    ],
+    "refresh.interval.ms": 15000
+  },
+
   /* Present even with no profile files: without the registry MappingProfileRegistryImpl never
    * binds, and ProviderMappingRegistryImpl then skips every mapping carrying a `profile`
    * reference rather than registering it profile-less. Keep the directory, keep it empty, and

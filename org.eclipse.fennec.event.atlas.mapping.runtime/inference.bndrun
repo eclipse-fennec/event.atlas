@@ -79,7 +79,8 @@
 	bnd.identity;id='org.eclipse.fennec.ai.chat.completion.impl.claude',\
 	bnd.identity;id='org.apache.felix.gogo.shell',\
 	bnd.identity;id='org.apache.felix.gogo.command',\
-	bnd.identity;id='org.eclipse.fennec.mcp.endpoint'
+	bnd.identity;id='org.eclipse.fennec.mcp.endpoint',\
+	bnd.identity;id='org.eclipse.fennec.model.atlas.eobject.provider'
 
 -runbundles: \
 	com.fasterxml.jackson.core.jackson-annotations;version='[2.22.0,2.22.1)',\
@@ -173,4 +174,5 @@
 	tools.jackson.core.jackson-core;version='[3.2.2,3.2.3)',\
 	tools.jackson.core.jackson-databind;version='[3.2.2,3.2.3)',\
 	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)',\
-	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)'
+	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.model.atlas.eobject.provider;version='[0.1.0,0.1.1)'
