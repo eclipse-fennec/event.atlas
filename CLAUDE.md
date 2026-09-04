@@ -21,12 +21,12 @@ Gradle graph automatically):
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
 | `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles}` mount-point skeleton |
 | `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring + the timescale history store) |
-| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — three resources: `config.json` (file providers + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker) and `timescale.json` (the history store) |
+| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — four resources: `config.json` (file providers + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker), `timescale.json` (the history store) and `inference.json` (model inference, **off unless `EVENTATLAS_INFERENCE_ENABLED` and `INFERENCE_NAMESPACE` are set**) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload (XMI or JSON), pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, `FORMAT_UNSUPPORTED`, …), plus the optional `UnknownModelHandler` hook it offers unhandled payloads to |
 | `…event.atlas.southbound.sampling` | `PayloadSampleCollector` — the `UnknownModelHandler` implementation that buffers unhandled payloads per channel and hands a closed `PayloadSampleSet` to a `PayloadSampleSetHandler` |
 | `…event.atlas.model.inference` | `ModelInferenceService` — the `PayloadSampleSetHandler` that turns a closed sample set into a model draft: fingerprint dedup, run rate limit, one prompt, one agentic completion, then a receipt. Carries **no EMF dependency**, which is what makes "never registers an inferred package locally" structural, and talks to an AI stack only through its own `ChatCompletion` port |
-| `…event.atlas.model.inference.chat` | `ChatCompletionAdapter` — the only bundle here that depends on an AI stack: binds the `ChatCompletion` port to a Fennec AI `ChatCompletionService` and reads the agent's answer out of the response's content blocks. Not deploying it is how a runtime opts out of inference |
+| `…event.atlas.model.inference.chat` | `ChatCompletionAdapter` — the only bundle here that depends on an AI stack: binds the `ChatCompletion` port to a Fennec AI `ChatCompletionService` and reads the agent's answer out of the response's content blocks. Not deploying it is one way a runtime opts out of inference; since 2026-09-04 configuration is the other |
 | `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
 | `…event.atlas.rest.southbound.adapter` | `PayloadIngestResource` — `POST <whiteboard base>/ingest/{channel}`; the HTTP status mirrors the `IngestResult` outcome |
 
@@ -171,7 +171,7 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
 ## Model inference (optional, off unless configured)
 
 Unknown payloads can be turned into a **reviewed model draft** instead of being dropped. Nothing
-about it is mandatory: a runtime without these bundles, or without their configuration, ingests
+about it is mandatory: a runtime without these bundles, or with inference switched off, ingests
 exactly as before. The chain, one issue per link (#27 → #30):
 
 ```
@@ -179,6 +179,40 @@ PayloadIngest ──UnknownModelHandler──▶ PayloadSampleCollector ──Pa
     ModelInferenceService ──ChatCompletion──▶ ChatCompletionAdapter ──▶ ChatCompletionService
                                                                           + remote MCPEndpoint
 ```
+
+**Two config switches turn it off, and they gate different costs.** Both default to off, so
+deploying the bundles is safe — which is what lets the docker image ship them unconditionally
+(`configs/inference.json`, `EVENTATLAS_INFERENCE_ENABLED` + `INFERENCE_NAMESPACE`).
+
+- `enabled` on `event.atlas.southbound.sampling` gates **buffering**. Off, `PayloadSampleCollector`
+  still registers as the `UnknownModelHandler` and declines each payload, so no window opens and
+  no memory is held. `PayloadIngest`'s reference is dynamic, so flipping it takes effect on the
+  next payload with no service churn.
+- `namespace` on `event.atlas.model.inference` gates the **run**, which is what costs money. Blank
+  (the default) means the service activates, logs that it has no namespace, and refuses every
+  sample set. This one predates the docker work.
+
+`enabled` true with a blank `namespace` is a deliberate state: payloads are sampled and the sets
+dropped, so the log shows what *would* be inferred at no API cost. Note `ConfigurationPolicy` is
+**`OPTIONAL`** on both components, so config *absence* is not the switch — the defaults are;
+`REQUIRE` would have made the baked-in docker config pin inference permanently on.
+
+**Unknown payloads are separated per channel, but the run budget is not.** The collector's window
+key is `(source, namespaceUri, format)` — `source` being the concrete MQTT topic
+(`MqttPayloadListener` passes the topic) or `rest/<channel>` — so two southbound adapters infer
+two models independently, and `inFlight` is keyed by source so they run concurrently.
+`RunRateLimiter`, though, holds **one** counter for the whole runtime: with
+`maxRunsPerInterval=1` the first set to close in the interval takes the run and any other
+channel's is refused *and discarded* (it releases its fingerprint claim, so that channel can
+re-accumulate). Raise it to at least the number of distinct unknown families expected per
+interval; the OCD default is 5, and both the docker and inference configs set 1 on purpose.
+
+**There is no topic or channel filter for inference** — it consumes whatever the ingest channels
+report as unknown, and only three outcomes reach it (`MODEL_UNKNOWN`, `EMPTY`, `PARSE_ERROR`;
+not `NO_MAPPING`, `FORMAT_UNSUPPORTED` or `PUSH_FAILED`). The collector's `channels` property
+looks like a filter but only overrides the per-channel close conditions. Since `PARSE_ERROR` is
+in that set and the docker runtime serves `POST /event/rest/ingest/{channel}`, malformed input to
+an open endpoint is also a trigger, bounded only by the run cap and the fingerprint dedup.
 
 The agent behind the completion **authors and publishes the package itself**, through the
 metamodel MCP server's tools; what returns is a receipt line. Nothing in this repository
@@ -202,13 +236,22 @@ restart. `inference.bndrun` now carries `org.eclipse.fennec.model.atlas.eobject.
 `AtlasEObjectProvider~jena` block for exactly this; a `FileEObjectProvider` cannot do it, because
 it walks its directory once at activation and never again.
 
-- **`cnf/local` is a temporary `LocalIndexedRepo`** (registered as `-plugin.0.Local` in
-  `cnf/build.bnd`) holding local builds of the chat-completion API/impl/models — **four bundles
-  now, all from the AI workspace**, which publishes nowhere. `org.eclipse.fennec.mcp.endpoint`
-  left it on 2026-09-01 and resolves from
-  `org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT` in `central.mvn`. Its
-  `README.md` says what to delete once the rest publish; the repo is a `LocalIndexedRepo`, so
-  adding or removing a jar means regenerating `index.xml`.
+- **The four chat-completion bundles come from a Maven repo now — `cnf/local` is gone.** Since
+  2026-09-04 `eclipse-fennec/fennec-ai` publishes a snapshot, so the `LocalIndexedRepo` that used
+  to carry local builds of the AI api/impl/models has been deleted along with its
+  `-plugin.0.Local` registration in `cnf/build.bnd`. They are declared in **`cnf/ext/nexus.maven`
+  at `1.0.0-SNAPSHOT`** (so both bndruns' `-runbundles` name them `[1.0.0,1.0.1)`) and fetched by
+  the `-plugin.6.nexus` repo in `cnf/ext/nexus.bnd` (`.6` because `fennec.bnd` already holds
+  `.5.Central`).
+  **They are published *only* to the DIM nexus** — `devel.data-in-motion.biz/nexus/repository/dim-snapshot`,
+  anonymously readable. Not to Maven Central, and not to Sonatype's Central Snapshots either;
+  both 404. So `nexus.bnd` is load-bearing rather than a convenience, and CI needs egress to that
+  host for the bndrun re-resolve and the docker export. Beware bnd's cache sidecar in `~/.m2`
+  when checking provenance: its `"uri"` field records the **first** URL of a comma-separated
+  `snapshotUrl` list, not the host the bytes came from, so it can name a URL that 404s — compare
+  the recorded `sha_1` against the candidate hosts instead.
+  `org.eclipse.fennec.mcp.endpoint` is unaffected: it resolves from
+  `org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT` in `central.mvn`.
   `RemoteMCPEndpoint` (config `server.name` + `server.url`) is what makes a *remote* MCP
   deployment addressable, so no MCP **server** bundle is deployed here — that was the blocker
   recorded in #29.
@@ -285,12 +328,14 @@ it walks its directory once at activation and never again.
 Scoping happens at **both** ends, and neither end is optional.
 
 *Server side*: `server.url` points at `/mcp/inference`, the metamodel runtime's task-scoped
-servlet, whose `inference_tool_provider` serves **21 tools** — discovery, authoring, validation,
-register, publish. The general-purpose `/mcp/emf` servlet on the same runtime serves all 38.
+servlet, whose `inference_tool_provider` serves **20 tools** — discovery, authoring, validation,
+register, publish (verified against the live server 2026-09-04; it was 21 before
+`export_dataset` became `export_package`). The general-purpose `/mcp/emf` servlet on the same
+runtime serves all 38.
 Each servlet carries its own `server.instructions`, and `/mcp/inference`'s are written for this
 task, which matters because the prompt here deliberately names no tool.
 
-*Client side*: `mcp.tools.enabled` in `configs/config.json` repeats those 21 names, and it is
+*Client side*: `mcp.tools.enabled` in `configs/config.json` repeats those 20 names, and it is
 **mandatory, not an optimisation**. `ClaudeHelper` always builds the toolset with
 `default_config {enabled:false}` and re-enables only what the array names, and
 `ClaudeChatCompletionConfig` declares `String[] mcp_tools_enabled()` with *no default* — so
@@ -299,6 +344,19 @@ omitting the key disables every tool on the server and hands the agent nothing t
 Between them: nothing exposed manages or deletes datasets beyond authoring, replays a recipe, or
 unregisters a package, and nothing can promote a draft to a released stage. A name that drifts
 out of the server's provider stops being callable rather than silently widening the surface.
+
+**Drift is silent in both directions, so diff the two lists rather than trusting them.** On
+2026-09-04 the allow-list still named `export_dataset`, which the server had renamed to
+`export_package` — a dead entry that enables nothing and reports no error (the server's own
+`create_epackage` description still referred to the old name too). Ask the running server and
+compare; `/mcp/inference` needs the bearer token from `secrets.bndrun`, and answers
+`401 Missing or invalid bearer token` without it:
+
+```bash
+TOK=$(grep -oP '(?<=-DMETAMODEL_MCP_TOKEN=)[^\s,\\]+' …/secrets.bndrun | head -1)
+# POST initialize -> read the Mcp-Session-Id response header -> POST tools/list with it
+# (responses are SSE: strip the leading `id: …` line before parsing the JSON)
+```
 
 The reason is cost, and it was measured on the prototype (same server, same prompt): a server's
 tool definitions are re-sent on **every** turn, and a run is ~100 turns.

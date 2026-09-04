@@ -293,6 +293,24 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 	}
 
 	/**
+	 * What the provider said about the individual requests of a batch that did not complete.
+	 * <p>
+	 * The batch-level status is only ever a word - {@code FAILED} for a request the API rejected -
+	 * while the reason sits in the results file one field deep, as
+	 * {@code result.error.error.message}. Fetching it costs one request and is the difference
+	 * between "ended as FAILED" and being told which field the request was missing.
+	 */
+	private String providerError(String batchId) {
+		try {
+			String message = batchService.getBatchError(batchId).getErrorMessage();
+			return message == null || message.isBlank() ? "" : ": " + message;
+		} catch (IOException | RuntimeException e) {
+			// the status is the finding here; failing to enrich it must not replace it
+			return String.format(" (the provider's error could not be read: %s)", describe(e));
+		}
+	}
+
+	/**
 	 * Polls until the batch leaves {@link BatchStatusType#IN_PROGRESS}, then reads its result.
 	 * An interruption is propagated as an interrupt and reported as unavailable - model
 	 * inference cancels the call on its own timeout, and that is the path it takes.
@@ -309,8 +327,8 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 				Thread.sleep(poll.toMillis());
 			}
 			if (status != BatchStatusType.COMPLETED) {
-				throw new IllegalStateException(
-						String.format("Completion batch '%s' ended as %s", batchId, status));
+				throw new IllegalStateException(String.format("Completion batch '%s' ended as %s%s", batchId,
+						status, providerError(batchId)));
 			}
 			BatchResult result = batchService.getBatchResult(batchId);
 			if (batchService.isPaused(result, customId)) {

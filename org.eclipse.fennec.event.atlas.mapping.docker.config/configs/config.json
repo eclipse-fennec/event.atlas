@@ -27,6 +27,50 @@
     "eager.scopes": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
     "eager.stages": ["$[env:EVENTATLAS_ATLAS_STAGE;default=release]"],
     "register.in.global.registry": true,
+
+    /* Required whenever register.in.global.registry is true and the swept scope inherits the
+     * `atlas` parent, whose listing carries the platform's own system packages.
+     *
+     * Without it the eager sweep mirrors a DYNAMIC copy of a system nsURI into
+     * EPackage.Registry.INSTANCE while the slot is still empty - the generated package in the
+     * bundle has not initialised yet, so the publisher's containsKey check cannot see it and
+     * putIfAbsent legitimately succeeds. The same sync pass then needs the generated factory,
+     * finds the dynamic one, and dies:
+     *
+     *   ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory
+     *       at ScopeApiFactoryImpl.init / ScopeApiFactory.<clinit>
+     *       at RemoteReadableScopeService.parseScopeInfo
+     *       at AtlasObjectSync.syncRegistry
+     *
+     * model.atlas #227 made the mirror non-clobbering, which is a different bug: putIfAbsent
+     * protects an OCCUPIED slot and this one is empty. It is order-dependent and so latent - a
+     * factory's <clinit> runs once, so if anything touches the class before the sweep the
+     * runtime is fine for its whole life. Verified the hard way on 2026-09-04 by removing the
+     * list and watching it break.
+     *
+     * Matching is exact `contains`, so this is a deny-list of the 17 stable system nsURIs rather
+     * than an allow-list of domain ones: an inferred package's nsURI differs on every run.
+     * Domain packages are untouched and still mirrored, which is what ingest needs. Keep in step
+     * with the same list in ...mapping.inference.config/configs/config.json. */
+    "nsuri.deny.list": [
+      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/rest/1.0",
+      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
+      "http://www.eclipse.org/emf/2002/Ecore",
+      "http://www.eclipse.org/emf/2003/XMLType",
+      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
+      "http://www.eclipse.org/uml2/5.0.0/Types",
+      "http://www.eclipse.org/uml2/5.0.0/UML",
+      "http://www.gme.org/cocl/1.0",
+      "http://www.gme.org/datagen/1.0",
+      "http://www.w3.org/XML/1998/namespace",
+      "https://dg.de/1.0",
+      "https://eclipse.org/fennec/codec/1.0.0",
+      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    ],
     "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000;type=Long]"
   },
 

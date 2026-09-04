@@ -124,6 +124,20 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 		 * pathological payload cannot fill a context window.
 		 */
 		int maxPayloadChars() default 4096;
+
+		/**
+		 * Whether the prompt carries the {@code ShapeDelta} summary in front of the payload
+		 * bodies - which paths every sample holds, which only some hold, and which value kinds
+		 * each was seen with.
+		 * <p>
+		 * On by default, and there are two reasons to be able to turn it off. It is what makes
+		 * the block's contribution <em>measurable</em>: both arms of a comparison then come off
+		 * one jar and differ in nothing else, which a rebuild between runs cannot promise. And
+		 * the block costs prefix tokens on every server-side iteration of a run, so a
+		 * deployment that finds it does not earn them can stop paying for it without dropping
+		 * the bundle.
+		 */
+		boolean shapeDeltaEnabled() default true;
 	}
 
 	/**
@@ -323,7 +337,8 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 			return InferenceOutcome.of(Status.UNAVAILABLE, "no chat completion is deployed");
 		}
 		String systemMessage = InferencePrompt.systemMessage();
-		String userMessage = InferencePrompt.userMessage(sampleSet, current.namespace(), current.maxPayloadChars());
+		String userMessage = InferencePrompt.userMessage(sampleSet, current.namespace(), current.maxPayloadChars(),
+				current.shapeDeltaEnabled());
 		Future<InferenceOutcome> call = calls.submit(() -> completion.complete(systemMessage, userMessage));
 		try {
 			return call.get(current.timeout().toSeconds(), TimeUnit.SECONDS);
@@ -449,15 +464,16 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 	 * @param timeout how long to wait for a completion
 	 * @param retryAfterUnavailable how long an unreachable completion blocks a retry
 	 * @param maxPayloadChars how much of a payload body reaches the prompt
+	 * @param shapeDeltaEnabled whether the prompt summarises the samples' shapes
 	 */
 	private record Settings(String namespace, int maxRunsPerInterval, Duration interval, Duration timeout,
-			Duration retryAfterUnavailable, int maxPayloadChars) {
+			Duration retryAfterUnavailable, int maxPayloadChars, boolean shapeDeltaEnabled) {
 
 		static Settings of(Config config) {
 			return new Settings(config.namespace() == null ? "" : config.namespace().strip(),
 					Math.max(0, config.maxRunsPerInterval()), atLeastASecond(config.intervalSeconds()),
 					atLeastASecond(config.timeoutSeconds()), atLeastASecond(config.retryAfterUnavailableSeconds()),
-					Math.max(0, config.maxPayloadChars()));
+					Math.max(0, config.maxPayloadChars()), config.shapeDeltaEnabled());
 		}
 
 		private static Duration atLeastASecond(long seconds) {
@@ -504,6 +520,11 @@ public class ModelInferenceService implements PayloadSampleSetHandler {
 		@Override
 		public int maxPayloadChars() {
 			return 4096;
+		}
+
+		@Override
+		public boolean shapeDeltaEnabled() {
+			return true;
 		}
 	}
 

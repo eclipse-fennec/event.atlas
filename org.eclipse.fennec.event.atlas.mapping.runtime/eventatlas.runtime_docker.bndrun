@@ -22,6 +22,12 @@
 # `json` file extension that PayloadIngest selects for a JSON channel. Without it EMF falls
 # back to the XMI factory and every JSON payload dies in a SAX parser, so requiring it here
 # is also the resolve-time guarantee that a `format: json` channel can be honoured.
+# Optional model inference. The bundles ship unconditionally; configs/inference.json in
+# ...mapping.docker.config decides whether they do anything, and it is off unless
+# EVENTATLAS_INFERENCE_ENABLED and INFERENCE_NAMESPACE say otherwise. They are listed by
+# identity below because the resolver only sees package requirements, not DS service
+# references - the chain is wired entirely through services (UnknownModelHandler,
+# PayloadSampleSetHandler, ChatCompletion), so nothing would pull them in on its own.
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.command)',\
@@ -48,7 +54,12 @@
 	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
 	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation',\
 	bnd.identity;id='org.eclipse.fennec.codec',\
-	bnd.identity;id='org.eclipse.sensinact.gateway.southbound.history.timescale-provider'
+	bnd.identity;id='org.eclipse.sensinact.gateway.southbound.history.timescale-provider',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.southbound.sampling',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.model.inference',\
+	bnd.identity;id='org.eclipse.fennec.event.atlas.model.inference.chat',\
+	bnd.identity;id='org.eclipse.fennec.ai.chat.completion.impl.claude',\
+	bnd.identity;id='org.eclipse.fennec.mcp.endpoint'
 
 # http.port=-1 switches OFF the framework's default HTTP service: the whiteboard that
 # serves 8080 is the named org.apache.felix.http~eventHttp instance from sensinact.json
@@ -188,4 +199,12 @@
 	org.postgresql.jdbc;version='[42.7.13,42.7.14)',\
 	tx-control-provider-jdbc-local;version='[1.0.1,1.0.2)',\
 	tx-control-service-local;version='[1.0.1,1.0.2)',\
-	org.osgi.service.cm;version='[1.6.1,1.6.2)'
+	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
+	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.event.atlas.model.inference;version=snapshot,\
+	org.eclipse.fennec.event.atlas.model.inference.chat;version=snapshot,\
+	org.eclipse.fennec.event.atlas.southbound.sampling;version=snapshot,\
+	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)'

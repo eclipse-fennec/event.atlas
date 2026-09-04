@@ -528,6 +528,11 @@ public class ModelInferenceServiceTest {
 			public int maxPayloadChars() {
 				return 4096;
 			}
+
+			@Override
+			public boolean shapeDeltaEnabled() {
+				return true;
+			}
 		};
 	}
 
@@ -557,7 +562,11 @@ public class ModelInferenceServiceTest {
 
 			@Override
 			public synchronized void publish(LogRecord record) {
-				logged.add(record);
+				// on the list, not just on the handler: awaitLog streams the list from the test thread
+				// while the runner thread logs, and `synchronized` here only locks this handler
+				synchronized (logged) {
+					logged.add(record);
+				}
 			}
 
 			@Override

@@ -122,17 +122,17 @@
 	org.eclipse.sensinact.gateway.filters.resource.selector;version='[0.0.2,0.0.3)',\
 	org.eclipse.sensinact.gateway.filters.resource.selector.impl;version='[0.0.2,0.0.3)',\
 	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
-	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)',\
 	org.eclipse.fennec.event.atlas.model.inference;version=snapshot,\
 	org.eclipse.fennec.event.atlas.model.inference.chat;version=snapshot,\
 	org.eclipse.fennec.event.atlas.southbound.sampling;version=snapshot,\
 	org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;version=snapshot,\
 	org.eclipse.paho.client.mqttv3;version='[1.2.5,1.2.6)',\
 	org.eclipse.sensinact.gateway.southbound.mqtt.mqtt-client;version='[0.0.2,0.0.3)',\
-	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)'
+	org.eclipse.fennec.mcp.endpoint;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)'
 
 # org.eclipse.fennec.codec is the EMF JSON codec (the Resource.Factory for the `json` file
 # extension PayloadIngest selects for a JSON channel) - see eventatlas.runtime_docker.bndrun.

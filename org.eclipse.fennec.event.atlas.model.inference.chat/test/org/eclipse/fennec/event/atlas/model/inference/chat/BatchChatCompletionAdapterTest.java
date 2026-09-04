@@ -206,6 +206,49 @@ public class BatchChatCompletionAdapterTest {
 		verify(batchService, never()).continueMessageBatch(any(), any(), anyString());
 	}
 
+	/**
+	 * A batch the API rejected ends as FAILED, and the reason - which field the request was missing -
+	 * is only in the results file. Reporting the status alone made a rejected continuation look like a
+	 * provider outage for an hour.
+	 */
+	@Test
+	@DisplayName("A batch that ends as FAILED reports the provider's own error")
+	void failedBatch_reportsTheProviderError() throws Exception {
+		BatchStatusType failedStatus = BatchStatusType.FAILED;
+		BatchResponse failedBatch = mock(BatchResponse.class);
+		when(failedBatch.getBatchStatus()).thenReturn(failedStatus);
+		when(batchService.getBatch(anyString())).thenReturn(failedBatch);
+		BatchResult errors = mock(BatchResult.class);
+		when(errors.getErrorMessage())
+				.thenReturn("messages.1.content.0.mcp_tool_use.input: Field required");
+		when(batchService.getBatchError(anyString())).thenReturn(errors);
+		answerWith(finished("{\"status\":\"PUBLISHED\"}"));
+
+		IllegalStateException failure = assertThrows(IllegalStateException.class,
+				() -> adapter.complete(SYSTEM, USER));
+
+		assertTrue(failure.getMessage().contains("ended as FAILED"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("mcp_tool_use.input: Field required"),
+				"the field the provider named has to reach the log: " + failure.getMessage());
+	}
+
+	/** Enriching the message is a second request; when it fails the status must still be reported. */
+	@Test
+	@DisplayName("An unreadable provider error does not replace the status")
+	void failedBatch_survivesAnUnreadableProviderError() throws Exception {
+		BatchResponse failedBatch = mock(BatchResponse.class);
+		when(failedBatch.getBatchStatus()).thenReturn(BatchStatusType.FAILED);
+		when(batchService.getBatch(anyString())).thenReturn(failedBatch);
+		when(batchService.getBatchError(anyString())).thenThrow(new IOException("results are gone"));
+		answerWith(finished("{\"status\":\"PUBLISHED\"}"));
+
+		IllegalStateException failure = assertThrows(IllegalStateException.class,
+				() -> adapter.complete(SYSTEM, USER));
+
+		assertTrue(failure.getMessage().contains("ended as FAILED"), failure.getMessage());
+		assertTrue(failure.getMessage().contains("could not be read"), failure.getMessage());
+	}
+
 	/** What the stubbed codec yields when the adapter reads the final turn's answer. */
 	private void agentAnswers(InferenceStatus status, String nsUri, String message) {
 		InferenceResult result = InferenceResultFactory.eINSTANCE.createInferenceResult();

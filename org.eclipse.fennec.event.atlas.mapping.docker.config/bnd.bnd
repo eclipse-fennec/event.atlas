@@ -2,7 +2,8 @@ Bundle-Name: Fennec Event Atlas :: SensiNact Mapping Docker Config
 Bundle-Description: Configurator resource for the self-contained docker runtime: wires \
  the file-based EObject providers for mappings and profiles below /opt/eventatlas/runtime \
  into the registries the mapping engine listens on, and opens the sensinact session \
- manager (ALLOW_ALL) for the northbound REST API.
+ manager (ALLOW_ALL) for the northbound REST API. Also carries the optional model-inference \
+ wiring, which is off unless EVENTATLAS_INFERENCE_ENABLED and INFERENCE_NAMESPACE are set.
 
 -workingset: SensiNact
 

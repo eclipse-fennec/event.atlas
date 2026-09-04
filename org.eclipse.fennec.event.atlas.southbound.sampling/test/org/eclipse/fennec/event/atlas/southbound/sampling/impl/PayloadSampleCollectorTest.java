@@ -403,6 +403,85 @@ public class PayloadSampleCollectorTest {
 		}
 	}
 
+	@Test
+	@DisplayName("Disabled, it declines every payload and hands nothing over")
+	// The default. A runtime that merely deploys this bundle - a docker image shipping every
+	// feature - must buffer nothing until an operator asks for it.
+	void disabled_collectsNothing() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		PayloadSampleCollector collector = new PayloadSampleCollector();
+		collector.activate(disabledConfig());
+		inject(collector, "sampleSetHandler", handler);
+		collectors.add(collector);
+
+		for (int i = 0; i < 20; i++) {
+			collector.onUnknownModel(json(CHANNEL, "{\"shape" + i + "\":1}"));
+		}
+
+		assertNull(handler.poll(), "A disabled collector must not hand a set over");
+	}
+
+	@Test
+	@DisplayName("Switching it off abandons the windows already open")
+	// Holding a half-collected set across a disable would leak it: nothing is going to consume it.
+	void disabling_abandonsOpenWindows() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		PayloadSampleCollector collector = collector(handler, 5, 99, 600, 0, 10);
+
+		collector.onUnknownModel(json(CHANNEL, "{\"a\":1}"));
+		collector.onUnknownModel(json(CHANNEL, "{\"b\":1}"));
+
+		collector.activate(disabledConfig());
+
+		collector.onUnknownModel(json(CHANNEL, "{\"c\":1}"));
+		assertNull(handler.poll(), "Neither the abandoned window nor the new payload may be handed over");
+	}
+
+	private static PayloadSampleCollector.Config disabledConfig() {
+		return new PayloadSampleCollector.Config() {
+
+			@Override
+			public Class<? extends Annotation> annotationType() {
+				return PayloadSampleCollector.Config.class;
+			}
+
+			@Override
+			public boolean enabled() {
+				return false;
+			}
+
+			@Override
+			public int targetSamples() {
+				return 10;
+			}
+
+			@Override
+			public int quietSamples() {
+				return 3;
+			}
+
+			@Override
+			public long maxWaitSeconds() {
+				return 1800;
+			}
+
+			@Override
+			public int ringSize() {
+				return 0;
+			}
+
+			@Override
+			public int maxWindows() {
+				return 100;
+			}
+
+			@Override
+			public String[] channels() {
+				return new String[0];
+			}
+		};
+	}
+
 	private PayloadSampleCollector collector(PayloadSampleSetHandler handler, int target, int quiet, long maxWaitSeconds,
 			int ring, int windows, String... channels) {
 		PayloadSampleCollector collector = new PayloadSampleCollector();
@@ -422,6 +501,13 @@ public class PayloadSampleCollectorTest {
 			@Override
 			public Class<? extends Annotation> annotationType() {
 				return PayloadSampleCollector.Config.class;
+			}
+
+			@Override
+			public boolean enabled() {
+				// These tests are about what the collector does when it is collecting; the
+				// disabled path has its own tests below.
+				return true;
 			}
 
 			@Override

@@ -42,32 +42,35 @@
     "eager.scopes": ["jena"],
     "register.in.global.registry": true,
 
-    /* Never let the Atlas overwrite a package this framework already generates itself.
+    /* RESTORED 2026-09-04 after removing it broke the runtime.
      *
-     * `register.in.global.registry` mirrors via RemoteEPackagePublisher.mirrorToGlobal, which
-     * does an unconditional EPackage.Registry.INSTANCE.put(nsUri, ePackage) - not putIfAbsent.
-     * The jena scope inherits its parent `atlas` scope, whose listing carries the platform's own
-     * system packages, so an eager sweep replaces the GENERATED EPackage from a bundle with a
-     * DYNAMIC one fetched over REST. Generated code then fails the moment it runs its standard
-     * `(XFactory) EPackage.Registry.INSTANCE.getEFactory(eNS_URI)` init:
+     * model.atlas #227 (commit 89d0e8e, in the deployed 0.1.0-20260902.150611-35) made the
+     * mirror non-clobbering - RemoteEPackagePublisher.mirrorToGlobal now checks `mirrored`, then
+     * globalRegistry.containsKey, then putIfAbsent. All correct, and all about OVERWRITING.
+     * None of it addresses ORDERING, and this failure is an ordering failure:
+     *
+     * when the eager sweep reaches a system nsURI BEFORE anything has registered that generated
+     * package, containsKey is false, putIfAbsent succeeds, and the DYNAMIC package is mirrored
+     * legitimately. The same sync pass then needs the generated factory and finds the dynamic
+     * one:
      *
      *   ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory
      *       at ScopeApiFactoryImpl.init / ScopeApiFactory.<clinit>
      *       at RemoteReadableScopeService.parseScopeInfo
-     *       at AtlasObjectSync.syncRegistry
+     *       at AtlasObjectSync.syncRegistry          <- inside the sweep itself
      *
-     * It is order-dependent and therefore latent: a factory's <clinit> runs once, so whichever
-     * happens first - the class being touched, or the sweep clobbering the registry - decides
-     * for the life of the framework. Adding the Atlas EObject provider above is what made this
-     * runtime touch ScopeApiFactory *after* the sweep, turning a dormant bug into a hard failure.
+     * putIfAbsent cannot help: there was nothing to lose the race to. mirrorToGlobal
+     * deliberately does not resolve an EPackage.Descriptor either ("a generated package
+     * registered lazily must not be forced to initialise merely because we looked"), so it
+     * cannot see a package that has not initialised yet. Only NOT MIRRORING these nsURIs avoids
+     * it, which is what this list does.
      *
-     * The gate is applied in RemoteEPackageProviderImpl.isPublishable, before the cache and on
-     * every path (getEPackage / ensureAvailable / resolve / refresh), so it covers the eager
-     * sweep and the drift watcher alike. Matching is exact `contains`, not prefix - which is why
-     * this is a deny-list of the 17 stable system nsURIs rather than an allow-list of domain
-     * ones: an inferred package's nsURI is different on every run and could not be listed ahead
-     * of time. The jena-scope domain packages (lorawan, em310udl, buerger and any inferred one)
-     * are untouched and still mirrored, which is what ingest needs. */
+     * Matching is exact `contains`, not prefix - hence a deny-list of the 17 stable system
+     * nsURIs rather than an allow-list of domain ones: an inferred package's nsURI differs on
+     * every run and could not be listed ahead of time. The jena-scope domain packages (lorawan,
+     * em310udl, buerger and any inferred one) are untouched and still mirrored, which is what
+     * ingest needs. Quickest check that it is live: count the eager sweep in the Atlas log -
+     * 4 domain packages, not 21. */
     "nsuri.deny.list": [
       "http://eclipse.org/fennec/model/atlas/management/1.0.0",
       "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
@@ -87,7 +90,6 @@
       "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
       "https://fennec.eclipse.org/event.atlas/mapping/1.0"
     ],
-
     "drift.check.interval.ms": 10000
   },
 
@@ -214,6 +216,9 @@
    * type evidence is often in the later ones. maxWait is the backstop, and closing on it is the
    * only thing that sets lowEvidence. */
   "event.atlas.southbound.sampling": {
+    /* Sampling is off unless asked for - see the collector's `enabled` default. This runtime
+     * exists to exercise the chain, so it asks. */
+    "enabled": true,
     "targetSamples": "$[env:SAMPLING_TARGET;default=$[prop:SAMPLING_TARGET;default=5]]",
     "quietSamples": "$[env:SAMPLING_QUIET;default=$[prop:SAMPLING_QUIET;default=20]]",
     "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=$[prop:SAMPLING_MAX_WAIT;default=120]]"
@@ -235,7 +240,20 @@
     "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]]",
     "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=1]]",
     "intervalSeconds": 3600,
-    "timeoutSeconds": "$[env:INFERENCE_TIMEOUT;default=$[prop:INFERENCE_TIMEOUT;default=900]]"
+    "timeoutSeconds": "$[env:INFERENCE_TIMEOUT;default=$[prop:INFERENCE_TIMEOUT;default=900]]",
+
+    /* Whether the prompt carries the ShapeDelta summary - which paths every sample holds, which
+     * only some hold, and which value kinds each was seen with - in front of the payload bodies.
+     * The payloads themselves are never affected; only the summary in front of them.
+     *
+     * It is a switch so that both arms of a comparison come off ONE jar and differ in nothing
+     * else: editing InferencePrompt and rebuilding between runs cannot promise that. Flip it with
+     * -DINFERENCE_SHAPE_DELTA=false in secrets.bndrun, or the environment variable.
+     *
+     * A config update also re-runs the component's @Activate, which rebuilds AttemptRegistry -
+     * so switching arms clears the fingerprint dedup in the same action, and the same payloads
+     * can be replayed without a framework restart. */
+    "shapeDeltaEnabled": "$[env:INFERENCE_SHAPE_DELTA;default=$[prop:INFERENCE_SHAPE_DELTA;default=true;type=Boolean]]"
   },
 
   /* The remote metamodel MCP server. `server.url` must be reachable FROM ANTHROPIC - the client
@@ -290,7 +308,6 @@
       "add_eenum_literal",
       "modify_feature",
       "create_from_json",
-      "export_dataset",
       "register_package",
       "list_registry",
       "post_to_model_atlas"
@@ -365,7 +382,6 @@
       "add_eenum_literal",
       "modify_feature",
       "create_from_json",
-      "export_dataset",
       "register_package",
       "list_registry",
       "post_to_model_atlas"

@@ -109,10 +109,6 @@
 	org.eclipse.emf.common;version='[2.44.0,2.44.1)',\
 	org.eclipse.emf.ecore;version='[2.41.0,2.41.1)',\
 	org.eclipse.emf.ecore.xmi;version='[2.39.0,2.39.1)',\
-	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)',\
 	org.eclipse.fennec.codec;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.codec.api;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.codec.metadata;version='[0.1.0,0.1.1)',\
@@ -180,4 +176,8 @@
 	org.eclipse.sensinact.gateway.northbound.gogo-shell;version='[0.0.2,0.0.3)',\
 	org.eclipse.sensinact.gateway.northbound.security.security-api;version='[0.0.2,0.0.3)',\
 	org.eclipse.sensinact.gateway.northbound.session.session-api;version='[0.0.2,0.0.3)',\
-	org.eclipse.sensinact.gateway.northbound.session.session-impl;version='[0.0.2,0.0.3)'
+	org.eclipse.sensinact.gateway.northbound.session.session-impl;version='[0.0.2,0.0.3)',\
+	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)'

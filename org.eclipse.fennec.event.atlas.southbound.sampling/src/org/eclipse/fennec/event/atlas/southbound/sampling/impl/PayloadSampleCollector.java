@@ -77,6 +77,15 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 	public @interface Config {
 
 		/**
+		 * Whether to collect at all. <b>Off by default</b>, so a runtime that merely deploys
+		 * this bundle - a docker image shipping every feature, say - buffers nothing and pays
+		 * nothing until an operator asks for it. The component still registers as an
+		 * {@link UnknownModelHandler} when disabled and declines each payload, which keeps the
+		 * switch a configuration change rather than a redeploy.
+		 */
+		boolean enabled() default false;
+
+		/**
 		 * How many distinctly shaped payloads to gather before handing the set over - N. Ten
 		 * is enough to expose a type discriminator and to widen the types of the fields that
 		 * vary, without waiting for a slow sensor forever.
@@ -164,6 +173,9 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 
 	private volatile int maxWindows = 100;
 
+	/** Mirrors {@link Config#enabled()}; false until activation says otherwise. */
+	private volatile boolean enabled;
+
 	/**
 	 * Optional so the collector can be deployed before anything consumes its sets - the
 	 * activation log then reports what would have been handed over, which is a useful
@@ -177,6 +189,14 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 	@Activate
 	@Modified
 	void activate(Config config) {
+		enabled = config.enabled();
+		if (!enabled) {
+			// Abandon anything already open: a set collected under the old setting is not
+			// evidence anybody is going to consume now, and holding it would leak.
+			windows.clear();
+			logger.info("Payload sampling is disabled - unknown payloads are dropped as before");
+			return;
+		}
 		ChannelSettings defaults = ChannelSettings.of(config.targetSamples(), config.quietSamples(),
 				config.maxWaitSeconds(), config.ringSize());
 		ChannelSettingsResolver resolved = new ChannelSettingsResolver(defaults, config.channels());
@@ -210,6 +230,12 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 	 */
 	@Override
 	public void onUnknownModel(UnknownPayload payload) {
+		if (!enabled) {
+			// Declining here rather than not registering at all: the reference in PayloadIngest
+			// is dynamic, so flipping `enabled` takes effect on the next payload with no
+			// service churn and no restart.
+			return;
+		}
 		// The collector does not care WHY the payload was unhandled - it takes whatever the
 		// hook gives it. The shape is what decides whether it is new evidence.
 		List<String> shape = ShapeFingerprint.of(payload);

@@ -27,6 +27,77 @@
     "mode": "EAGER",
     "eager.scopes": ["jena"],
     "register.in.global.registry": true,
+
+    /* Required alongside register.in.global.registry, same reason as in
+     * ...mapping.inference.config (which carries the full explanation) and
+     * ...mapping.docker.config. Short version: EAGER mode sweeps what
+     * GET /{scope}/schema/all returns, and that resolves inheritance - 18 of the 22 packages a
+     * `jena` sweep sees are owned by the parent `atlas` scope. Mirroring one of those into
+     * EPackage.Registry.INSTANCE while the generated package's slot is still empty makes the
+     * generated factory die casting it:
+     * `EFactoryImpl cannot be cast to ScopeApiFactory`.
+     *
+     * model.atlas #227 does not cover it - putIfAbsent protects an OCCUPIED slot and this one is
+     * empty. The real fix is for EAGER to be strict about eager.scopes; sketched in
+     * nsc/docs/issue-eager-scopes-should-not-sweep-inherited-parents.md, and this list goes away
+     * when that lands.
+     *
+     * This runtime had never hit it - it is order-dependent, and a factory's <clinit> runs once -
+     * but it carries both halves of the trigger (the generated scope.api bundle and the Atlas
+     * EObject provider), so it was latent rather than safe. Keep in step with the other two
+     * copies. */
+    "nsuri.deny.list": [
+      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/rest/1.0",
+      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
+      "http://www.eclipse.org/emf/2002/Ecore",
+      "http://www.eclipse.org/emf/2003/XMLType",
+      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
+      "http://www.eclipse.org/uml2/5.0.0/Types",
+      "http://www.eclipse.org/uml2/5.0.0/UML",
+      "http://www.gme.org/cocl/1.0",
+      "http://www.gme.org/datagen/1.0",
+      "http://www.w3.org/XML/1998/namespace",
+      "https://dg.de/1.0",
+      "https://eclipse.org/fennec/codec/1.0.0",
+      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    ],
+
+    /* Required alongside register.in.global.registry, for the same reason as in
+     * ...mapping.inference.config and ...mapping.docker.config - the full explanation is in the
+     * inference config. Short version: the eager sweep of a scope that inherits the `atlas`
+     * parent mirrors a DYNAMIC copy of a system nsURI into EPackage.Registry.INSTANCE while the
+     * generated package's slot is still empty, and the generated factory then dies casting it
+     * (`EFactoryImpl cannot be cast to ScopeApiFactory`). model.atlas #227 made the mirror
+     * non-clobbering, which does not help: putIfAbsent protects an occupied slot and this one is
+     * empty.
+     *
+     * This runtime had never hit it - it is order-dependent, and a factory's <clinit> runs once -
+     * but it carries both halves of the trigger (the generated scope.api bundle and the Atlas
+     * EObject provider), so it was latent rather than safe. Keep in step with the other two
+     * copies. */
+    "nsuri.deny.list": [
+      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/rest/1.0",
+      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
+      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
+      "http://www.eclipse.org/emf/2002/Ecore",
+      "http://www.eclipse.org/emf/2003/XMLType",
+      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
+      "http://www.eclipse.org/uml2/5.0.0/Types",
+      "http://www.eclipse.org/uml2/5.0.0/UML",
+      "http://www.gme.org/cocl/1.0",
+      "http://www.gme.org/datagen/1.0",
+      "http://www.w3.org/XML/1998/namespace",
+      "https://dg.de/1.0",
+      "https://eclipse.org/fennec/codec/1.0.0",
+      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    ],
     "drift.check.interval.ms": 10000
   },
 
@@ -270,6 +341,9 @@
   /* Left at its defaults except for the wait: a dev broker publishes often, and half an hour
    * is a long time to watch nothing happen. */
   "event.atlas.southbound.sampling": {
+    /* Sampling is off unless asked for - see the collector's `enabled` default. This runtime
+     * exists to exercise the chain, so it asks. */
+    "enabled": true,
     "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=$[prop:SAMPLING_MAX_WAIT;default=300]]"
   }
 }
