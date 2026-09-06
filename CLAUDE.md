@@ -532,8 +532,9 @@ EPackages a runtime maps must be registered in that runtime.
 - **Runtime/OSGi dependencies come from Maven Central via bnd**, listed in `cnf/ext/central.mvn`
   — *not* Gradle. Gradle `dependencies` are test-only. Broader dependency sets are switched on
   through `-library:` in `fennec.bnd` (`fennec`, `fennecTest`, `fennecJacoco`, `fennecEMF`,
-  `fennecM2X`, `fennecJPA`, `fennecEMFModels`, `fennecCodec`); a project opts into a setup with
-  e.g. `-library: enableEMF` / `enableOSGi-Test` in its own `bnd.bnd`.
+  `fennecJPA`, `fennecEMFModels`, `fennecCodec`); a project opts into a setup with
+  e.g. `-library: enableEMF` / `enableOSGi-Test` in its own `bnd.bnd`. `fennecM2X` was in that
+  list until 2026-09-06 — see the third `-runbundles` trap below for why it had to go.
 - SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
   `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots);
   `central.mvn` additionally carries the Model Atlas client bundles
@@ -552,15 +553,26 @@ EPackages a runtime maps must be registered in that runtime.
 - **A new bundle is a new top-level directory with a `bnd.bnd`** — the bnd workspace plugin
   sweeps it into the Gradle graph automatically; the root build applies `java` + `jacoco` to
   every subproject.
-- **A `-runbundles` entry only survives CI if some index can actually *fetch* it.** Two ways to
-  get this wrong, both of which resolve fine locally (bnd uses `~/.m2` as a cache, and a
-  developer machine has half of Maven Central in there) and then fail the CI export with
-  "Not found in […]":
+- **A `-runbundles` entry only survives CI if some index can actually *fetch* it.** Three ways to
+  get this wrong, all of which resolve fine locally (bnd uses `~/.m2` as a cache, and a
+  developer machine has half of Maven Central in there) and then fail the CI export or
+  re-resolve:
   1. the bsn is in **no index at all** — it resolved purely out of `~/.m2` (this is how the
      Jackson 3 core/databind and `jackson-annotations` entries slipped in);
   2. the coordinate is indexed in **`cnf/ext/sensinact.maven`, which pins third-party artifacts
      the Eclipse SensiNact repos do not host** (netty 4.1.9x, `metrics-core`, postgresql,
-     tx-control) — `repo.eclipse.org/…/sensinact-{releases,snapshots}` 404s them.
+     tx-control) — `repo.eclipse.org/…/sensinact-{releases,snapshots}` 404s them;
+  3. the only index naming it belongs to a **`-library:` setup that is no longer fetchable**.
+     `org.antlr.antlr4-runtime` (the SensorThings northbound filter parser's ANTLR runtime) was
+     listed solely in `fennecM2X.maven`, which arrives inside
+     `org.eclipse.fennec.m2x:org.eclipse.fennec.m2x.library.workspace:0.1.0-SNAPSHOT`. That
+     snapshot has since 404'd on Sonatype's maven-snapshots, so on a clean runner the library
+     never expands, its repo never registers and antlr is simply absent — while a developer
+     machine keeps resolving it from the June expansion still sitting in
+     `cnf/cache/7.4.0/expanded/` (whose `.receipt` names `~/.m2`, not a URL). It surfaces not as
+     "Not found in […]" but as a *resolution* failure two hops away from the cause:
+     `sensorthings.rest.gateway cannot be resolved` ⇒ `ISensorthingsFilterParser` ⇒
+     `org.antlr.v4.runtime [4.12,5) could not be provided`.
 
   Either way the fix is the same: declare it in `central.mvn`, at the version the rest of that
   library family already uses. After changing a bndrun's `-runbundles`, cross-check every entry
