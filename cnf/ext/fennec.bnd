@@ -15,16 +15,16 @@
 # Enable the Fennec library setups (resolved from Maven Central via central.mvn).
 # fennecCodec re-added 2026-07-03 for E3 (OData-JSON data codec) — backing artifact
 # org.eclipse.fennec.codec:org.eclipse.fennec.codec.workspace.library:0.1.0-SNAPSHOT.
-# fennecM2X removed 2026-09-06: its backing library.workspace/library.project snapshots have
-# 404'd on Sonatype's maven-snapshots, so on a clean runner the setup no longer expands ("No
-# metadata for revision …m2x.library.project:0.1.0-SNAPSHOT"). Nothing here used the m2t/ocl/qvt
-# stack; the one bundle its index uniquely provided, org.antlr.antlr4-runtime, is declared in
-# central.mvn now.
+# fennecM2X earns its place through fennecM2X.maven alone: it is the only index naming
+# org.antlr:antlr4-runtime, which the SensorThings northbound filter parser needs. Its 0.1.0
+# snapshot 404'd on Sonatype for a while (2026-09-06, CI-only failure); 0.1.1-SNAPSHOT restored
+# it. Bump the version in central.mvn and clear cnf/cache/<bndversion>/expanded together.
 -library: \
 	fennec,\
 	fennecTest,\
 	fennecJacoco,\
 	fennecEMF,\
+	fennecM2X,\
 	fennecJPA,\
 	fennecEMFModels,\
 	fennecCodec

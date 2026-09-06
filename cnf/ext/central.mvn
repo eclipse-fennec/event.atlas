@@ -52,14 +52,6 @@ io.netty:netty-transport:4.1.133.Final
 io.netty:netty-transport-classes-epoll:4.1.133.Final
 io.netty:netty-transport-native-unix-common:4.1.133.Final
 
-# ANTLR runtime for the SensorThings northbound filter parser
-# (org.eclipse.sensinact.gateway.northbound.sensorthings.filter imports org.antlr.v4.runtime
-# [4.12,5), and it is what the rest.gateway's ISensorthingsFilterParser service comes from).
-# The jar already carries OSGi metadata. It is indexed NOWHERE else - not in sensinact.maven
-# either - so before this line both bndruns resolved only out of a developer's ~/.m2 and the
-# CI re-resolve failed with "could not be provided by any available bundle or dependency".
-org.antlr:antlr4-runtime:4.13.2
-
 # EMF XSD model + XSDEcoreBuilder (WSDL/XSD -> Ecore for the SOAP utility). Ships OSGi
 # metadata; requires org.eclipse.emf.ecore [2.41,3.0) — aligned with the workspace EMF.
 org.eclipse.emf:org.eclipse.xsd:2.22.0
@@ -194,6 +186,8 @@ org.bndtools:org.bndtools.templates.osgi:${bndversion}
 org.eclipse.fennec.emf:org.eclipse.fennec.emf.osgi.bnd.library.workspace:1.1.0-SNAPSHOT
 org.eclipse.osgi-technology.rest:org.eclipse.osgitech.rest.bnd.library:1.2.3
 org.eclipse.fennec.codec:org.eclipse.fennec.codec.workspace.library:0.1.0-SNAPSHOT
+
+org.eclipse.fennec.m2x:org.eclipse.fennec.m2x.library.workspace:0.1.1-SNAPSHOT
 org.eclipse.fennec.persistence.jpa:org.eclipse.fennec.persistence.jpa.library.workspace:0.1.0-SNAPSHOT
 org.eclipse.fennec.models:org.eclipse.fennec.common.models.library:0.0.1-SNAPSHOT
 
