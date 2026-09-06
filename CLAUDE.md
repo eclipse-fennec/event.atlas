@@ -219,8 +219,8 @@ metamodel MCP server's tools; what returns is a receipt line. Nothing in this re
 registers an inferred package into a running framework — a draft is promoted by a human.
 
 **Promoting it is not enough for a *running* runtime, though: the package arrives on the next
-restart, not the next payload.** Verified end to end on 2026-09-01 (see
-`docs/model-inference-test-log.md`). The Atlas client's `DriftWatcher` only refreshes entries it
+restart, not the next payload.** Verified end to end on 2026-09-01 (the test log is internal —
+see the xdp documentation project). The Atlas client's `DriftWatcher` only refreshes entries it
 already holds — `handleChangedNsUris` skips on `!held.contains(nsUri)`, `handleChangedObjects` on
 `!anyHeld` — so a newly published nsURI is filtered out even though the scope's ETag moved and the
 check fired. There is no polling counterpart for EPackages either: `EagerPrefetch` runs once at
