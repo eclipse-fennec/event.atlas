@@ -14,8 +14,8 @@
    * the mapping sync below finds the domain packages. Worth keeping even though the client now
    * resolves the references a fetched EPackage makes into other packages: it turns a layered
    * domain model (a shared base package plus vendor extensions) into a start-up cost rather than
-   * a first-payload one. register.in.global.registry mirrors them into EPackage.Registry.INSTANCE,
-   * where EMF deserialization looks.
+   * a first-payload one. They reach EMF deserialization through the OSGi framework
+   * EPackage.Registry - the metadata whiteboard - not through EPackage.Registry.INSTANCE.
    *
    * `eager.stages` is deliberately absent - empty is the default and exposes one stage-free
    * registry per scope, resolving that scope's own final stage server-side, which is correct
@@ -26,78 +26,37 @@
     "default.scope": "jena",
     "mode": "EAGER",
     "eager.scopes": ["jena"],
-    "register.in.global.registry": true,
-
-    /* Required alongside register.in.global.registry, same reason as in
-     * ...mapping.inference.config (which carries the full explanation) and
-     * ...mapping.docker.config. Short version: EAGER mode sweeps what
-     * GET /{scope}/schema/all returns, and that resolves inheritance - 18 of the 22 packages a
-     * `jena` sweep sees are owned by the parent `atlas` scope. Mirroring one of those into
-     * EPackage.Registry.INSTANCE while the generated package's slot is still empty makes the
-     * generated factory die casting it:
-     * `EFactoryImpl cannot be cast to ScopeApiFactory`.
+    /* No `register.in.global.registry` and no `nsuri.deny.list`: both came out on 2026-09-08.
+     * They were one workaround for two upstream bugs, and the deny-list was in here TWICE -
+     * the same 17 entries under the same key in the same object, so the second silently won.
      *
-     * model.atlas #227 does not cover it - putIfAbsent protects an OCCUPIED slot and this one is
-     * empty. The real fix is for EAGER to be strict about eager.scopes; sketched in
-     * nsc/docs/issue-eager-scopes-should-not-sweep-inherited-parents.md, and this list goes away
-     * when that lands.
+     * The chain was: an EAGER sweep of `jena` resolves inheritance, so 18 of the 22 packages it
+     * saw were owned by the parent `atlas` scope. The mirror copied each into
+     * EPackage.Registry.INSTANCE, and a DYNAMIC copy of a system nsURI landing there before the
+     * generated package had initialised broke that package's factory initialiser
+     * (ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory). This runtime had
+     * never actually hit it - the failure is order-dependent and a factory's <clinit> runs once -
+     * but it carried both halves of the trigger.
      *
-     * This runtime had never hit it - it is order-dependent, and a factory's <clinit> runs once -
-     * but it carries both halves of the trigger (the generated scope.api bundle and the Atlas
-     * EObject provider), so it was latent rather than safe. Keep in step with the other two
-     * copies. */
-    "nsuri.deny.list": [
-      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/rest/1.0",
-      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
-      "http://www.eclipse.org/emf/2002/Ecore",
-      "http://www.eclipse.org/emf/2003/XMLType",
-      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
-      "http://www.eclipse.org/uml2/5.0.0/Types",
-      "http://www.eclipse.org/uml2/5.0.0/UML",
-      "http://www.gme.org/cocl/1.0",
-      "http://www.gme.org/datagen/1.0",
-      "http://www.w3.org/XML/1998/namespace",
-      "https://dg.de/1.0",
-      "https://eclipse.org/fennec/codec/1.0.0",
-      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
-      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
-    ],
-
-    /* Required alongside register.in.global.registry, for the same reason as in
-     * ...mapping.inference.config and ...mapping.docker.config - the full explanation is in the
-     * inference config. Short version: the eager sweep of a scope that inherits the `atlas`
-     * parent mirrors a DYNAMIC copy of a system nsURI into EPackage.Registry.INSTANCE while the
-     * generated package's slot is still empty, and the generated factory then dies casting it
-     * (`EFactoryImpl cannot be cast to ScopeApiFactory`). model.atlas #227 made the mirror
-     * non-clobbering, which does not help: putIfAbsent protects an occupied slot and this one is
-     * empty.
+     * - fennec-codec #207 (published 0.1.0.202609080603-SNAPSHOT) removes the reason for the
+     *   mirror: TypeResolutionHelper no longer resolves an nsURI out of EPackage.Registry.INSTANCE,
+     *   type resolution goes through the per-load PackageResolver. With the mirror at its default
+     *   false, nothing dynamic reaches the EMF singleton and the hazard is gone, not dodged.
+     * - model.atlas c37f91d (published 2026-09-07) replaces the deny-list: LocalGeneratedPackages
+     *   reads the org.eclipse.emf.ecore.generated_package capability, so local-first suppression
+     *   sees what a bundle DECLARES from install rather than only what it registered.
      *
-     * This runtime had never hit it - it is order-dependent, and a factory's <clinit> runs once -
-     * but it carries both halves of the trigger (the generated scope.api bundle and the Atlas
-     * EObject provider), so it was latent rather than safe. Keep in step with the other two
-     * copies. */
-    "nsuri.deny.list": [
-      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/rest/1.0",
-      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
-      "http://www.eclipse.org/emf/2002/Ecore",
-      "http://www.eclipse.org/emf/2003/XMLType",
-      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
-      "http://www.eclipse.org/uml2/5.0.0/Types",
-      "http://www.eclipse.org/uml2/5.0.0/UML",
-      "http://www.gme.org/cocl/1.0",
-      "http://www.gme.org/datagen/1.0",
-      "http://www.w3.org/XML/1998/namespace",
-      "https://dg.de/1.0",
-      "https://eclipse.org/fennec/codec/1.0.0",
-      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
-      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
-    ],
+     * So nsc/docs/issue-eager-scopes-should-not-sweep-inherited-parents.md is no longer what
+     * this depends on: the sweep still returns the parent's packages, and suppression now
+     * happens client-side on the right criterion.
+     *
+     * The `AtlasEObjectProvider` gates below are unaffected - their `packageRegistry` reference
+     * defaults to the framework registry (default.resourceset.epackage.registry=true), and
+     * AtlasObjectSync pins only the required nsURIs into the singleton itself, value-matched
+     * and never over an occupied slot.
+     *
+     * Verified in inference.bndrun on 2026-09-08 (`published 14 EPackage(s)`, no
+     * ClassCastException, `1 mapping(s) applied`). NOT yet re-verified in this runtime. */
     "drift.check.interval.ms": 10000
   },
 

@@ -302,18 +302,41 @@ it walks its directory once at activation and never again.
   `event.atlas.southbound.ingest` is an *ingest-side* setting and is deliberately not mirrored
   into the inference configuration.
 
-- **`register.in.global.registry: true` needs an `nsuri.deny.list`, or it breaks the framework.**
-  The mirror is an unconditional `EPackage.Registry.INSTANCE.put`
-  (`RemoteEPackagePublisher.mirrorToGlobal`), and a scope inherits its parent `atlas` scope — whose
-  listing carries the platform's own 17 system packages. An eager sweep therefore replaces
-  *generated* EPackages with *dynamic* ones, `Ecore`, the codec and
-  `event.atlas/mapping/1.0` included. Generated code then dies on its standard init:
-  `ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory`. It is **order-dependent
-  and so latent** — a factory's `<clinit>` runs once, so it only bites when something touches the
-  class after the sweep, which is why adding the Atlas EObject provider is what finally exposed
-  it. `inference.bndrun`'s config carries the 17-entry deny-list; the quickest check that it is
-  live is to count the eager sweep in the Atlas log — **4 domain packages, not 21**. Sketched as
+- **Leave `register.in.global.registry` at its default `false`, and carry no `nsuri.deny.list`.**
+  All three config bundles used to set the mirror on plus a hand-maintained 17-entry deny-list;
+  both came out on 2026-09-08, because they were one workaround for two upstream bugs that are
+  now fixed. The mirror is an unconditional `EPackage.Registry.INSTANCE.put`
+  (`RemoteEPackagePublisher.mirrorToGlobal`), and a scope inherits its parent `atlas` scope —
+  whose listing carries the platform's own system packages — so an eager sweep replaced
+  *generated* EPackages with *dynamic* ones (`Ecore`, the codec, `event.atlas/mapping/1.0`
+  included) and generated code then died on its standard init:
+  `ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory`. It was **order-dependent
+  and so latent** — a factory's `<clinit>` runs once — which is why adding the Atlas EObject
+  provider is what finally exposed it. Sketched as
   `nsc/docs/issue-atlas-global-registry-clobber.md`.
+  - **fennec-codec #207** (published `0.1.0.202609080603-SNAPSHOT`) is why the mirror was ever
+    needed: `TypeResolutionHelper` resolved an nsURI straight out of
+    `EPackage.Registry.INSTANCE`, which is empty in a runtime that publishes its models through
+    the metadata whiteboard. Type resolution now goes through the per-load `PackageResolver`, so
+    with the mirror off nothing dynamic reaches the EMF singleton and the hazard is *removed*,
+    not dodged.
+  - **model.atlas `c37f91d`** (published 2026-09-07) replaces the deny-list: `LocalGeneratedPackages`
+    reads the `org.eclipse.emf.ecore.generated_package` capability every generated model bundle
+    carries, so local-first suppression sees what a bundle *declares* from the moment it is
+    installed. It needs no maintenance and is not tied to a scope.
+  - **The old check ("4 domain packages, not 21") is obsolete.** The deny-list blocked the whole
+    inherited scope; `LocalGeneratedPackages` blocks only what the runtime itself declares, so
+    the healthy number went *up*. `published N EPackage(s)` should equal the scope's final-stage
+    nsURIs minus the runtime's own generated ones — for `inference.bndrun` on 2026-09-08 that is
+    21 − 7 = **14**, and the 7 include `scope/api/1.0.0`, the one that used to blow up. To
+    recompute N, diff `GET /atlas/rest/{scope}/schema/all` (`properties.nsUri` + `stage`) against
+    the `generated_package` capabilities in the exported runtime jar — parse the manifest clause
+    by clause, since Fennec-generated bundles put `uri=` *after* `class=`.
+  - A missing `ClassCastException` is **no longer evidence** of anything: with the mirror off
+    that clobber is structurally impossible. The suppression count is the evidence for `c37f91d`;
+    a real ingest reporting `1 mapping(s) applied` is the evidence for #207.
+  - Verified end to end in `inference.bndrun` on 2026-09-08. `docker.config` and `local.config`
+    are changed the same way but **not re-verified in their own runtimes**.
 - **Reading the twin in `inference.bndrun` means the Gogo shell, and it needs two things.** That
   runtime deploys no northbound REST, no SensorThings and sets `org.osgi.service.http.port=-1`, so
   the twin is write-only over HTTP. Add `org.eclipse.sensinact.gateway.northbound.gogo-shell` *and*

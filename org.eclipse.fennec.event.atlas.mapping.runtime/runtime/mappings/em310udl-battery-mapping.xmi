@@ -7,9 +7,11 @@
 
   1. Every href is an nsURI href (<nsURI>#//<Name>), not a relative file path. A relative href
      would load a second, private copy of the domain EPackage from disk; the payload is
-     deserialized against the copy the Model Atlas client registered in
-     EPackage.Registry.INSTANCE, and InstancePusher keys on EClass *identity* - so the two would
-     never match and the mapping would silently never apply.
+     deserialized against the copy the Model Atlas client published, and InstancePusher keys on
+     EClass *identity* - so the two would never match and the mapping would silently never
+     apply. That copy reaches both sides through the OSGi framework EPackage.Registry: since
+     2026-09-07 this runtime no longer sets register.in.global.registry, so it is NOT in
+     EPackage.Registry.INSTANCE and nothing should expect to find it there.
   2. No <profile> reference. The profile registry is configured but left empty in this runtime,
      and a mapping whose profile cannot be resolved is skipped entirely rather than registered
      profile-less.

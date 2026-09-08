@@ -29,8 +29,8 @@
 
   /* EPackages come from the Atlas, and only from there: the codec must deserialize a payload
    * into the same EPackage instance a mapping resolved its providerClasses against, since
-   * InstancePusher keys on EClass identity. register.in.global.registry mirrors them into
-   * EPackage.Registry.INSTANCE, which is where both EMF deserialization and an nsURI href look.
+   * InstancePusher keys on EClass identity. They reach both through the OSGi framework
+   * EPackage.Registry - the metadata whiteboard - which is all this block needs to configure.
    *
    * This is also what the inference agent discovers through the MCP server's metadata tools -
    * the same jena scope, so what it finds is what this runtime actually has. */
@@ -40,56 +40,51 @@
     "default.scope": "jena",
     "mode": "EAGER",
     "eager.scopes": ["jena"],
-    "register.in.global.registry": true,
-
-    /* RESTORED 2026-09-04 after removing it broke the runtime.
+    /* Three settings this block used to carry are gone, as of 2026-09-07, and they came out
+     * together because they were one workaround for two bugs.
      *
-     * model.atlas #227 (commit 89d0e8e, in the deployed 0.1.0-20260902.150611-35) made the
-     * mirror non-clobbering - RemoteEPackagePublisher.mirrorToGlobal now checks `mirrored`, then
-     * globalRegistry.containsKey, then putIfAbsent. All correct, and all about OVERWRITING.
-     * None of it addresses ORDERING, and this failure is an ordering failure:
+     * The chain was: an EAGER sweep of `jena` resolves scope inheritance, so it also swept the
+     * 18 packages owned by the implicit `atlas` parent - Ecore, UML, XMLType, the atlas APIs,
+     * the codec, this workspace's own mapping metamodel. `register.in.global.registry: true`
+     * then mirrored each into EPackage.Registry.INSTANCE, and a DYNAMIC copy of a system nsURI
+     * landing there before the generated package had initialised broke that package's factory
+     * initialiser (ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory). A
+     * hand-maintained 17-entry `nsuri.deny.list` suppressed the mirror for those nsURIs.
      *
-     * when the eager sweep reaches a system nsURI BEFORE anything has registered that generated
-     * package, containsKey is false, putIfAbsent succeeds, and the DYNAMIC package is mirrored
-     * legitimately. The same sync pass then needs the generated factory and finds the dynamic
-     * one:
+     * - `nsuri.deny.list` - removed. model.atlas c37f91d closes the window properly:
+     *   LocalGeneratedPackages reads the org.eclipse.emf.ecore.generated_package capability
+     *   every generated model bundle carries, so local-first suppression now sees what a bundle
+     *   DECLARES from the moment it is installed, not only what it has registered. That is what
+     *   the deny-list was standing in for, and unlike the list it is not tied to a scope and
+     *   needs no maintenance.
+     * - `register.in.global.registry` - removed, back to its default false. fennec-codec #207
+     *   is why it was ever needed: TypeResolutionHelper resolved an nsURI straight out of
+     *   EPackage.Registry.INSTANCE, which is empty in a runtime that publishes its models
+     *   through the metadata whiteboard, so the mirror was the only way the codec could read a
+     *   payload. Type resolution now goes through the per-load PackageResolver instead. With
+     *   the mirror off, nothing dynamic reaches the EMF singleton at all - which removes the
+     *   ordering hazard above rather than dodging it.
+     * - `include.atlas.scope` - gone as a property. model.atlas e2552c0 (#254) added it,
+     *   defaulting to false, as the first fix for the sweep; c37f91d superseded it and the
+     *   client has since dropped it outright, so there is nothing left to set even by accident.
      *
-     *   ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory
-     *       at ScopeApiFactoryImpl.init / ScopeApiFactory.<clinit>
-     *       at RemoteReadableScopeService.parseScopeInfo
-     *       at AtlasObjectSync.syncRegistry          <- inside the sweep itself
+     * `AtlasEObjectProvider~jena`'s `required.nsuris` gate is unaffected: it resolves against
+     * the framework EPackage.Registry it binds through `packageRegistry.target`, and only falls
+     * back to EPackage.Registry.INSTANCE when that reference is absent.
      *
-     * putIfAbsent cannot help: there was nothing to lose the race to. mirrorToGlobal
-     * deliberately does not resolve an EPackage.Descriptor either ("a generated package
-     * registered lazily must not be forced to initialise merely because we looked"), so it
-     * cannot see a package that has not initialised yet. Only NOT MIRRORING these nsURIs avoids
-     * it, which is what this list does.
+     * How to check it: the client logs `EAGER pre-fetch ... published N EPackage(s)`, N being
+     * the jena-owned packages only, and no ClassCastException. Counting fetches in the ATLAS
+     * log proves nothing here - both fixes gate after the fetch, so all 22 are still served.
      *
-     * Matching is exact `contains`, not prefix - hence a deny-list of the 17 stable system
-     * nsURIs rather than an allow-list of domain ones: an inferred package's nsURI differs on
-     * every run and could not be listed ahead of time. The jena-scope domain packages (lorawan,
-     * em310udl, buerger and any inferred one) are untouched and still mirrored, which is what
-     * ingest needs. Quickest check that it is live: count the eager sweep in the Atlas log -
-     * 4 domain packages, not 21. */
-    "nsuri.deny.list": [
-      "http://eclipse.org/fennec/model/atlas/management/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/management/api/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/rest/1.0",
-      "http://eclipse.org/fennec/model/atlas/scope/api/1.0.0",
-      "http://eclipse.org/fennec/model/atlas/workflow/api/1.0.0",
-      "http://www.eclipse.org/emf/2002/Ecore",
-      "http://www.eclipse.org/emf/2003/XMLType",
-      "http://www.eclipse.org/fennec/m2x/ocl/1.0",
-      "http://www.eclipse.org/uml2/5.0.0/Types",
-      "http://www.eclipse.org/uml2/5.0.0/UML",
-      "http://www.gme.org/cocl/1.0",
-      "http://www.gme.org/datagen/1.0",
-      "http://www.w3.org/XML/1998/namespace",
-      "https://dg.de/1.0",
-      "https://eclipse.org/fennec/codec/1.0.0",
-      "https://eclipse.org/fennec/emf/osgi/metadata/1.0.0",
-      "https://fennec.eclipse.org/event.atlas/mapping/1.0"
-    ],
+     * Where the two fixes come from, as of 2026-09-08: fennec-codec #207 is PUBLISHED
+     * (0.1.0.202609080603-SNAPSHOT, build 113) and needs no local build any more; model.atlas
+     * c37f91d is published too (2026-09-07 12:14 UTC), and only the three
+     * `…rest.client.{api,impl,osgi}` bundles still come out of `cnf/local` - today's working
+     * tree on top of it, which is what removes `include.atlas.scope`.
+     *
+     * docker.config and local.config still carry the deny-list and the mirror. Both fixes are
+     * now published, so they can come out there as well - unverified in those two runtimes,
+     * which is the only reason they are still in. */
     "drift.check.interval.ms": 10000
   },
 
