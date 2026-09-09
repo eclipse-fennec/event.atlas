@@ -289,9 +289,21 @@
   },
 
   /* The namespace the agent may publish under - the one thing it cannot work out for itself.
-   * Everything else about the model is left to discovery. */
+   * Everything else about the model is left to discovery.
+   *
+   * It defaults to BLANK, which is the off position: the service activates, logs that it has no
+   * namespace and refuses every sample set. That is deliberate for a dev playground. `namespace`
+   * is documented as the switch that gates the RUN, i.e. the money, so a checkout that has done
+   * nothing but export ANTHROPIC_API_KEY must not spend any - and `./gradlew run.launch` serves
+   * POST /event/rest/ingest/{channel}, where PARSE_ERROR is one of the three outcomes offered to
+   * inference, so any malformed body posted at an open local endpoint would otherwise be a
+   * trigger.
+   *
+   * Supply it in secrets.bndrun (`-DINFERENCE_NAMESPACE=…`, see secrets.bndrun.template) or as an
+   * environment variable. Creating that file is the deliberate act that turns spending on, which
+   * keeps "both switches default to off" true here as well as in the image. */
   "event.atlas.model.inference": {
-    "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]]",
+    "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=]]",
     "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=3]]",
     "intervalSeconds": 3600,
     "timeoutSeconds": 600
@@ -301,7 +313,9 @@
    * is a long time to watch nothing happen. */
   "event.atlas.southbound.sampling": {
     /* Sampling is off unless asked for - see the collector's `enabled` default. This runtime
-     * exists to exercise the chain, so it asks. */
+     * exists to exercise the chain, so it asks. Paired with the blank `namespace` above, that
+     * gives the sampled-but-dropped state: the log shows what WOULD be inferred, from a real
+     * broker, at no API cost. Only the two together spend anything. */
     "enabled": true,
     "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=$[prop:SAMPLING_MAX_WAIT;default=300]]"
   }

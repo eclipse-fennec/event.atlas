@@ -193,8 +193,10 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 		if (!enabled) {
 			// Abandon anything already open: a set collected under the old setting is not
 			// evidence anybody is going to consume now, and holding it would leak.
-			windows.clear();
-			logger.info("Payload sampling is disabled - unknown payloads are dropped as before");
+			int abandoned = abandonOpenWindows();
+			logger.info(String.format(
+					"Payload sampling is disabled - unknown payloads are dropped as before%s",
+					abandoned == 0 ? "" : String.format(", %s open collection window(s) abandoned", abandoned)));
 			return;
 		}
 		ChannelSettings defaults = ChannelSettings.of(config.targetSamples(), config.quietSamples(),
@@ -217,11 +219,28 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 		handover.shutdownNow();
 		// Open windows are abandoned rather than handed over: a partial set collected up to a
 		// shutdown is not evidence anybody asked for, and the consumer is going away too.
-		int abandoned = windows.size();
-		windows.clear();
+		int abandoned = abandonOpenWindows();
 		if (abandoned > 0) {
 			logger.info(String.format("Payload sampling stopped - %s open collection window(s) abandoned", abandoned));
 		}
+	}
+
+	/**
+	 * Closes every window that is still open, dropping its samples, and reports how many there
+	 * were.
+	 * <p>
+	 * Removing the entries is not enough on its own - {@link SampleWindow#abandon()} is what
+	 * cancels the maximum-wait timer, and a timer left running still holds its window and would
+	 * hand the set over up to {@code maxWaitSeconds} later. On the disable path that would be a
+	 * paid inference run after an operator switched sampling off.
+	 * @return the number of windows that were open
+	 */
+	private int abandonOpenWindows() {
+		int abandoned = windows.size();
+		// abandon() before the removal, so no window is unreachable while its timer still runs
+		windows.values().forEach(SampleWindow::abandon);
+		windows.clear();
+		return abandoned;
 	}
 
 	/*
@@ -348,6 +367,16 @@ public class PayloadSampleCollector implements UnknownModelHandler {
 	 * Logs the closed window and passes it to the handler, off the calling thread.
 	 */
 	private void handOver(PayloadSampleSet sampleSet) {
+		if (!enabled) {
+			// Backstop for a payload that was already past the check in onUnknownModel when
+			// sampling was switched off, and for a window opened in that same gap. The timers
+			// are cancelled on disable, so this catches the race rather than the common case -
+			// and what it prevents is a paid run nobody asked for any more.
+			logger.info(String.format(
+					"Payload sampling was switched off while channel '%s' was collecting - the set is dropped",
+					sampleSet.source()));
+			return;
+		}
 		logger.info(String.format(
 				"Sample set ready for channel '%s' (%s%s): %s distinct shape(s) from %s payload(s) in %ss, closed "
 						+ "because %s%s",

@@ -401,6 +401,15 @@ public class PayloadSampleCollectorTest {
 		PayloadSampleSet poll() throws InterruptedException {
 			return received.poll(250, TimeUnit.MILLISECONDS);
 		}
+
+		/**
+		 * @return a set handed over within {@code millis}, or <code>null</code>. For the
+		 * assertions that have to outlast a maximum wait: 250 ms proves nothing about a timer
+		 * that was scheduled for a second from now
+		 */
+		PayloadSampleSet poll(long millis) throws InterruptedException {
+			return received.poll(millis, TimeUnit.MILLISECONDS);
+		}
 	}
 
 	@Test
@@ -435,6 +444,26 @@ public class PayloadSampleCollectorTest {
 
 		collector.onUnknownModel(json(CHANNEL, "{\"c\":1}"));
 		assertNull(handler.poll(), "Neither the abandoned window nor the new payload may be handed over");
+	}
+
+	@Test
+	@DisplayName("Switching it off cancels the maximum wait, so no set arrives later")
+	// The disable path used to drop the map entry without closing the window, which left the
+	// timer holding it: it fired up to maxWaitSeconds later, found a window that was never
+	// actually closed and handed the set over - a paid inference run after an operator had
+	// switched sampling off. maxWaitSeconds=1 here, so the assertion outlives the timer.
+	void disabling_cancelsTheMaxWaitTimer() throws Exception {
+		RecordingHandler handler = new RecordingHandler();
+		PayloadSampleCollector collector = collector(handler, 10, 99, 1, 0, 10);
+
+		collector.onUnknownModel(json(CHANNEL, "{\"a\":1}"));
+		assertTrue(collector.isCollecting(CHANNEL), "The window has to be open for the test to mean anything");
+
+		collector.activate(disabledConfig());
+
+		assertFalse(collector.isCollecting(CHANNEL), "Disabling must close the window, not merely forget it");
+		assertNull(handler.poll(2000),
+				"The maximum-wait timer of an abandoned window must not hand its set over");
 	}
 
 	private static PayloadSampleCollector.Config disabledConfig() {

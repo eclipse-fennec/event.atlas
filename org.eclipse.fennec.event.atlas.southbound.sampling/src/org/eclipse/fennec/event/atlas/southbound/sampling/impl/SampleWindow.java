@@ -143,6 +143,21 @@ class SampleWindow {
 	}
 
 	/**
+	 * Closes the window without building a set: the disable and shutdown paths, where the
+	 * samples are dropped rather than handed over.
+	 * <p>
+	 * Cancelling the maximum-wait timer is the whole point. Dropping the window from the
+	 * collector's map does not reach the timer, which holds its own reference: it would fire up
+	 * to {@link ChannelSettings#maxWait()} later, find a window that was never actually closed
+	 * and hand the set over after all - a paid inference run after sampling was switched off.
+	 */
+	synchronized void abandon() {
+		closed = true;
+		cancelMaxWait();
+		slots.clear();
+	}
+
+	/**
 	 * @return the timestamp the window opened at, for the log line that says how long it took
 	 */
 	Instant openedAt() {
@@ -176,10 +191,7 @@ class SampleWindow {
 	 */
 	private PayloadSampleSet close(CloseReason reason, Instant at) {
 		closed = true;
-		if (maxWaitTimer != null) {
-			maxWaitTimer.cancel(false);
-			maxWaitTimer = null;
-		}
+		cancelMaxWait();
 		if (slots.isEmpty()) {
 			return null;
 		}
@@ -190,6 +202,17 @@ class SampleWindow {
 		}
 		return new PayloadSampleSet(key.source(), key.namespaceUri(), key.format(), samples, reason, payloadsSeen,
 				openedAt, at);
+	}
+
+	/**
+	 * Must be called with the monitor held. A window closes exactly once, so the timer is
+	 * dropped as well as cancelled.
+	 */
+	private void cancelMaxWait() {
+		if (maxWaitTimer != null) {
+			maxWaitTimer.cancel(false);
+			maxWaitTimer = null;
+		}
 	}
 
 	/**

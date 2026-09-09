@@ -193,7 +193,13 @@ deploying the bundles is safe — which is what lets the docker image ship them 
   sample set. This one predates the docker work.
 
 `enabled` true with a blank `namespace` is a deliberate state: payloads are sampled and the sets
-dropped, so the log shows what *would* be inferred at no API cost. Note `ConfigurationPolicy` is
+dropped, so the log shows what *would* be inferred at no API cost. **That is exactly what
+`local.config` ships**, since 2026-09-09: sampling on, `namespace` blank. `run.launch` serves an
+open `POST /event/rest/ingest/{channel}` and `PARSE_ERROR` is one of the three outcomes offered
+to inference, so a non-blank default there would have made any malformed local request cost
+money on a machine that had merely exported `ANTHROPIC_API_KEY`. The namespace comes from
+`secrets.bndrun` (`-DINFERENCE_NAMESPACE=…`) instead — creating that gitignored file is the
+deliberate act that turns spending on. Note `ConfigurationPolicy` is
 **`OPTIONAL`** on both components, so config *absence* is not the switch — the defaults are;
 `REQUIRE` would have made the baked-in docker config pin inference permanently on.
 
