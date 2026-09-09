@@ -65,26 +65,27 @@
      *   the mirror off, nothing dynamic reaches the EMF singleton at all - which removes the
      *   ordering hazard above rather than dodging it.
      * - `include.atlas.scope` - gone as a property. model.atlas e2552c0 (#254) added it,
-     *   defaulting to false, as the first fix for the sweep; c37f91d superseded it and the
-     *   client has since dropped it outright, so there is nothing left to set even by accident.
+     *   defaulting to false, as the first fix for the sweep; c37f91d superseded it and 5f9401c
+     *   dropped it outright, so there is nothing left to set even by accident.
      *
      * `AtlasEObjectProvider~jena`'s `required.nsuris` gate is unaffected: it resolves against
      * the framework EPackage.Registry it binds through `packageRegistry.target`, and only falls
      * back to EPackage.Registry.INSTANCE when that reference is absent.
      *
      * How to check it: the client logs `EAGER pre-fetch ... published N EPackage(s)`, N being
-     * the jena-owned packages only, and no ClassCastException. Counting fetches in the ATLAS
-     * log proves nothing here - both fixes gate after the fetch, so all 22 are still served.
+     * the fetchable final-stage nsURIs minus the ones this runtime declares generated itself -
+     * 21 - 7 = 14 here on 2026-09-08 - and no ClassCastException. It is NOT the jena-owned
+     * packages only: that was the deny-list's number, which blocked the whole inherited scope.
+     * Counting fetches in the ATLAS log proves nothing here - both fixes gate after the fetch,
+     * so all 22 are still served.
      *
-     * Where the two fixes come from, as of 2026-09-08: fennec-codec #207 is PUBLISHED
-     * (0.1.0.202609080603-SNAPSHOT, build 113) and needs no local build any more; model.atlas
-     * c37f91d is published too (2026-09-07 12:14 UTC), and only the three
-     * `…rest.client.{api,impl,osgi}` bundles still come out of `cnf/local` - today's working
-     * tree on top of it, which is what removes `include.atlas.scope`.
-     *
-     * docker.config and local.config still carry the deny-list and the mirror. Both fixes are
-     * now published, so they can come out there as well - unverified in those two runtimes,
-     * which is the only reason they are still in. */
+     * Both fixes are published, and as of 2026-09-09 nothing here comes from a local build any
+     * more: fennec-codec #207 as 0.1.0.202609080603-SNAPSHOT (build 113), and the model.atlas
+     * client family as 0.1.0.202609081837-SNAPSHOT, which carries c37f91d and 5f9401c (#254,
+     * the commit that drops `include.atlas.scope`) alike. `cnf/local` and its `-plugin.0.Local`
+     * registration are gone again. docker.config and local.config no longer carry the
+     * deny-list or the mirror either - they were changed the same way on 2026-09-08, though
+     * only this runtime was re-verified. */
     "drift.check.interval.ms": 10000
   },
 

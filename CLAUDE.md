@@ -323,7 +323,11 @@ it walks its directory once at activation and never again.
   - **model.atlas `c37f91d`** (published 2026-09-07) replaces the deny-list: `LocalGeneratedPackages`
     reads the `org.eclipse.emf.ecore.generated_package` capability every generated model bundle
     carries, so local-first suppression sees what a bundle *declares* from the moment it is
-    installed. It needs no maintenance and is not tied to a scope.
+    installed. It needs no maintenance and is not tied to a scope. The client snapshot the
+    runtime resolves is `0.1.0.202609081837-SNAPSHOT` from `central.mvn`, which carries `c37f91d`
+    and `5f9401c` (#254, `include.atlas.scope` dropped as a property) — so no local build is
+    involved any more; verify with the export, since a green resolve says nothing about
+    provenance.
   - **The old check ("4 domain packages, not 21") is obsolete.** The deny-list blocked the whole
     inherited scope; `LocalGeneratedPackages` blocks only what the runtime itself declares, so
     the healthy number went *up*. `published N EPackage(s)` should equal the scope's final-stage
