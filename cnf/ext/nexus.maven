@@ -1,0 +1,4 @@
+org.eclipse.fennec.ai:org.eclipse.fennec.ai.apis.meta.model:1.0.0-SNAPSHOT
+org.eclipse.fennec.ai:org.eclipse.fennec.ai.chat.completion.api:1.0.0-SNAPSHOT
+org.eclipse.fennec.ai:org.eclipse.fennec.ai.chat.completion.claude.model:1.0.0-SNAPSHOT
+org.eclipse.fennec.ai:org.eclipse.fennec.ai.chat.completion.impl.claude:1.0.0-SNAPSHOT

@@ -109,6 +109,7 @@ config does not work here. The bundle ships two configurator resources
 | `config.json` | the event.atlas side: file providers → EObject registries `sensinact-mappings` / `sensinact-profiles`, the Model Atlas REST client + `AtlasEObjectProvider`, and the MQTT southbound (SensiNact MQTT client + `MqttPayloadListener`) |
 | `sensinact.json` | the SensiNact side: session manager `ALLOW_ALL`, the named Felix HTTP whiteboard + Jersey whiteboard, northbound REST (anonymous), SensorThings REST (`history.provider`) and the SensorThings MQTT broker ports/keystore |
 | `timescale.json` | the history store: where the twin's value updates are written, and under which provider name they are served back — see [History](#history) |
+| `inference.json` | optional model inference: the sample collector, the inference service, the remote MCP endpoint and the Claude chat services — **off unless switched on**, see [Model inference](#model-inference) |
 
 Deployment-specific values are `$[env:…]` placeholders resolved at configuration-delivery
 time by `org.apache.felix.configadmin.plugin.interpolation`, so one published image serves
@@ -133,6 +134,12 @@ every environment. Every placeholder has a default — the image starts standalo
 | `SENSORTHINGS_MQTT_WS_PORT` / `_WSS_PORT` | `8885` / `8886` | hosted SensorThings broker, WebSocket / WSS |
 | `SENSORTHINGS_MQTT_KEYSTORE_FILE` / `_TYPE` | empty / `jks` | keystore for the TLS listeners; without a file the TLS ports stay closed |
 | `SENSORTHINGS_MQTT_KEYSTORE_PASSWORD` / `_KEYMANAGER_PASSWORD` | empty | keystore secrets (`.`-prefixed properties, so ConfigAdmin treats them as private) |
+| `EVENTATLAS_INFERENCE_ENABLED` | `false` | whether unknown payloads are **buffered** for inference; see [Model inference](#model-inference) |
+| `INFERENCE_NAMESPACE` | empty | namespace **prefix** drafts publish beneath. Empty is the off position for the run itself |
+| `METAMODEL_MCP_URL` / `_TOKEN` | empty | the metamodel MCP server, dialled **by Anthropic** — must be publicly reachable over HTTPS |
+| `ANTHROPIC_API_KEY` | empty | never put this in a config file; it is interpolated from the environment |
+| `INFERENCE_MODEL` | `claude-sonnet-4-6` | see the note in [Model inference](#model-inference) before raising this |
+| `INFERENCE_MAX_RUNS` / `INFERENCE_TIMEOUT` | `1` / `900` | run cap per hour, and per-run timeout in seconds |
 
 ### List-valued variables
 
@@ -258,3 +265,81 @@ Mappings must reference domain models resolvable in the runtime; add the domain 
 bundles in a derived image (or extend the docker bndrun) for the sources you map. Until a
 mapping produces a twin, `Things` and the provider list show only the built-in `sensiNact`
 provider.
+
+## Model inference
+
+The image **always carries** the inference bundles; `configs/inference.json` decides whether they
+do anything, and everything in it defaults to off. A container started with no new variables
+ingests exactly as it did before the feature existed.
+
+To switch it on:
+
+```bash
+docker run … \
+  -e EVENTATLAS_INFERENCE_ENABLED=true \
+  -e INFERENCE_NAMESPACE=https://your.org/inferred \
+  -e METAMODEL_MCP_URL=https://your-public-host/mcp/inference \
+  -e METAMODEL_MCP_TOKEN=… \
+  -e ANTHROPIC_API_KEY=sk-ant-… \
+  eclipsefennec/event.atlas
+```
+
+**There are two switches, and they gate different costs.**
+
+| switch | gates | off means |
+|---|---|---|
+| `EVENTATLAS_INFERENCE_ENABLED` | **buffering** | the collector declines every unknown payload; no window opens, no memory held |
+| `INFERENCE_NAMESPACE` | the **run**, i.e. the API spend | the service activates, logs that it has no namespace, and refuses every sample set |
+
+`ENABLED=true` with an empty `INFERENCE_NAMESPACE` is a deliberate, useful state: payloads are
+sampled and the sets dropped, so the log shows *what* would be inferred at no API cost.
+
+Three things that surprise people:
+
+- **The MCP server is reached by Anthropic, not by this container.** `METAMODEL_MCP_URL` must be
+  publicly reachable over HTTPS; a `localhost` or docker-network address can never work, and it
+  is never probed, so a wrong URL first shows up as a failed run.
+- **An unset `ANTHROPIC_API_KEY` does not stop anything starting.** The chat service activates
+  and the first run fails at the provider, landing as an `UNAVAILABLE` receipt. `INFERENCE_NAMESPACE`
+  is the switch that governs spend, not the key.
+- **`INFERENCE_MODEL` defaults to `claude-sonnet-4-6` on purpose.** Current-generation models run
+  adaptive thinking by default and emit `thinking` content blocks, which the Claude model in
+  `fennec-ai` cannot yet deserialize (`Cannot instantiate abstract EClass: ContentBlock`) — the
+  run is paid for and then discarded client-side. Raise the default once that is fixed.
+
+### Several southbound adapters share one run budget
+
+Unknown payloads are kept apart per channel, and correctly so — the collector's window key is
+`(source, namespaceUri, format)`, where `source` is the concrete MQTT topic or `rest/<channel>`.
+Two adapters producing two different unknown models therefore build two independent sample sets
+and infer two separate models, concurrently.
+
+**The run budget, however, is global.** `INFERENCE_MAX_RUNS` counts runs across *all* channels in
+a sliding `INFERENCE_TIMEOUT`-independent window (`intervalSeconds`, one hour), not per channel.
+With the default of `1`:
+
+- the first sample set to close takes the run;
+- any other channel closing inside the same hour is **refused and its set discarded** — not
+  queued behind it;
+- a discarded set releases its fingerprint claim, so the channel can re-accumulate a window and
+  try again later. It is recoverable, but the ordering is "whoever closes first wins".
+
+If a runtime has several southbound adapters feeding unknown payloads, raise
+`INFERENCE_MAX_RUNS` to at least the number of distinct unknown families you expect per hour.
+The default is deliberately conservative — a floor to raise on purpose rather than a bill to
+discover — and the component's own default is `5`.
+
+Two related notes:
+
+- `PARSE_ERROR` is one of the three outcomes offered to inference (with `MODEL_UNKNOWN` and
+  `EMPTY`), and this image serves `POST /event/rest/ingest/{channel}`. So malformed input to an
+  open ingest endpoint — truncated JSON, a wrong content-type, binary junk — is also an inference
+  trigger. The run cap and the fingerprint dedup are what bound that, which is another reason to
+  raise the cap deliberately rather than reflexively.
+- There is **no topic or channel filter for inference**. It consumes whatever the ingest channels
+  report as unknown. To scope it you narrow an ingest channel's `mqttTopics`, which narrows
+  ingest too. The collector's `channels` property looks like a filter but only overrides the
+  per-channel *close conditions*.
+
+A draft is published to the Model Atlas for **human review**; nothing here registers an inferred
+package into the running framework, and a promoted package is picked up on the next restart.

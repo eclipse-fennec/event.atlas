@@ -14,8 +14,8 @@
    * the mapping sync below finds the domain packages. Worth keeping even though the client now
    * resolves the references a fetched EPackage makes into other packages: it turns a layered
    * domain model (a shared base package plus vendor extensions) into a start-up cost rather than
-   * a first-payload one. register.in.global.registry mirrors them into EPackage.Registry.INSTANCE,
-   * where EMF deserialization looks.
+   * a first-payload one. They reach EMF deserialization through the OSGi framework
+   * EPackage.Registry - the metadata whiteboard - not through EPackage.Registry.INSTANCE.
    *
    * `eager.stages` is deliberately absent - empty is the default and exposes one stage-free
    * registry per scope, resolving that scope's own final stage server-side, which is correct
@@ -26,7 +26,37 @@
     "default.scope": "jena",
     "mode": "EAGER",
     "eager.scopes": ["jena"],
-    "register.in.global.registry": true,
+    /* No `register.in.global.registry` and no `nsuri.deny.list`: both came out on 2026-09-08.
+     * They were one workaround for two upstream bugs, and the deny-list was in here TWICE -
+     * the same 17 entries under the same key in the same object, so the second silently won.
+     *
+     * The chain was: an EAGER sweep of `jena` resolves inheritance, so 18 of the 22 packages it
+     * saw were owned by the parent `atlas` scope. The mirror copied each into
+     * EPackage.Registry.INSTANCE, and a DYNAMIC copy of a system nsURI landing there before the
+     * generated package had initialised broke that package's factory initialiser
+     * (ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory). This runtime had
+     * never actually hit it - the failure is order-dependent and a factory's <clinit> runs once -
+     * but it carried both halves of the trigger.
+     *
+     * - fennec-codec #207 (published 0.1.0.202609080603-SNAPSHOT) removes the reason for the
+     *   mirror: TypeResolutionHelper no longer resolves an nsURI out of EPackage.Registry.INSTANCE,
+     *   type resolution goes through the per-load PackageResolver. With the mirror at its default
+     *   false, nothing dynamic reaches the EMF singleton and the hazard is gone, not dodged.
+     * - model.atlas c37f91d (published 2026-09-07) replaces the deny-list: LocalGeneratedPackages
+     *   reads the org.eclipse.emf.ecore.generated_package capability, so local-first suppression
+     *   sees what a bundle DECLARES from install rather than only what it registered.
+     *
+     * So nsc/docs/issue-eager-scopes-should-not-sweep-inherited-parents.md is no longer what
+     * this depends on: the sweep still returns the parent's packages, and suppression now
+     * happens client-side on the right criterion.
+     *
+     * The `AtlasEObjectProvider` gates below are unaffected - their `packageRegistry` reference
+     * defaults to the framework registry (default.resourceset.epackage.registry=true), and
+     * AtlasObjectSync pins only the required nsURIs into the singleton itself, value-matched
+     * and never over an occupied slot.
+     *
+     * Verified in inference.bndrun on 2026-09-08 (`published 14 EPackage(s)`, no
+     * ClassCastException, `1 mapping(s) applied`). NOT yet re-verified in this runtime. */
     "drift.check.interval.ms": 10000
   },
 
@@ -84,9 +114,17 @@
 
   /* JSON payloads do not name their model; the codec types them through the discriminator
    * registry named here. One registry and one discriminator path per runtime - every JSON
-   * device family shares it (see docs/json-southbound-typing.md). */
+   * device family shares it (see docs/json-southbound-typing.md).
+   *
+   * The id must match the `http://eclipse.org/fennec/codec/typeMapping/{id}` annotation source
+   * the deployed models actually carry (AnnotationSources.TYPE_MAPPING_PREFIX plus the id) - an
+   * id no model annotates for types nothing at all, silently. Overridable because it is a
+   * property of the model set a runtime is loaded with, not of the runtime: `jena-sensors` is
+   * the m5airq/waterparc family, while the lorawan/em310udl fixtures in the jena atlas annotate
+   * for `lorawan`. Whatever an inference run's agent discovers from the sibling models it finds
+   * is the id it will annotate its draft for, which is why the prompt does not mention one. */
   "event.atlas.southbound.ingest": {
-    "codec.typeMapId": "jena-sensors"
+    "codec.typeMapId": "$[env:EVENTATLAS_CODEC_TYPE_MAP_ID;default=$[prop:EVENTATLAS_CODEC_TYPE_MAP_ID;default=jena-sensors]]"
   },
 
   /* --- local dev broker: weather simulator (XMI) + a generic JSON channel --- */
@@ -150,5 +188,135 @@
     "mqtt.handler.id": "waterpark-broker",
     "format": "json",
     "name": "waterpark-mqtt"
+  },
+
+  /* --- model inference: a draft model for payloads this runtime has no model for ---------
+   *
+   * All of this is optional. Without these four configurations - or without the bundles they
+   * configure - unknown payloads are dropped exactly as they were before, and the sample
+   * collector below simply reports what it would have handed over.
+   *
+   * The chain is: PayloadIngest offers an unhandled payload to the collector, the collector
+   * gathers a set of distinctly shaped payloads per channel, and model inference spends one
+   * agentic completion on the closed set. The agent authors and publishes through the MCP
+   * server's own tools; what comes back is a receipt. Nothing here registers a model locally -
+   * a draft is promoted by a human, and the runtime resolves it on the next payload. */
+
+  /* The remote metamodel MCP server, registered as an addressable MCPEndpoint without this
+   * framework hosting an MCP server of its own. `server.name` is also the service property the
+   * chat completion's mcpServers.target filters on, and the name the request's mcp_toolset
+   * refers to - change it in both places or the completion will not activate.
+   *
+   * `server.url` must be reachable FROM ANTHROPIC, not from this runtime. The client sends it as
+   * an `mcp_servers` entry of type `url`, i.e. through Anthropic's MCP connector, so the API
+   * dials the server itself and this framework never opens the connection. The localhost default
+   * below is a placeholder that cannot work in a real run - point it at a public HTTPS address
+   * for the metamodel runtime's servlet (a tunnel is enough for a test). Nothing validates it:
+   * RemoteMCPEndpoint never probes the URL, so a wrong one first shows up as a failed run. */
+  "RemoteMCPEndpoint~metamodel": {
+    "server.name": "metamodel",
+    "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=http://localhost:8099/mcp/inference]]"
+  },
+
+  /* The Claude client. Note `mcpServers.target`: the reference is 1..n and unfiltered by
+   * default, so without this it would bind ANY MCPEndpoint in the framework - including a
+   * co-hosted one - and the agent would be handed the wrong tool surface. Which tool surface
+   * that is, is decided entirely by the endpoint's URL - see the note on scoping below.
+   *
+   * `api.key` is read from the environment; the key itself never lives in configuration.
+   * `download.file.folder` is required even though only the batch service reads it: the shared
+   * OCD marks it mandatory, so the component does not activate without it.
+   *
+   * The values are read as $[env:NAME;default=$[prop:NAME;default=...]] - an exported
+   * environment variable first, then a system property (which is what secrets.bndrun sets
+   * through -runvm), then the default here. The numeric ones carry no `type=Integer`: a nested
+   * placeholder and a type directive would have to survive the same `;`-separated parse, and
+   * Declarative Services coerces a numeric string to the component's int either way.
+   *
+   * `max.tokens` is the per-answer output ceiling. The component's own default of 1024 is far
+   * too small for a turn that authors a package, and hitting it truncates the answer mid-way.
+   *
+   * `mcp.authorization.token` is what Anthropic presents to the MCP server as
+   * `Authorization: Bearer <token>`, and it must equal `auth.token` on that servlet's
+   * HttpMCPServerComponent configuration. It is not optional once the endpoint is tunnelled:
+   * McpAuthenticationFilter trusts direct loopback callers only while no token is configured,
+   * and a tunnelled request arrives from loopback *carrying a forwarding header*, which it
+   * refuses by design. Empty here means the request goes out with no credential and the server
+   * answers 403 - which reads like a transport fault and is not one.
+   *
+   * `mcp.tools.enabled` is NOT optional, and it is not merely an allow-list: ClaudeHelper always
+   * builds the toolset with `default_config {enabled:false}` and re-enables only what this array
+   * names. Leaving it out leaves every tool on the server disabled - the agent gets a tool
+   * surface of nothing - so it has to be listed here even when the endpoint is already scoped.
+   *
+   * It mirrors the 21 tools `inference_tool_provider` serves on /mcp/inference, which is the
+   * task-scoped servlet: discovery, authoring, validation, register and publish. What manages
+   * datasets beyond authoring, deletes, replays a recipe or unregisters a package is not served
+   * there at all, and nothing on it can promote a draft to a released stage - that stays a human
+   * decision. Scoping at both ends means a name that drifts out of the server's provider stops
+   * being callable rather than silently widening the surface. */
+  "ClaudeChatCompletionService": {
+    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
+    "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
+    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-opus-5]]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=$[prop:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]]",
+    "mcpServers.target": "(server.name=metamodel)",
+    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
+    "mcp.tools.enabled": [
+      "list_metamodel",
+      "describe_eclass",
+      "export_package",
+      "list_annotation_sources",
+      "find_classes_by_annotation",
+      "find_features_by_annotation",
+      "describe_aspects",
+      "create_dataset",
+      "create_epackage",
+      "add_eclass",
+      "add_eattribute",
+      "add_ereference",
+      "add_eannotation",
+      "add_eenum",
+      "add_eenum_literal",
+      "modify_feature",
+      "create_from_json",
+      "export_dataset",
+      "register_package",
+      "list_registry",
+      "post_to_model_atlas"
+    ]
+  },
+
+  /* The namespace the agent may publish under - the one thing it cannot work out for itself.
+   * Everything else about the model is left to discovery.
+   *
+   * It defaults to BLANK, which is the off position: the service activates, logs that it has no
+   * namespace and refuses every sample set. That is deliberate for a dev playground. `namespace`
+   * is documented as the switch that gates the RUN, i.e. the money, so a checkout that has done
+   * nothing but export ANTHROPIC_API_KEY must not spend any - and `./gradlew run.launch` serves
+   * POST /event/rest/ingest/{channel}, where PARSE_ERROR is one of the three outcomes offered to
+   * inference, so any malformed body posted at an open local endpoint would otherwise be a
+   * trigger.
+   *
+   * Supply it in secrets.bndrun (`-DINFERENCE_NAMESPACE=…`, see secrets.bndrun.template) or as an
+   * environment variable. Creating that file is the deliberate act that turns spending on, which
+   * keeps "both switches default to off" true here as well as in the image. */
+  "event.atlas.model.inference": {
+    "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=]]",
+    "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=3]]",
+    "intervalSeconds": 3600,
+    "timeoutSeconds": 600
+  },
+
+  /* Left at its defaults except for the wait: a dev broker publishes often, and half an hour
+   * is a long time to watch nothing happen. */
+  "event.atlas.southbound.sampling": {
+    /* Sampling is off unless asked for - see the collector's `enabled` default. This runtime
+     * exists to exercise the chain, so it asks. Paired with the blank `namespace` above, that
+     * gives the sampled-but-dropped state: the log shows what WOULD be inferred, from a real
+     * broker, at no API cost. Only the two together spend anything. */
+    "enabled": true,
+    "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=$[prop:SAMPLING_MAX_WAIT;default=300]]"
   }
 }

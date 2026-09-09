@@ -186,6 +186,7 @@ org.bndtools:org.bndtools.templates.osgi:${bndversion}
 org.eclipse.fennec.emf:org.eclipse.fennec.emf.osgi.bnd.library.workspace:1.1.0-SNAPSHOT
 org.eclipse.osgi-technology.rest:org.eclipse.osgitech.rest.bnd.library:1.2.3
 org.eclipse.fennec.codec:org.eclipse.fennec.codec.workspace.library:0.1.0-SNAPSHOT
+
 org.eclipse.fennec.m2x:org.eclipse.fennec.m2x.library.workspace:0.1.1-SNAPSHOT
 org.eclipse.fennec.persistence.jpa:org.eclipse.fennec.persistence.jpa.library.workspace:0.1.0-SNAPSHOT
 org.eclipse.fennec.models:org.eclipse.fennec.common.models.library:0.0.1-SNAPSHOT
@@ -243,3 +244,11 @@ org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.eobject.provider:0
 
 #Mqtt
 org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5
+
+# No MCP SDK here on purpose. It used to be mandatory: org.eclipse.fennec.mcp.api carried both
+# the MCP server API and MCPEndpoint in one bundle, so a consumer that only wanted to *address*
+# a remote MCP server still had to resolve mcp-core, reactor-core and reactive-streams.
+# emf.osgi-mcp#31 split MCPEndpoint + RemoteMCPEndpoint into org.eclipse.fennec.mcp.endpoint,
+# whose Import-Package is java.lang and nothing else - so this workspace needs no part of the
+# SDK closure. Deploying an MCP *server* would; nothing here does.
+org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT

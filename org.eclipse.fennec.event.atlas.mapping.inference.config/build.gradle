@@ -1,0 +1,9 @@
+/*
+ * InferenceRuntimeLocationsTest reads two files Gradle cannot infer as inputs: this bundle's
+ * configurator resource and the bndrun that overrides it. Without declaring them the test task
+ * stays UP-TO-DATE when either changes, which is exactly when it needs to run.
+ */
+tasks.named("test") {
+	inputs.file("configs/config.json")
+	inputs.file(file("${rootDir}/org.eclipse.fennec.event.atlas.mapping.runtime/inference.bndrun"))
+}

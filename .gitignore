@@ -6,3 +6,12 @@ build/
 bin/
 bin_test/
 /cnf/cache
+
+# local A/B experiment working files (see the shape-delta notes)
+/docs/shape-delta-ab-runs.jsonl
+/docs/shape-delta-collect.py
+/docs/shape-delta-payloads.txt
+
+# internal notes and run artefacts — kept locally, published to the xdp docs project
+/docs/results/
+/docs/model-inference-test-log.md

@@ -1,0 +1,167 @@
+{
+  /* --- optional model inference -------------------------------------------------------------
+   *
+   * The image always CARRIES the inference bundles; this file decides whether they DO anything.
+   * Everything is off unless the environment says so, so a container started with no new
+   * variables ingests exactly as it did before this file existed.
+   *
+   * Turning it on:
+   *
+   *   EVENTATLAS_INFERENCE_ENABLED=true
+   *   INFERENCE_NAMESPACE=https://<your-prefix>/inferred
+   *   METAMODEL_MCP_URL=https://<publicly-reachable>/mcp/inference
+   *   METAMODEL_MCP_TOKEN=...
+   *   ANTHROPIC_API_KEY=sk-ant-...
+   *
+   * The variable names are deliberately the same ones launch.bndrun and inference.bndrun use, so
+   * a setting learnt locally transfers to the image unchanged.
+   *
+   * TWO switches, because they gate different costs and the cheap half is useful alone:
+   *
+   *  - `enabled` on the sample collector gates BUFFERING. Off, it declines every unknown payload,
+   *    so no window opens and no memory is held. Its reference in PayloadIngest is dynamic, so
+   *    flipping it takes effect on the next payload, with no service churn.
+   *  - `namespace` on the inference service gates the RUN, which is what costs money. Blank - the
+   *    default, and the off position - means the service activates, logs that it has no namespace,
+   *    and refuses every sample set. That switch is not new: it predates this file.
+   *
+   * `enabled` true with a blank `namespace` is a deliberate, useful state: payloads are sampled and
+   * the sets are dropped, so the log shows WHAT would be inferred at no API cost.
+   *
+   * The MCP server is dialled BY ANTHROPIC, from its side, not from this container - so
+   * METAMODEL_MCP_URL must be publicly reachable over HTTPS. A localhost or docker-network address
+   * can never work, and RemoteMCPEndpoint never probes it, so a wrong URL first surfaces as a
+   * failed run.
+   *
+   * `mcp.tools.enabled` is MANDATORY, not an optimisation: the client builds the toolset with
+   * default_config {enabled:false} and re-enables only what this array names, and the config
+   * declares no default - omit it and the agent is handed nothing to call. The 20 names must match
+   * what the server's task-scoped servlet actually serves; a name that drifts out of the server's
+   * provider stops being callable rather than silently widening the surface.
+   *
+   * An unset ANTHROPIC_API_KEY does NOT stop the chat service activating - the metatype's
+   * `required` is documentation, not enforcement. The first run then fails at the provider and
+   * lands as an UNAVAILABLE receipt. Which is why `namespace`, not the key, is the switch that
+   * governs spend.
+   *
+   * Both a sync and a batch chat service are configured. BatchChatCompletionAdapter has
+   * configuration-policy=require and service.ranking=100, so `event.atlas.model.inference.chat.batch`
+   * below is what selects the batch path - which is the one to want: it raises the provider's
+   * server-side iteration ceiling from ~10 to ~21, and a paused turn is resumed rather than lost.
+   *
+   * INFERENCE_MAX_RUNS is a GLOBAL budget, not per channel. Unknown payloads are windowed per
+   * channel - the key is (source, namespaceUri, format), source being the MQTT topic or
+   * rest/<channel> - so two adapters infer two models independently. But RunRateLimiter holds one
+   * counter for the whole runtime, so with the default of 1 the first sample set to close in an
+   * hour takes the run and any other channel's is REFUSED AND DISCARDED, not queued. It releases
+   * its fingerprint claim, so that channel can re-accumulate and try again; the ordering is
+   * simply "whoever closes first wins". A runtime with several southbound adapters feeding
+   * unknown payloads should raise this to at least the number of distinct unknown families it
+   * expects per hour (the component's own default is 5). Kept at 1 here on purpose: a floor to
+   * raise deliberately beats a bill to discover.
+   *
+   * Note also that PARSE_ERROR is one of the three outcomes offered to inference, and this image
+   * serves POST /event/rest/ingest/{channel} - so malformed input to an open endpoint is an
+   * inference trigger too, bounded only by this cap and the fingerprint dedup.
+   *
+   * INFERENCE_MODEL defaults to claude-sonnet-4-6 because that is the model this chain has
+   * actually been proven on, end to end, with a bare payload.
+   *
+   * The blocker that used to force it is GONE as of fennec-ai 1.0.0-SNAPSHOT build 4
+   * (2026-09-04 12:02 UTC): the Claude model now declares ThinkingBlock and
+   * RedactedThinkingBlock, so a `thinking` content block no longer fails to deserialize with
+   * `Cannot instantiate abstract EClass: ContentBlock`. The client also now always states its
+   * choice - ClaudeHelper sets thinking explicitly, `thinking_enabled` defaults to false - so
+   * behaviour no longer changes silently with the model, which is how it changed under us once
+   * before.
+   *
+   * What is still missing is a verified run: claude-sonnet-5 has not completed this chain. Its
+   * one attempt predates both the prompt fix and ThinkingBlock. So raise this default after a
+   * successful run, not before - and if you enable thinking on a current model, note that
+   * ThinkingType.ENABLED plus budget_tokens is the pre-4.6 request shape and Sonnet 5 rejects
+   * budget_tokens with a 400. */
+  ":configurator:resource-version": 1,
+  "event.atlas.southbound.sampling": {
+    "enabled": "$[env:EVENTATLAS_INFERENCE_ENABLED;default=false;type=Boolean]",
+    "targetSamples": "$[env:SAMPLING_TARGET;default=10]",
+    "quietSamples": "$[env:SAMPLING_QUIET;default=3]",
+    "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=1800]"
+  },
+  "event.atlas.model.inference": {
+    "namespace": "$[env:INFERENCE_NAMESPACE;default=]",
+    "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=1]]",
+    "intervalSeconds": 3600,
+    "timeoutSeconds": "$[env:INFERENCE_TIMEOUT;default=$[prop:INFERENCE_TIMEOUT;default=900]]",
+    "shapeDeltaEnabled": "$[env:INFERENCE_SHAPE_DELTA;default=$[prop:INFERENCE_SHAPE_DELTA;default=true;type=Boolean]]"
+  },
+  "RemoteMCPEndpoint~metamodel": {
+    "server.name": "metamodel",
+    "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=]]"
+  },
+  "ClaudeChatCompletionService": {
+    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
+    "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
+    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-sonnet-4-6]]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=/opt/eventatlas/runtime/inference]",
+    "mcpServers.target": "(server.name=metamodel)",
+    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
+    "mcp.tools.enabled": [
+      "list_metamodel",
+      "describe_eclass",
+      "export_package",
+      "list_annotation_sources",
+      "find_classes_by_annotation",
+      "find_features_by_annotation",
+      "describe_aspects",
+      "create_dataset",
+      "create_epackage",
+      "add_eclass",
+      "add_eattribute",
+      "add_ereference",
+      "add_eannotation",
+      "add_eenum",
+      "add_eenum_literal",
+      "modify_feature",
+      "create_from_json",
+      "register_package",
+      "list_registry",
+      "post_to_model_atlas"
+    ]
+  },
+  "ClaudeBatchMessageService": {
+    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
+    "base.url": "$[env:ANTHROPIC_BATCH_URL;default=$[prop:ANTHROPIC_BATCH_URL;default=https://api.anthropic.com/v1/messages/batches]]",
+    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-sonnet-4-6]]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=/opt/eventatlas/runtime/inference]",
+    "mcpServers.target": "(server.name=metamodel)",
+    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
+    "mcp.tools.enabled": [
+      "list_metamodel",
+      "describe_eclass",
+      "export_package",
+      "list_annotation_sources",
+      "find_classes_by_annotation",
+      "find_features_by_annotation",
+      "describe_aspects",
+      "create_dataset",
+      "create_epackage",
+      "add_eclass",
+      "add_eattribute",
+      "add_ereference",
+      "add_eannotation",
+      "add_eenum",
+      "add_eenum_literal",
+      "modify_feature",
+      "create_from_json",
+      "register_package",
+      "list_registry",
+      "post_to_model_atlas"
+    ]
+  },
+  "event.atlas.model.inference.chat.batch": {
+    "pollSeconds": "$[env:INFERENCE_BATCH_POLL;default=$[prop:INFERENCE_BATCH_POLL;default=20]]",
+    "maxContinuations": "$[env:INFERENCE_MAX_CONTINUATIONS;default=$[prop:INFERENCE_MAX_CONTINUATIONS;default=2]]"
+  }
+}

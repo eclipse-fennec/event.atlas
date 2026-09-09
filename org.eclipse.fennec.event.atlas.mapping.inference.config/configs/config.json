@@ -1,0 +1,400 @@
+{
+  ":configurator:resource-version": 1,
+  ":configurator:symbolic-name": "org.eclipse.fennec.event.atlas.mapping.inference.config",
+  ":configurator:version": "1.0.0",
+
+  /* Configuration for inference.bndrun - the minimal runtime for watching one model-inference
+   * run happen. Deliberately smaller than local.config: one broker, two JSON channels, no
+   * history store, no northbound REST, no SensorThings, no HTTP whiteboard at all. What is left
+   * is the chain under test:
+   *
+   *   MQTT -> PayloadIngest -> (unknown) -> PayloadSampleCollector -> ModelInferenceService
+   *                                              -> ChatCompletion -> remote MCP server
+   *
+   * The sensinact gateway is still here, and cannot be removed: PayloadIngest has a mandatory
+   * reference to InstancePusher, and InstancePusherImpl has a mandatory reference to
+   * GatewayThread. Nothing northbound of the twin is deployed, so the twin is write-only here -
+   * you observe outcomes through the ingest log, not through a REST provider list. */
+
+  /* Without this the session manager denies everything and the gogo commands answer
+   *   NotPermittedException: The user <ANONYMOUS> does not have permission to read resource ...
+   * with `providers` coming back empty rather than erroring, because an unreadable provider is
+   * filtered out of the listing rather than reported. This runtime has no northbound REST and no
+   * authentication of any kind, so there is no user to be anything other than anonymous; the two
+   * deployed runtimes set exactly the same policy in their sensinact.json. It is what makes the
+   * twin readable from the Gogo shell, which is the only way to see a value in this runtime. */
+  "sensinact.session.manager": {
+    "auth.policy": "ALLOW_ALL"
+  },
+
+  /* EPackages come from the Atlas, and only from there: the codec must deserialize a payload
+   * into the same EPackage instance a mapping resolved its providerClasses against, since
+   * InstancePusher keys on EClass identity. They reach both through the OSGi framework
+   * EPackage.Registry - the metadata whiteboard - which is all this block needs to configure.
+   *
+   * This is also what the inference agent discovers through the MCP server's metadata tools -
+   * the same jena scope, so what it finds is what this runtime actually has. */
+  "org.eclipse.fennec.model.atlas.rest.client~jena": {
+    "base.uri": "$[env:ATLAS_BASE_URI;default=$[prop:ATLAS_BASE_URI;default=http://localhost:8080/atlas/rest]]",
+    "scope.allow.list": ["jena"],
+    "default.scope": "jena",
+    "mode": "EAGER",
+    "eager.scopes": ["jena"],
+    /* Three settings this block used to carry are gone, as of 2026-09-07, and they came out
+     * together because they were one workaround for two bugs.
+     *
+     * The chain was: an EAGER sweep of `jena` resolves scope inheritance, so it also swept the
+     * 18 packages owned by the implicit `atlas` parent - Ecore, UML, XMLType, the atlas APIs,
+     * the codec, this workspace's own mapping metamodel. `register.in.global.registry: true`
+     * then mirrored each into EPackage.Registry.INSTANCE, and a DYNAMIC copy of a system nsURI
+     * landing there before the generated package had initialised broke that package's factory
+     * initialiser (ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory). A
+     * hand-maintained 17-entry `nsuri.deny.list` suppressed the mirror for those nsURIs.
+     *
+     * - `nsuri.deny.list` - removed. model.atlas c37f91d closes the window properly:
+     *   LocalGeneratedPackages reads the org.eclipse.emf.ecore.generated_package capability
+     *   every generated model bundle carries, so local-first suppression now sees what a bundle
+     *   DECLARES from the moment it is installed, not only what it has registered. That is what
+     *   the deny-list was standing in for, and unlike the list it is not tied to a scope and
+     *   needs no maintenance.
+     * - `register.in.global.registry` - removed, back to its default false. fennec-codec #207
+     *   is why it was ever needed: TypeResolutionHelper resolved an nsURI straight out of
+     *   EPackage.Registry.INSTANCE, which is empty in a runtime that publishes its models
+     *   through the metadata whiteboard, so the mirror was the only way the codec could read a
+     *   payload. Type resolution now goes through the per-load PackageResolver instead. With
+     *   the mirror off, nothing dynamic reaches the EMF singleton at all - which removes the
+     *   ordering hazard above rather than dodging it.
+     * - `include.atlas.scope` - gone as a property. model.atlas e2552c0 (#254) added it,
+     *   defaulting to false, as the first fix for the sweep; c37f91d superseded it and 5f9401c
+     *   dropped it outright, so there is nothing left to set even by accident.
+     *
+     * `AtlasEObjectProvider~jena`'s `required.nsuris` gate is unaffected: it resolves against
+     * the framework EPackage.Registry it binds through `packageRegistry.target`, and only falls
+     * back to EPackage.Registry.INSTANCE when that reference is absent.
+     *
+     * How to check it: the client logs `EAGER pre-fetch ... published N EPackage(s)`, N being
+     * the fetchable final-stage nsURIs minus the ones this runtime declares generated itself -
+     * 21 - 7 = 14 here on 2026-09-08 - and no ClassCastException. It is NOT the jena-owned
+     * packages only: that was the deny-list's number, which blocked the whole inherited scope.
+     * Counting fetches in the ATLAS log proves nothing here - both fixes gate after the fetch,
+     * so all 22 are still served.
+     *
+     * Both fixes are published, and as of 2026-09-09 nothing here comes from a local build any
+     * more: fennec-codec #207 as 0.1.0.202609080603-SNAPSHOT (build 113), and the model.atlas
+     * client family as 0.1.0.202609081837-SNAPSHOT, which carries c37f91d and 5f9401c (#254,
+     * the commit that drops `include.atlas.scope`) alike. `cnf/local` and its `-plugin.0.Local`
+     * registration are gone again. docker.config and local.config no longer carry the
+     * deny-list or the mirror either - they were changed the same way on 2026-09-08, though
+     * only this runtime was re-verified. */
+    "drift.check.interval.ms": 10000
+  },
+
+  /* Mappings and profiles come from files, not from the Atlas: a test runtime should be able to
+   * gain a mapping by dropping a file in, without an upload and two stage transitions. The
+   * directories are the same runtime/ skeleton the docker image mounts.
+   *
+   * A mapping placed here must use nsURI hrefs (`<nsURI>#//<Name>`), never relative paths: a
+   * relative href would load a second, private copy of the domain EPackage, and an instance
+   * deserialized against the Atlas-registered copy would then match no mapping at all. */
+  "FileEObjectProvider~mappings": {
+    "emf.eobject.provider.name": "mapping-files",
+    "locations": ["$[env:EVENTATLAS_MAPPINGS_DIR;default=$[prop:EVENTATLAS_MAPPINGS_DIR;default=runtime/mappings]]"]
+  },
+
+  "EObjectRegistry~mappings": {
+    "name": "sensinact-mappings",
+    "initialProvider.target": "(emf.eobject.provider.name=mapping-files)"
+  },
+
+  /* Mappings from the Model Atlas, alongside the files above - this is the half of
+   * promote-and-reingest the file provider cannot do.
+   *
+   * FileEObjectProvider walks its directory once at activation and never again, so a mapping
+   * added after start-up needs a restart. This provider does not replace it: it binds the
+   * registry as a `writer` and adds to it, so em310udl-battery-mapping.xmi keeps working while
+   * new mappings can arrive over REST.
+   *
+   * `refresh.interval.ms` is what makes that live, and it is the whole point of the block:
+   * AtlasObjectSync.syncRegistry re-runs `listObjectIds()` on every pass, so an object that did
+   * not exist at the previous pass IS discovered. That is unlike the client's DriftWatcher,
+   * which only refreshes nsURIs/objects it already holds (`!held.contains(...)`) and therefore
+   * never sees a newly published one. 15s rather than local.config's 60s because this runtime
+   * exists to be watched by hand.
+   *
+   * `key.feature` is `mid` - the mapping's own registry key, which is what
+   * ProviderMappingRegistryImpl indexes by.
+   *
+   * `required.nsuris` is a GATE, not a loader: a listed nsURI that is not registered postpones
+   * the WHOLE pass, because fetched objects would otherwise materialize as dynamic EObjects.
+   * Deliberately only the mapping metamodel and the stable lorawan base package - NOT any
+   * inferred nsURI. An inferred package is exactly the thing that may not exist yet, and gating
+   * on it would stop every other mapping from syncing; a mapping whose providerClasses cannot
+   * resolve is parked and retried by ProviderMappingRegistryImpl as EPackages arrive, which is
+   * the mechanism that already handles this. */
+  "AtlasEObjectProvider~jena": {
+    "atlasScope.target": "(atlas.scope=jena)",
+    "writer.target": "(emf.eobject.registry.name=sensinact-mappings)",
+    "emf.eobject.provider.name": "atlas-jena",
+    "registries": ["sensinactmapping"],
+    "key.feature": "mid",
+    "required.nsuris": [
+      "https://fennec.eclipse.org/event.atlas/mapping/1.0",
+      "https://eclipse.org/fennec/lorawan"
+    ],
+    "refresh.interval.ms": 15000
+  },
+
+  /* Present even with no profile files: without the registry MappingProfileRegistryImpl never
+   * binds, and ProviderMappingRegistryImpl then skips every mapping carrying a `profile`
+   * reference rather than registering it profile-less. Keep the directory, keep it empty, and
+   * use profile-free mappings here. */
+  "FileEObjectProvider~profiles": {
+    "emf.eobject.provider.name": "profile-files",
+    "locations": ["$[env:EVENTATLAS_PROFILES_DIR;default=$[prop:EVENTATLAS_PROFILES_DIR;default=runtime/profiles]]"]
+  },
+
+  "EObjectRegistry~profiles": {
+    "name": "sensinact-profiles",
+    "initialProvider.target": "(emf.eobject.provider.name=profile-files)"
+  },
+
+  /* The discriminator vocabulary to type JSON through - the `{id}` in the models'
+   * `http://eclipse.org/fennec/codec/typeMapping/{id}` annotation source. The lorawan/em310udl
+   * packages in the jena scope annotate for `lorawan`, so that is the default here (unlike
+   * local.config, whose m5airq/waterparc family uses `jena-sensors`). An id no deployed model
+   * annotates for types nothing at all, and does so silently. */
+  "event.atlas.southbound.ingest": {
+    "codec.typeMapId": "$[env:EVENTATLAS_CODEC_TYPE_MAP_ID;default=$[prop:EVENTATLAS_CODEC_TYPE_MAP_ID;default=lorawan]]"
+  },
+
+  /* --- one broker, two channels -------------------------------------------------------------
+   *
+   * An external mosquitto owns 1883 here. That port is free in this runtime precisely because
+   * the SensorThings MQTT broker is not deployed - in launch.bndrun the gateway publishes its
+   * own broker on 1883 and the southbound then connects to it, which is confusing to debug.
+   *
+   * Two channels rather than one because the sample collector windows per channel: a known
+   * payload and an unknown one then never share a window, and the log says which is which. */
+  "sensinact.southbound.mqtt~local": {
+    "id": "local-broker",
+    "protocol": "tcp",
+    "host": "$[env:EVENTATLAS_MQTT_HOST;default=$[prop:EVENTATLAS_MQTT_HOST;default=localhost]]",
+    "port": "$[env:EVENTATLAS_MQTT_PORT;default=$[prop:EVENTATLAS_MQTT_PORT;default=1883;type=Integer]]",
+    "topics": ["lorawan/#"]
+  },
+
+  /* A model this runtime has: deserializes, and is either APPLIED or NO_MAPPING depending on
+   * whether a mapping for its EClass sits in runtime/mappings. Never sampled - a known model is
+   * not offered to the UnknownModelHandler. */
+  "event.atlas.southbound.mqtt~known": {
+    "mqttTopics": ["lorawan/known/#"],
+    "mqtt.handler.id": "local-broker",
+    "format": "json",
+    "name": "known-mqtt"
+  },
+
+  /* The channel under test. A payload whose discriminator value matches no concrete EClass ends
+   * as EMPTY, which is one of the three outcomes offered to the UnknownModelHandler
+   * (MODEL_UNKNOWN, EMPTY, PARSE_ERROR - and only those). */
+  "event.atlas.southbound.mqtt~unknown": {
+    "mqttTopics": ["lorawan/unknown/#"],
+    "mqtt.handler.id": "local-broker",
+    "format": "json",
+    "name": "unknown-mqtt"
+  },
+
+  /* --- sampling ----------------------------------------------------------------------------
+   *
+   * Tuned for a hand-driven test, not for a sensor. `samples` is the number of distinctly
+   * shaped payloads that closes a window; `quiet` is how many consecutive payloads may add no
+   * new shape before it is handed over early. quiet is set high on purpose: with the default 3
+   * a five-payload set would be handed over before the last two arrived, and the interesting
+   * type evidence is often in the later ones. maxWait is the backstop, and closing on it is the
+   * only thing that sets lowEvidence. */
+  "event.atlas.southbound.sampling": {
+    /* Sampling is off unless asked for - see the collector's `enabled` default. This runtime
+     * exists to exercise the chain, so it asks. */
+    "enabled": true,
+    "targetSamples": "$[env:SAMPLING_TARGET;default=$[prop:SAMPLING_TARGET;default=5]]",
+    "quietSamples": "$[env:SAMPLING_QUIET;default=$[prop:SAMPLING_QUIET;default=20]]",
+    "maxWaitSeconds": "$[env:SAMPLING_MAX_WAIT;default=$[prop:SAMPLING_MAX_WAIT;default=120]]"
+  },
+
+  /* --- inference ---------------------------------------------------------------------------
+   *
+   * The namespace is the only thing the agent is told; everything else about the model it has to
+   * discover. It is a PREFIX, not the nsURI: the agent extends it with a segment identifying the
+   * model it authored, so a second device family does not land on the first one's namespace, and
+   * the nsURI it settles on comes back in the receipt. The MCP server's EMFPackageRegistry
+   * nsuri.allowlist and ModelAtlasPublisher publish.nsuri.allowlist must therefore stay
+   * prefix-shaped - `https://fennec.eclipse.org/event.atlas/inferred*`, which is what they
+   * already carry. maxRunsPerInterval defaults to 1 here rather than 3: a run costs real money, and
+   * a test runtime that is restarted often should not be able to spend three of them by
+   * accident. A fingerprint whose run came back UNAVAILABLE is claimed for
+   * retryAfterUnavailableSeconds, in memory - so restart the framework to retry, do not wait. */
+  "event.atlas.model.inference": {
+    "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=https://fennec.eclipse.org/event.atlas/inferred]]",
+    "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=1]]",
+    "intervalSeconds": 3600,
+    "timeoutSeconds": "$[env:INFERENCE_TIMEOUT;default=$[prop:INFERENCE_TIMEOUT;default=900]]",
+
+    /* Whether the prompt carries the ShapeDelta summary - which paths every sample holds, which
+     * only some hold, and which value kinds each was seen with - in front of the payload bodies.
+     * The payloads themselves are never affected; only the summary in front of them.
+     *
+     * It is a switch so that both arms of a comparison come off ONE jar and differ in nothing
+     * else: editing InferencePrompt and rebuilding between runs cannot promise that. Flip it with
+     * -DINFERENCE_SHAPE_DELTA=false in secrets.bndrun, or the environment variable.
+     *
+     * A config update also re-runs the component's @Activate, which rebuilds AttemptRegistry -
+     * so switching arms clears the fingerprint dedup in the same action, and the same payloads
+     * can be replayed without a framework restart. */
+    "shapeDeltaEnabled": "$[env:INFERENCE_SHAPE_DELTA;default=$[prop:INFERENCE_SHAPE_DELTA;default=true;type=Boolean]]"
+  },
+
+  /* The remote metamodel MCP server. `server.url` must be reachable FROM ANTHROPIC - the client
+   * sends it as an `mcp_servers` entry of type `url`, so the API dials it, not this framework.
+   * A localhost URL therefore cannot work; tunnel the metamodel runtime's servlet. Nothing
+   * probes the URL, so a wrong one first shows up as a failed run. */
+  "RemoteMCPEndpoint~metamodel": {
+    "server.name": "metamodel",
+    "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=]]"
+  },
+
+  /* The Claude client. `mcpServers.target` is not optional: the reference is 1..n and unfiltered
+   * by default, so without it any MCPEndpoint in the framework would be bound.
+   *
+   * `mcp.authorization.token` must equal `auth.token` on that servlet's HttpMCPServerComponent.
+   * It is required as soon as the endpoint is tunnelled: the server's McpAuthenticationFilter
+   * trusts direct loopback callers only while no token is configured, and a tunnelled request
+   * is loopback *carrying a forwarding header*, which it refuses by design.
+   *
+   * `mcp.tools.enabled` is also not optional, and is not merely an allow-list: ClaudeHelper
+   * always builds the toolset with `default_config {enabled:false}` and re-enables only what
+   * this array names, so leaving it out disables every tool on the server. These 21 mirror what
+   * `inference_tool_provider` serves on /mcp/inference. Measured 2026-08-28: a disabled tool's
+   * definition does stay out of the request prefix (915 vs 14,021 input tokens for 1 vs 21).
+   *
+   * `max.tokens` must be well above the component's own 1024 default, which would truncate a
+   * turn that authors a package. `download.file.folder` is required by the shared OCD even
+   * though only the batch service reads it. */
+  "ClaudeChatCompletionService": {
+    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
+    "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
+    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-opus-5]]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=$[prop:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]]",
+    "mcpServers.target": "(server.name=metamodel)",
+    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
+    "mcp.tools.enabled": [
+      "list_metamodel",
+      "describe_eclass",
+      "export_package",
+      "list_annotation_sources",
+      "find_classes_by_annotation",
+      "find_features_by_annotation",
+      "describe_aspects",
+      "create_dataset",
+      "create_epackage",
+      "add_eclass",
+      "add_eattribute",
+      "add_ereference",
+      "add_eannotation",
+      "add_eenum",
+      "add_eenum_literal",
+      "modify_feature",
+      "create_from_json",
+      "register_package",
+      "list_registry",
+      "post_to_model_atlas"
+    ]
+  },
+
+  /* --- outbound HTTP allow-list -------------------------------------------------------------
+   *
+   * emf.osgi's REST URI handler blocks ALL outbound http(s) *resolution* unless the host is
+   * allow-listed - an SSRF guard, since an attacker-supplied proxy reference in a model would
+   * otherwise make the runtime fetch arbitrary URLs.
+   *
+   * This bites the batch path asymmetrically and confusingly: submitting a batch is a Resource
+   * *save* and is not gated, but every status poll and the result fetch are Resource *loads* and
+   * are. So the batch is accepted, starts running, costs money - and the first poll then fails
+   * with "host 'api.anthropic.com' is not in the configured allow-list". The synchronous path
+   * never needed this because a completion is a single save-and-read-response round trip.
+   *
+   * Only the provider host is listed. Do not use "*": it disables the guard entirely and the
+   * handler logs a warning saying so.
+   *
+   * Deliberately a literal, not $[env:...]: this value was interpolation-shaped while the
+   * allow-list was failing to take effect, and a placeholder is one variable too many in a
+   * setting whose failure mode is silent. */
+  "org.eclipse.fennec.emf.osgi.urihandler.http": {
+    "allowedHosts": ["api.anthropic.com"]
+  },
+
+  /* --- the batch service, and why it is what actually runs -----------------------------------
+   *
+   * A synchronous request cannot finish this task. The Messages API runs server-side tools in a
+   * sampling loop with a documented default limit of 10 iterations per request; on reaching it the
+   * response returns `stop_reason: pause_turn` carrying only what the agent had said so far, which
+   * model inference reports as an answer with no receipt. Measured 2026-08-28 on this exact prompt:
+   * 11 iterations then pause_turn, identically with and without streaming, while the same request
+   * as a batch ran 21 iterations to end_turn and published its draft. See
+   * docs/model-inference-test-log.md.
+   *
+   * `BatchChatCompletionAdapter` ranks above the synchronous adapter and is configuration-required,
+   * so the presence of THIS block is what switches the batch path on.
+   *
+   * Note `base.url`: the batch service treats it as the batches *collection* - it POSTs to it and
+   * then GETs `<base.url>/{batchId}` and `<base.url>/{batchId}/results`. It is therefore a
+   * different URL from the synchronous service's, and pointing it at /v1/messages fails on the
+   * first status poll rather than on submission.
+   *
+   * Everything else mirrors ClaudeChatCompletionService because both components share one OCD.
+   * `download.file.folder` stops being a quirk here: the batch service is what reads it. */
+  "ClaudeBatchMessageService": {
+    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
+    "base.url": "$[env:ANTHROPIC_BATCH_URL;default=$[prop:ANTHROPIC_BATCH_URL;default=https://api.anthropic.com/v1/messages/batches]]",
+    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-opus-5]]",
+    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
+    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=$[prop:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]]",
+    "mcpServers.target": "(server.name=metamodel)",
+    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
+    "mcp.tools.enabled": [
+      "list_metamodel",
+      "describe_eclass",
+      "export_package",
+      "list_annotation_sources",
+      "find_classes_by_annotation",
+      "find_features_by_annotation",
+      "describe_aspects",
+      "create_dataset",
+      "create_epackage",
+      "add_eclass",
+      "add_eattribute",
+      "add_ereference",
+      "add_eannotation",
+      "add_eenum",
+      "add_eenum_literal",
+      "modify_feature",
+      "create_from_json",
+      "register_package",
+      "list_registry",
+      "post_to_model_atlas"
+    ]
+  },
+
+  /* Poll cadence for the batch above, and how many times a paused turn may be resumed.
+   *
+   * Batch raises the provider's server-side iteration ceiling but does not remove it: three
+   * measured runs went 21, 15 and 22 iterations, the last coming back `stop_reason: pause_turn`.
+   * A paused result is neither success nor failure - isSuccessful() is false and it carries no
+   * error - so before continuation was wired in it was reported as "failed: null" and the work
+   * was thrown away. maxContinuations is deliberately low: each continuation is a whole new batch
+   * with its own queueing, so INFERENCE_TIMEOUT above is usually what stops a run first. 0
+   * restores the submit-once behaviour. */
+  "event.atlas.model.inference.chat.batch": {
+    "pollSeconds": "$[env:INFERENCE_BATCH_POLL;default=$[prop:INFERENCE_BATCH_POLL;default=20]]",
+    "maxContinuations": "$[env:INFERENCE_MAX_CONTINUATIONS;default=$[prop:INFERENCE_MAX_CONTINUATIONS;default=2]]"
+  }
+}

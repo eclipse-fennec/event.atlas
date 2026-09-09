@@ -21,12 +21,40 @@
     /* Domain EPackages come from the Atlas too, not from model bundles baked into the image.
      * EAGER pre-fetches them at activation so the mapping sync below finds them; the stage
      * name is the scope's final stage - "release" in the jena scope, NOT the client default
-     * "released". register.in.global.registry mirrors them into EPackage.Registry.INSTANCE,
-     * which is where AtlasObjectSync.ensureRequiredPackages() and EMF deserialization look. */
+     * "released". They reach both the codec and the mapping sync through the OSGi framework
+     * EPackage.Registry - the metadata whiteboard - which is all this block configures. */
     "mode": "EAGER",
     "eager.scopes": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
     "eager.stages": ["$[env:EVENTATLAS_ATLAS_STAGE;default=release]"],
-    "register.in.global.registry": true,
+    /* No `register.in.global.registry` and no `nsuri.deny.list`: both came out on 2026-09-08,
+     * because they were one workaround for two upstream bugs that are now fixed.
+     *
+     * The chain was: an EAGER sweep resolves scope inheritance, so it also swept the packages
+     * owned by the implicit `atlas` parent - Ecore, UML, XMLType, the atlas APIs, the codec,
+     * this workspace's own mapping metamodel. The mirror then copied each into
+     * EPackage.Registry.INSTANCE, and a DYNAMIC copy of a system nsURI landing there before the
+     * generated package had initialised broke that package's factory initialiser
+     * (ClassCastException: EFactoryImpl cannot be cast to ScopeApiFactory). A hand-maintained
+     * 17-entry deny-list suppressed the mirror for those nsURIs.
+     *
+     * - fennec-codec #207 (published 0.1.0.202609080603-SNAPSHOT) is why the mirror was ever
+     *   needed: TypeResolutionHelper resolved an nsURI straight out of
+     *   EPackage.Registry.INSTANCE, which is empty in a runtime that publishes its models
+     *   through the metadata whiteboard. Type resolution now goes through the per-load
+     *   PackageResolver, so the mirror can go back to its default false - and with nothing
+     *   dynamic reaching the EMF singleton, the ordering hazard is removed rather than dodged.
+     * - model.atlas c37f91d (published 2026-09-07) replaces the deny-list: LocalGeneratedPackages
+     *   reads the org.eclipse.emf.ecore.generated_package capability every generated model bundle
+     *   carries, so local-first suppression sees what a bundle DECLARES from the moment it is
+     *   installed. Unlike the list it is not tied to a scope and needs no maintenance.
+     *
+     * `AtlasEObjectProvider~atlas`'s `required.nsuris` gate below does not depend on the mirror:
+     * its `packageRegistry` reference defaults to the framework registry
+     * (default.resourceset.epackage.registry=true) and AtlasObjectSync pins only those few
+     * nsURIs into the singleton itself, value-matched and never over an occupied slot.
+     *
+     * Verified in inference.bndrun on 2026-09-08 (`published 14 EPackage(s)`, no
+     * ClassCastException, `1 mapping(s) applied`). NOT yet re-verified in this image. */
     "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000;type=Long]"
   },
 

@@ -25,7 +25,12 @@ jobs:
     with:
       # bnd resolve/export tasks are not parallel-safe in this workspace.
       gradle-parallel: false
-      # Validate that the runtime bndruns still resolve and export.
+      # Validate that ALL THREE runtime bndruns still resolve, and that the image exports.
+      # A -runbundles entry can resolve locally out of ~/.m2 and be in no index a clean runner
+      # can fetch from (see CLAUDE.md for the three ways); resolving here is what catches it.
+      # inference.bndrun additionally needs egress to the DIM nexus, which hosts the only
+      # published copy of the four fennec-ai chat-completion bundles.
       extra-gradle-tasks: >-
         org.eclipse.fennec.event.atlas.mapping.runtime:resolve.launch
+        org.eclipse.fennec.event.atlas.mapping.runtime:resolve.inference
         org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker
