@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<genmodel:GenModel xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:genmodel="http://www.eclipse.org/emf/2002/GenModel" copyrightText="Copyright (c) 2012 - 2026 Data In Motion and others.&#xA;All rights reserved. &#xA;&#xA;This program and the accompanying materials are made&#xA;available under the terms of the Eclipse Public License 2.0&#xA;which is available at https://www.eclipse.org/legal/epl-2.0/&#xA;&#xA;SPDX-License-Identifier: EPL-2.0&#xA;&#xA;Contributors:&#xA;     Data In Motion - initial API and implementation"
+    modelDirectory="/org.eclipse.fennec.event.atlas.deployment/src" modelPluginID="org.eclipse.fennec.event.atlas.deployment"
+    modelName="Event-atlas-deployment" rootExtendsClass="org.eclipse.emf.ecore.impl.MinimalEObjectImpl$Container"
+    importerID="org.eclipse.emf.importer.ecore" complianceLevel="21.0" copyrightFields="false"
+    operationReflection="true" importOrganizing="true" oSGiCompatible="true">
+  <foreignModel>event-atlas-deployment.ecore</foreignModel>
+  <genPackages prefix="Deployment" basePackage="org.eclipse.fennec.event.atlas.model"
+      resource="XMI" disposableProviderFactory="true" ecorePackage="event-atlas-deployment.ecore#/">
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-deployment.ecore#//PrefetchMode">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//PrefetchMode/EAGER"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//PrefetchMode/LAZY"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-deployment.ecore#//ChannelTransport">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//ChannelTransport/MQTT"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//ChannelTransport/REST"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-deployment.ecore#//PayloadFormat">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//PayloadFormat/XMI"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//PayloadFormat/JSON"/>
+    </genEnums>
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="event-atlas-deployment.ecore#//ChangeMode">
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//ChangeMode/ALL"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//ChangeMode/ON_CHANGE"/>
+      <genEnumLiterals ecoreEnumLiteral="event-atlas-deployment.ecore#//ChangeMode/DEADBAND"/>
+    </genEnums>
+    <genDataTypes ecoreDataType="event-atlas-deployment.ecore#//EDuration"/>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//EventAtlasDeployment">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//EventAtlasDeployment/deploymentId"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//EventAtlasDeployment/description"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//EventAtlasDeployment/http"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//EventAtlasDeployment/atlas"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//EventAtlasDeployment/brokers"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//EventAtlasDeployment/channels"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//EventAtlasDeployment/history"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//EventAtlasDeployment/inference"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//HttpEndpoint">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HttpEndpoint/port"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HttpEndpoint/host"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HttpEndpoint/contextPath"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HttpEndpoint/restPath"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HttpEndpoint/whiteboardName"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HttpEndpoint/allowAnonymous"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//AtlasBinding">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/baseUri"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/scope"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/stage"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/mappingRegistries"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/prefetchMode"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/requiredNsUris"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/driftCheckIntervalMs"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//AtlasBinding/refreshIntervalMs"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//MqttBroker">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/id"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/protocol"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/host"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/port"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/user"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/password"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/topics"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//IngestChannel">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//IngestChannel/name"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//IngestChannel/transport"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//IngestChannel/format"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//IngestChannel/brokerId"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//IngestChannel/topics"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//IngestChannel/codecTypeMapId"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//HistoryConfig">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistoryConfig/providerName"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//HistoryConfig/storage"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//HistoryConfig/filters"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-deployment.ecore#//HistoryConfig/housekeeping"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//HistoryStorage">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistoryStorage/maxPageSize"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistoryStorage/includeResources"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistoryStorage/excludeResources"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//TimescaleStorage">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/url"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/host"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/port"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/database"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/user"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/password"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//InMemoryStorage">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//InMemoryStorage/maxValuesPerResource"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//HistorizationFilter">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/name"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/targets"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/includeResources"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/excludeResources"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/changeMode"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/changeThreshold"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/changeThresholdPercent"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HistorizationFilter/changeMaxInterval"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//HousekeepingPolicy">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HousekeepingPolicy/name"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HousekeepingPolicy/targets"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HousekeepingPolicy/retentionPeriod"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HousekeepingPolicy/keepCount"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HousekeepingPolicy/maxDelete"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//HousekeepingPolicy/schedulePeriod"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-deployment.ecore#//InferenceConfig">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//InferenceConfig/samplingEnabled"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//InferenceConfig/namespace"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//InferenceConfig/maxRunsPerInterval"/>
+    </genClasses>
+  </genPackages>
+</genmodel:GenModel>

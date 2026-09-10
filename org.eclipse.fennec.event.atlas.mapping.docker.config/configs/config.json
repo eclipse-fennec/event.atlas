@@ -85,6 +85,24 @@
     "refresh.interval.ms": "$[env:EVENTATLAS_ATLAS_REFRESH_INTERVAL_MS;default=60000;type=Long]"
   },
 
+  /* Deployment models. Empty by default, and inert while it stays empty: the registry binds the
+   * DeploymentConfigurator, which writes nothing until an EventAtlasDeployment turns up.
+   *
+   * Drop an XMI into the mounted /opt/eventatlas/runtime/deployment and its sections are applied
+   * as ConfigAdmin configurations. Sections it does not declare keep coming from these JSON files,
+   * and a PID one of these files already owns is left alone with a warning - see
+   * model/examples/deployment-history-tuning.xmi for the step that collides with nothing. */
+  "FileEObjectProvider~deployment": {
+    "emf.eobject.provider.name": "deployment-files",
+    "locations": ["/opt/eventatlas/runtime/deployment"],
+    "key.feature": "deploymentId"
+  },
+
+  "EObjectRegistry~deployment": {
+    "name": "event-atlas-deployment",
+    "initialProvider.target": "(emf.eobject.provider.name=deployment-files)"
+  },
+
   "FileEObjectProvider~profiles": {
     "emf.eobject.provider.name": "profile-files",
     "locations": ["/opt/eventatlas/runtime/profiles"],
