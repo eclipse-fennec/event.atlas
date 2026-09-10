@@ -39,11 +39,20 @@ jobs:
         org.eclipse.fennec.event.atlas.mapping/generated/org.eclipse.fennec.event.atlas.mapping.jar
     secrets: inherit
 
+  # The image is built from the release-jars artifact of the release job above,
+  # so the jar it embeds is the jar published to Maven in that same Gradle
+  # invocation. Declarative staging: the runtime jar plus the runtime tree
+  # (eclipse-fennec/.github, docs/ci-cd-reusable-workflows.md §5.7).
   container:
     needs: release
-    uses: ./.github/workflows/reusable-container.yml
+    uses: eclipse-fennec/.github/.github/workflows/reusable-container.yml@074409595cdb7f4afc3c3ab521fe720b05f913b3 # eclipse-fennec/.github#43
     with:
+      image-name: event.atlas
       docker-label: latest
+      docker-context: docker/eventatlas
+      runtime-jar: eventatlas.runtime_docker.jar
+      runtime-dir: org.eclipse.fennec.event.atlas.mapping.runtime/runtime
+      version-jar: org.eclipse.fennec.event.atlas.mapping.jar
     secrets: inherit
 
   docs:
