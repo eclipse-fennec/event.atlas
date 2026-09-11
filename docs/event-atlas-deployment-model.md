@@ -146,9 +146,14 @@ tags for exactly this, because its bootstrap component differs per source.)
 
 Three things to know before seeding one:
 
-- **The registry needs its own root type.** An Atlas registry can pin `root.eclass.uri`; the
-  `sensinactmapping` registry pins it to `ProviderMapping`, so a deployment object cannot live
-  there. Give it a registry of its own.
+- **Whether it needs a registry of its own depends on that registry's `root.eclass.uri`.** A
+  registry pinned to a concrete type cannot hold a deployment — `sensinactmapping` pins
+  `ProviderMapping` — but one rooted at `Ecore#//EObject` holds anything, so a general-purpose
+  configuration registry can be shared with another product. Sharing needs `object.ids`: without
+  it the provider loads *every* object the registry lists and warns once per pass per object whose
+  key feature it cannot derive (`No key derivable … - skipping it`), which on a shared registry is
+  a warning a minute. Naming the object loads exactly that one — and the sync skips foreign
+  objects rather than failing, so the cost of getting this wrong is noise, not breakage.
 - **The metamodel must be seeded as a schema, in every stage the object passes through.** The Atlas
   deserializes the stored instance server-side, so it needs `event-atlas-deployment.ecore`
   registered — in `draft` *and* `release` if updates go through a staged transition, because each

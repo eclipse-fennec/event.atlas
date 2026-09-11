@@ -326,7 +326,8 @@ exists, so it costs nothing when unused.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `EVENTATLAS_DEPLOYMENT_REGISTRY` | `eventatlas-configurations` | Atlas registry holding the deployment object. Needs its own registry — `sensinactmapping` pins `root.eclass.uri` to `ProviderMapping` |
+| `EVENTATLAS_DEPLOYMENT_REGISTRY` | `eventatlas-configurations` | Atlas registry holding the deployment object. An existing registry works if it is rooted at `Ecore#//EObject`; one pinned to a concrete type does not (`sensinactmapping` pins `ProviderMapping`) |
+| `EVENTATLAS_DEPLOYMENT_OBJECT_ID` | `eventatlas` | which object to load. Leave it set when sharing a registry — otherwise every object is loaded and each one that cannot be keyed warns per pass |
 | `EVENTATLAS_DEPLOYMENT_REFRESH_INTERVAL_MS` | `60000` | how often the object is re-read |
 
 The metamodel has to be seeded into the Atlas as a schema (one file — it references nothing but

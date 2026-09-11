@@ -241,9 +241,13 @@ A deployment can be described as a model instead of forty environment variables:
   seeds it, `AtlasEObjectProvider~deployment` syncs on top, and the docker `config.json` declares
   both (inert until the Atlas actually has the registry). data.atlas needs `runtime.config` vs
   `runtime.config.atlas` and two image tags for the same capability because its bootstrap component
-  differs per source. An Atlas registry for deployments needs its own `root.eclass.uri` —
-  `sensinactmapping` pins it to `ProviderMapping` — and the metamodel must be seeded as a schema in
-  every stage the object passes through. Never seed one `deploymentId` into both sources.
+  differs per source. A deployment can share an
+  existing Atlas registry when that registry is rooted at `Ecore#//EObject` (a registry pinned to a
+  concrete type cannot hold one — `sensinactmapping` pins `ProviderMapping`); sharing wants
+  `object.ids` set, or the provider loads every object and warns once per pass per foreign one it
+  cannot key. The metamodel must be seeded as a schema in every stage the object passes through,
+  because the Atlas deserializes the instance server-side. Never seed one `deploymentId` into both
+  sources.
 - **`EDuration` needs its `create`/`convert` GenModel bodies.** EMF's default reflective conversion
   cannot build a `java.time.Duration` from a literal (no `valueOf(String)`), so without them every
   deployment XMI carrying a duration fails to load with `The value 'P30D' is invalid`. The bodies
