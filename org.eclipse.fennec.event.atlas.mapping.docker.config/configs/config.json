@@ -85,6 +85,65 @@
     "refresh.interval.ms": "$[env:EVENTATLAS_ATLAS_REFRESH_INTERVAL_MS;default=60000;type=Long]"
   },
 
+  /* Deployment models. Empty by default, and inert while it stays empty: the registry binds the
+   * DeploymentConfigurator, which writes nothing until an EventAtlasDeployment turns up.
+   *
+   * Drop an XMI into the mounted /opt/eventatlas/runtime/deployment and its sections are applied
+   * as ConfigAdmin configurations. Sections it does not declare keep coming from these JSON files,
+   * and a PID one of these files already owns is left alone with a warning - see
+   * model/examples/deployment-history-tuning.xmi for the step that collides with nothing. */
+  "FileEObjectProvider~deployment": {
+    "emf.eobject.provider.name": "deployment-files",
+    "locations": ["/opt/eventatlas/runtime/deployment"],
+    "key.feature": "deploymentId"
+  },
+
+  "EObjectRegistry~deployment": {
+    "name": "event-atlas-deployment",
+    "initialProvider.target": "(emf.eobject.provider.name=deployment-files)"
+  },
+
+  /* Deployment models from the Model Atlas, so a deployment can be a stored, staged object
+   * instead of a mounted file - the same move data.atlas made for its DataAtlasConfiguration.
+   *
+   * This costs no second image. Because DeploymentConfigurator consumes a REGISTRY rather than
+   * fetching for itself, file mode and atlas mode are the same bundle and the same runtime:
+   * the file provider above seeds the registry, this provider syncs on top. (data.atlas needs
+   * runtime.config vs runtime.config.atlas and two image tags because its bootstrap component
+   * differs per source.)
+   *
+   * Inert until the registry exists. A registry the Atlas does not have syncs NOTHING and
+   * reports no error - the same silence as a wrong scope on the mappings provider - so shipping
+   * this block unconditionally is safe.
+   *
+   * WHETHER IT NEEDS A REGISTRY OF ITS OWN DEPENDS ON THAT REGISTRY'S `root.eclass.uri`. A
+   * registry pinned to a concrete type cannot hold a deployment - `sensinactmapping` pins
+   * ProviderMapping - but one rooted at Ecore#//EObject holds anything, so an existing
+   * general-purpose configuration registry can be shared. `object.ids` is what makes sharing
+   * clean: without it the provider loads EVERY object the registry lists and warns once per pass
+   * per object whose key feature it cannot derive ("No key derivable ... - skipping it"), which
+   * for a registry shared with another product is a warning a minute. Naming the object loads
+   * exactly that one.
+   *
+   * DO NOT put a deployment XMI in BOTH this registry and the mounted directory under the same
+   * deploymentId - two providers would race to define the same entry, exactly as two providers
+   * racing on one `mid` do. */
+  "AtlasEObjectProvider~deployment": {
+    "atlasScope.target": "(atlas.scope=$[env:EVENTATLAS_ATLAS_SCOPE;default=jena])",
+    "writer.target": "(emf.eobject.registry.name=event-atlas-deployment)",
+    "emf.eobject.provider.name": "atlas-deployment",
+    "registries": ["$[env:EVENTATLAS_DEPLOYMENT_REGISTRY;default=eventatlas-configurations]"],
+    "object.ids": ["$[env:EVENTATLAS_DEPLOYMENT_OBJECT_ID;default=eventatlas]"],
+    "key.feature": "deploymentId",
+    /* The deployment metamodel is carried by the deployment BUNDLE, so this gate is satisfied
+     * from the moment the framework is up - unlike the mapping gate, which waits for domain
+     * EPackages the Atlas has to publish first. */
+    "required.nsuris": [
+      "https://fennec.eclipse.org/event.atlas/deployment/1.0"
+    ],
+    "refresh.interval.ms": "$[env:EVENTATLAS_DEPLOYMENT_REFRESH_INTERVAL_MS;default=60000;type=Long]"
+  },
+
   "FileEObjectProvider~profiles": {
     "emf.eobject.provider.name": "profile-files",
     "locations": ["/opt/eventatlas/runtime/profiles"],

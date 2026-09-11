@@ -19,6 +19,7 @@ manual steps below):
 content/eventatlas.runtime_docker.jar   bnd-exported executable runtime
 content/runtime/mappings/               ProviderMapping XMIs (key.feature: mid)
 content/runtime/profiles/               MappingProfile XMIs (key.feature: profileId)
+content/runtime/deployment/             EventAtlasDeployment XMIs (key.feature: deploymentId)
 ```
 
 ## Ports
@@ -106,9 +107,9 @@ config does not work here. The bundle ships two configurator resources
 
 | Resource | Contents |
 |---|---|
-| `config.json` | the event.atlas side: file providers → EObject registries `sensinact-mappings` / `sensinact-profiles`, the Model Atlas REST client + `AtlasEObjectProvider`, and the MQTT southbound (SensiNact MQTT client + `MqttPayloadListener`) |
+| `config.json` | the event.atlas side: file providers → EObject registries `sensinact-mappings` / `sensinact-profiles` / `event-atlas-deployment`, the Model Atlas REST client + `AtlasEObjectProvider`, and the MQTT southbound (SensiNact MQTT client + `MqttPayloadListener`) |
 | `sensinact.json` | the SensiNact side: session manager `ALLOW_ALL`, the named Felix HTTP whiteboard + Jersey whiteboard, northbound REST (anonymous), SensorThings REST (`history.provider`) and the SensorThings MQTT broker ports/keystore |
-| `timescale.json` | the history store: where the twin's value updates are written, and under which provider name they are served back — see [History](#history) |
+| `timescale.json` | the history *storage backend*: where the twin's value updates are written, and under which provider name they are served back. The filters and retention policies around it belong to the [deployment model](#deployment-model) — see [History](#history) |
 | `inference.json` | optional model inference: the sample collector, the inference service, the remote MCP endpoint and the Claude chat services — **off unless switched on**, see [Model inference](#model-inference) |
 
 Deployment-specific values are `$[env:…]` placeholders resolved at configuration-delivery
@@ -130,6 +131,7 @@ every environment. Every placeholder has a default — the image starts standalo
 | `TIMESCALE_HOST` / `_PORT` / `_DB` | `localhost` / `5432` / `sensinactHistory` | the history database (see [History](#history)); with nothing listening there the history store simply stays inactive |
 | `TIMESCALE_USER` / `_PWD` | `snaHistory` / empty | history database credentials |
 | `TIMESCALE_PROVIDER` | `brokerHistory` | the name the history store is registered under - must match `history.provider` in `sensinact.json` |
+| `TIMESCALE_MAX_PAGE_SIZE` | `10000` | largest page a single range query returns; caps memory per request, not the reachable dataset |
 | `SENSORTHINGS_MQTT_PORT` / `_SECURE_PORT` | `1883` / `8883` | hosted SensorThings broker, TCP / TLS |
 | `SENSORTHINGS_MQTT_WS_PORT` / `_WSS_PORT` | `8885` / `8886` | hosted SensorThings broker, WebSocket / WSS |
 | `SENSORTHINGS_MQTT_KEYSTORE_FILE` / `_TYPE` | empty / `jks` | keystore for the TLS listeners; without a file the TLS ports stay closed |
@@ -172,30 +174,69 @@ path.
 
 Without a history store the twin only ever holds each resource's *current* value: SensorThings
 `Observations` return one row, and there is nothing to plot. This image therefore carries the
-SensiNact **timescale** history provider (`…southbound.history.timescale-provider`, plus the
-postgres driver and the two Aries tx-control bundles it reaches the database through). It
-subscribes to the twin's update notifications and appends them to a TimescaleDB hypertable.
+SensiNact history support, which since the gateway's history rework is **two** bundles:
+
+| bundle | role |
+|---|---|
+| `…southbound.history.timescale-provider` | the storage *backend* - it stores and queries, nothing else |
+| `…southbound.history.history-core` | the *engine* - subscribes the backend to the twin's updates, publishes the `HistoryProvider` service and the legacy ACT actions, and applies filters and retention |
+
+Both are in the image, and both are needed: the backend on its own would silently store nothing,
+because the event wiring lives in the engine now. (`history-core` exports no packages, so the
+bndrun requires it by identity - a resolver would never find it on its own.) The postgres driver,
+`org.osgi.service.jdbc` and the two Aries tx-control bundles come along for the database access.
 
 Two names have to agree, and both default to `brokerHistory`: the `provider` in
 `timescale.json` (what the store registers itself as) and `history.provider` in
 `sensinact.json` (what the SensorThings gateway asks for). Change one, change the other -
-`TIMESCALE_PROVIDER` exists so that a deployment can do it in one place.
+`TIMESCALE_PROVIDER` exists so that a deployment can do it in one place. In the
+[deployment model](#deployment-model) it is a single attribute, so they cannot drift apart.
 
 The store's component is `configuration-policy=require`, so `timescale.json` is the on/off
 switch. It ships in the config bundle, which means:
 
-- **with a reachable database** the store connects on activation, creates its schema if it is
-  not there yet (`sensinact.history`, a hypertable keyed by provider/service/resource and time)
-  and starts recording. `TimescaleDB enabled` in the log is the confirmation.
+- **with a reachable database** the store connects on activation, creates its schema if it is not
+  there yet - **one** table, `sensinact.history`, with a kind discriminator - and starts recording.
 - **without one** the component fails to activate and nothing else happens - no retry storm, no
   stack traces on stdout. The runtime serves everything else exactly as before, and history
   queries stay empty. The activation failure is reported through the OSGi log service only, so
   if history stays empty when you expect data, that is the first thing to check (`scr:list` in
   the Gogo shell shows the component as unsatisfied or failed).
 
-`exclude.resources` keeps the per-provider location resources (`observedArea`, `viewport`) out
-of the table - they are state, not measurements. It is a list of resource-selector filters, so a
-deployment can exclude more.
+### What the rework changed for an operator
+
+- **PostgreSQL is enough; TimescaleDB is an accelerator.** The extension is detected at startup:
+  with it the table becomes a hypertable and aggregation uses `time_bucket`, without it the
+  provider falls back to `date_bin` on plain PostgreSQL 14+. **PostGIS is no longer required** -
+  GeoJSON of any type, `FeatureCollection` included, is stored losslessly as JSONB.
+- **Values are no longer lossy.** Numerics keep full precision *and* their Java type; the old
+  schema narrowed them to `long`/`double` on read and `toString()`-ed anything that was not a
+  GeoJSON `Point`.
+- **An existing database migrates itself on first start.** Rows from the old three tables are
+  copied into `sensinact.history` and `numeric_data` / `text_data` / `geo_data` are renamed
+  `*_migrated` - renamed, not dropped. Verify the migration, then drop them yourself. Migrated
+  numeric values keep their historical read shape.
+- **SensorThings paging is answered by the database.** `$top` / `$skip`, time-field `$orderby`
+  and a `$filter` that reduces to time bounds (and numeric `result` comparisons) become SQL, so
+  `@iot.count` and the `@iot.nextLink` chain cover the full filtered dataset.
+  **One behaviour change to expect:** paginated `Observations` / `HistoricalLocations` now page
+  over the whole dataset from its start, where they used to page inside a window of the newest
+  values - on a large dataset the first page used to skip the beginning and the oldest rows were
+  unreachable. Requests that still fall back to in-memory evaluation (`or`, functions, string
+  comparisons) keep the old windowed behaviour.
+
+### Choosing what is stored, and for how long
+
+`exclude.resources` in `timescale.json` keeps the per-provider location resources (`observedArea`,
+`viewport`) out of the table - they are state, not measurements. It and `include.resources` decide
+which resources reach the backend at all, and changes to them now take effect immediately, without
+restarting the database connection.
+
+Everything finer-grained - store only on change, store only a change beyond a deadband, keep a
+heartbeat value anyway, delete data older than N days, keep at most N values per resource - is
+configured through the engine's two new factory PIDs, `sensinact.history.filter` and
+`sensinact.history.housekeeping`. **No JSON file in this image writes them**; they belong to the
+[deployment model](#deployment-model), which is why enabling them collides with nothing.
 
 A database to try it against, and the image wired to it:
 
@@ -217,6 +258,91 @@ docker compose -f docker/eventatlas/docker-compose.example.yml exec timescaledb 
 # and through the northbound: the Observations of one datastream
 curl 'http://localhost:8080/event/rest/v1.1/Datastreams'
 ```
+
+## Deployment model
+
+Everything above is configured with environment variables against the four baked-in JSON files.
+That is deliberate and stays supported. For a deployment you want to *describe* - diff it, review
+it, keep it in a Model Atlas - there is a declarative alternative: mount a directory of
+`EventAtlasDeployment` XMIs at `/opt/eventatlas/runtime/deployment` and the runtime applies them
+as ConfigAdmin configurations.
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v $(pwd)/my-deployment:/opt/eventatlas/runtime/deployment \
+  eventatlas:local
+```
+
+Two properties make this safe to try on a running deployment:
+
+- **A section the model does not declare is not written.** Whatever the XMI leaves out keeps
+  coming from the JSON files and their `$[env:…]` placeholders, so the model can take over one
+  concern at a time.
+- **A PID has exactly one writer.** Each configuration is stamped with
+  `event.atlas.deployment.owner`, and a PID that already exists without that stamp - one of the
+  baked-in JSON blocks - is left untouched, with a log line naming it. So a full deployment model
+  applied to the stock image changes nothing until you start deleting JSON blocks.
+
+The immediately useful case is the history tuning the previous section pointed at, because
+`sensinact.history.filter` and `sensinact.history.housekeeping` are owned by no JSON file here. A
+`<history>` element with no `<storage>` child claims only those two:
+
+```xml
+<deployment:EventAtlasDeployment xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:deployment="https://fennec.eclipse.org/event.atlas/deployment/1.0"
+    deploymentId="history-tuning">
+  <history providerName="brokerHistory">
+    <filters name="changes-only" changeMode="ON_CHANGE">
+      <targets>brokerHistory</targets>
+    </filters>
+    <housekeeping name="ninety-days" retentionPeriod="P90D" maxDelete="50000"/>
+  </history>
+</deployment:EventAtlasDeployment>
+```
+
+Drop that in and the filter and the retention policy appear; the store stays exactly where it is.
+Remove the file again and both are deleted.
+
+Beware one thing when writing housekeeping by hand: `keepCount` and `maxDelete` of `0` mean
+*unset*, not *unlimited* - the engine's sentinel is `-1`. The model omits any value that is not
+greater than zero rather than writing a literal `0`, which would otherwise ask it to keep no values
+at all.
+
+### Credentials stay out of it
+
+The model names the environment variable holding a password, never the password:
+`passwordVariable="TIMESCALE_PWD"` becomes the ConfigAdmin value `$[env:TIMESCALE_PWD;default=]`,
+resolved on delivery by the same interpolation plugin that fills the baked JSON. There is no
+attribute a secret could go into — which matters because a deployment model is *content*: put it in
+a Model Atlas and it is as readable as everything else there.
+
+### Or keep it in the Model Atlas instead of a mount
+
+The same image does both. The configurator consumes the `event-atlas-deployment` registry, so the
+source is whichever provider feeds it — the mounted directory above
+(`FileEObjectProvider~deployment`) or an Atlas registry (`AtlasEObjectProvider~deployment`, keyed by
+`deploymentId`). Both are declared in `config.json`; the Atlas one is inert until the registry
+exists, so it costs nothing when unused.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `EVENTATLAS_DEPLOYMENT_REGISTRY` | `eventatlas-configurations` | Atlas registry holding the deployment object. An existing registry works if it is rooted at `Ecore#//EObject`; one pinned to a concrete type does not (`sensinactmapping` pins `ProviderMapping`) |
+| `EVENTATLAS_DEPLOYMENT_OBJECT_ID` | `eventatlas` | which object to load. Leave it set when sharing a registry — otherwise every object is loaded and each one that cannot be keyed warns per pass |
+| `EVENTATLAS_DEPLOYMENT_REFRESH_INTERVAL_MS` | `60000` | how often the object is re-read |
+
+The metamodel has to be seeded into the Atlas as a schema (one file — it references nothing but
+Ecore), in every stage the object passes through, because the Atlas deserializes the instance
+server-side. Do not seed the same `deploymentId` into both the mount and the Atlas: two providers
+would race for one entry.
+
+Unlike the Data Atlas's atlas mode this one is **fail-soft** — an absent or unreadable object means
+the baked JSON keeps serving, not an endpoint that answers 404 forever — so no start-up gate is
+needed. The trade is silence, which is why the configurator logs what it applied, refused and
+removed on every pass.
+
+The full metamodel, the section-to-PID table, every refusal and the migration order are documented
+in [`docs/event-atlas-deployment-model.md`](../../docs/event-atlas-deployment-model.md); two ready
+examples ship in `org.eclipse.fennec.event.atlas.deployment/model/examples/`.
 
 ## Building locally
 
@@ -243,6 +369,7 @@ java -Dgosh.args=--nointeractive -jar \
 docker run --rm -p 8080:8080 -p 1883:1883 -p 8885:8885 \
   -v $(pwd)/my-mappings:/opt/eventatlas/runtime/mappings \
   -v $(pwd)/my-profiles:/opt/eventatlas/runtime/profiles \
+  -v $(pwd)/my-deployment:/opt/eventatlas/runtime/deployment \
   eventatlas:local
 ```
 

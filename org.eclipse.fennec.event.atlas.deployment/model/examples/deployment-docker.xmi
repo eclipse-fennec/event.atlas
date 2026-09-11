@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A complete event.atlas deployment, equivalent to what the docker image's configurator JSON
+  bundle wires today. Use it as the starting point for a model-driven deployment.
+
+  IMPORTANT: this model claims every PID the JSON files claim. Applying it as-is against the
+  shipped image logs "already exists and was not written from a deployment model" for each one
+  and changes nothing - by design, so a PID never has two writers. Adopt it by removing the
+  corresponding blocks from configs/config.json, configs/sensinact.json and configs/timescale.json,
+  or start from deployment-history-tuning.xmi, which claims only PIDs no JSON file here owns.
+-->
+<deployment:EventAtlasDeployment xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:deployment="https://fennec.eclipse.org/event.atlas/deployment/1.0"
+    deploymentId="eventatlas-docker"
+    description="The image's default wiring: Model Atlas mappings, one MQTT broker with an XMI and a JSON channel, REST ingest, and a Timescale history store.">
+
+  <http port="8080" contextPath="event/" restPath="rest" whiteboardName="eventrest" allowAnonymous="true"/>
+
+  <atlas baseUri="http://model-atlas:8080/atlas/rest" scope="jena" stage="release"
+      prefetchMode="EAGER" driftCheckIntervalMs="10000" refreshIntervalMs="60000">
+    <mappingRegistries>sensinactmapping</mappingRegistries>
+    <!-- The mapping metamodel's own nsURI is added automatically; list the domain models here. -->
+    <requiredNsUris>https://datainmotion.de/demo/m5airq/1.0</requiredNsUris>
+  </atlas>
+
+  <brokers id="eventatlas-broker" protocol="tcp" host="mqtt-broker" port="1883">
+    <topics>eventatlas/#</topics>
+  </brokers>
+
+  <channels name="eventatlas-mqtt-xmi" transport="MQTT" format="XMI" brokerId="eventatlas-broker">
+    <topics>eventatlas/#</topics>
+  </channels>
+  <channels name="eventatlas-mqtt-json" transport="MQTT" format="JSON" brokerId="eventatlas-broker"
+      codecTypeMapId="jena-sensors">
+    <topics>eventatlas/json/#</topics>
+  </channels>
+  <channels name="eventatlas-rest" transport="REST" format="XMI"/>
+
+  <history providerName="brokerHistory">
+    <!-- passwordVariable names the ENV VAR, never the password: this document is content, and in
+         a Model Atlas it is as readable as anything else there. -->
+    <storage xsi:type="deployment:TimescaleStorage" host="timescale" port="5432"
+        database="sensinactHistory" user="snaHistory" passwordVariable="TIMESCALE_PWD"
+        maxPageSize="10000">
+      <!-- Location state, not measurements. -->
+      <excludeResources>{"resource": {"value": "observedArea", "type": "EXACT"}}</excludeResources>
+      <excludeResources>{"resource": {"value": "viewport", "type": "EXACT"}}</excludeResources>
+    </storage>
+    <filters name="slow-drift" changeMode="DEADBAND" changeThresholdPercent="1.0"
+        changeMaxInterval="PT15M"/>
+    <housekeeping name="cleanup" retentionPeriod="P90D" maxDelete="50000" schedulePeriod="PT24H"/>
+  </history>
+
+  <inference samplingEnabled="false" maxRunsPerInterval="1"/>
+</deployment:EventAtlasDeployment>

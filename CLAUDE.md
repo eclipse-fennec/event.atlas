@@ -18,10 +18,11 @@ Gradle graph automatically):
 | Directory | Contents |
 |---|---|
 | `…event.atlas.mapping` | the mapping metamodel (`model/event-atlas-mapping.ecore` → `src-gen`) + the mapping engine + its DS components |
+| `…event.atlas.deployment` | the **deployment** metamodel (`model/event-atlas-deployment.ecore` → `src-gen`) + `DeploymentConfigurator`, which turns an `EventAtlasDeployment` XMI into ConfigAdmin configurations. Additive: an absent section is not written, and a PID another writer already owns is left alone. See `docs/event-atlas-deployment-model.md` |
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
-| `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles}` mount-point skeleton |
-| `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file provider + the MQTT/REST southbound wiring + the timescale history store) |
-| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — four resources: `config.json` (file providers + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker), `timescale.json` (the history store) and `inference.json` (model inference, **off unless `EVENTATLAS_INFERENCE_ENABLED` and `INFERENCE_NAMESPACE` are set**) |
+| `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles,deployment}` mount-point skeleton |
+| `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file providers, including the `event-atlas-deployment` registry + the MQTT/REST southbound wiring + the timescale history store) |
+| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — four resources: `config.json` (file providers — mappings, profiles and the `event-atlas-deployment` registry — + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker), `timescale.json` (the history store) and `inference.json` (model inference, **off unless `EVENTATLAS_INFERENCE_ENABLED` and `INFERENCE_NAMESPACE` are set**) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload (XMI or JSON), pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, `FORMAT_UNSUPPORTED`, …), plus the optional `UnknownModelHandler` hook it offers unhandled payloads to |
 | `…event.atlas.southbound.sampling` | `PayloadSampleCollector` — the `UnknownModelHandler` implementation that buffers unhandled payloads per channel and hands a closed `PayloadSampleSet` to a `PayloadSampleSetHandler` |
@@ -60,10 +61,11 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-08-25: `./gradlew clean build` is green — **68 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus 39 plain-JUnit tests (`ProviderModelMapperTest`,
-`ChangeRuleFilterImplTest`, `BindingResolverTest`, `MappingProfileValidationTest`,
-`GeneratedResourceValidationTest`).
+Baseline as of 2026-09-10: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus **227 plain-JUnit tests** across nine projects. The
+mapping project contributes 39 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+`BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`); the
+deployment project 24 (`DeploymentPlannerTest`, `ExampleDeploymentTest`).
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -151,22 +153,112 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   channel a *resolve-time* guarantee rather than a runtime surprise. `JsonPayloadIngestTest`
   (OSGi, with `data/dragino-example.json`) is the regression guard; `PayloadIngestImpl` now
   also reports a missing factory as `FORMAT_UNSUPPORTED` (HTTP 501) instead of parsing on.
-- **History is the timescale provider, switched on by its config.** Both bndruns require
-  `…southbound.history.timescale-provider`, which brings `org.postgresql.jdbc` and the two
-  Aries `tx-control` bundles (it reaches the database through the OSGi Transaction Control
-  service; those two also export the `org.osgi.service.transaction.control*` API packages, so
-  no separate API bundle is needed). All three are third-party artifacts that
-  `cnf/ext/sensinact.maven` pins but the Eclipse SensiNact repos do not host — they are
-  declared in `central.mvn` for exactly the reason described below. The store's component is
-  `configuration-policy=require`, so `configs/timescale.json` in the two config bundles is the
-  on/off switch: with a database it creates the `sensinact.history` hypertable and records; with
-  none it stays inactive and silent (the failure only reaches the OSGi log service, so `scr:list`
-  is where an empty history shows up). Its `provider` name must match `history.provider` in
-  `sensinact.json` — both are `brokerHistory`.
+- **History is two bundles now: a storage backend plus an engine.** Since the gateway's history
+  rework (PR #758, merged 2026-09-07) `…southbound.history.timescale-provider` only *stores and
+  queries*; `…southbound.history.history-core` is the engine that subscribes a backend to the
+  twin's update notifications, publishes the `HistoryProvider` service and a bit-identical legacy
+  ACT facade, and owns the historization-filter and housekeeping factory PIDs. **Both bndruns
+  require both**, and `history-core` is listed **by identity** because it exports no packages —
+  the resolver would never pull it in. The backend on its own would silently store nothing, since
+  the event wiring moved into the engine.
+  - Third-party deps come from `central.mvn`: `org.postgresql.jdbc` (42.7.13), the two Aries
+    `tx-control` bundles and `org.osgi.service.jdbc`. They used to be duplicated in
+    `cnf/ext/sensinact.maven` at postgresql 42.7.3 — removed on 2026-09-10, because the Eclipse
+    SensiNact repos do not host third-party artifacts and an entry there resolves only out of a
+    developer's `~/.m2` (trap 2 below). The rework also pulls in
+    `…filters.resource.selector(.impl)` as a *real* package requirement, so those two stopped
+    being incidental runbundles.
+  - `configs/timescale.json` in the two config bundles is still the on/off switch: the store's
+    component is `configuration-policy=require` (verified against the shipped DS metadata), the
+    PID `sensinact.history.timescale` and every key are unchanged, and `max.page.size` (default
+    10000) is new. With a database it creates the schema and records; with none it stays inactive
+    and silent (the failure only reaches the OSGi log service, so `scr:list` is where an empty
+    history shows up). Its `provider` name must match `history.provider` in `sensinact.json` —
+    both are `brokerHistory`.
+  - **What changed underneath, and it closes issue #31:** one table (`sensinact.history`) with a
+    kind discriminator instead of three, exact `NUMERIC` values plus the Java type, JSONB for any
+    GeoJSON object. PostGIS is no longer required and the TimescaleDB extension is *optional* —
+    hypertable + `time_bucket` when present, `date_bin` on plain PostgreSQL 14+. An existing
+    three-table database is **migrated on first start**: rows are copied over and
+    `numeric_data`/`text_data`/`geo_data` are renamed `*_migrated`, not dropped. Verify, then drop
+    them yourself.
+  - **SensorThings now pushes `$top`/`$skip`/`$orderby` and reducible `$filter`s into SQL.** One
+    behaviour change to know: paginated Observation/HistoricalLocation requests page over the
+    *full* dataset from its start, where they used to page inside a window of the newest
+    `history.results.max` values. Requests that still fall back to in-memory evaluation (`or`,
+    functions, string comparisons) keep the old windowed behaviour.
+  - **`sensinact.history.filter` and `sensinact.history.housekeeping` are new factory PIDs, and
+    no configurator JSON here writes them** — they belong to the deployment model (see below),
+    which is what makes `model/examples/deployment-history-tuning.xmi` a migration step that
+    collides with nothing. Note the engine's unset sentinel for `keep.count` and `max.delete` is
+    **`-1`**: a literal `0` would mean "keep no values", i.e. delete the table on the next run.
+  - `history-inmemory` (PID `sensinact.history.inmemory`) is indexed but deployed by no bndrun
+    here — history without a database, for tests and demos.
 - **Docker config is a bundle, not a mounted file.** The Felix configurator's
   `configurator.initial` pass runs before the runtime's JSON provider is wired and fails with
   "Invalid JSON", so the docker wiring is baked into `…mapping.docker.config`. See
   `docker/eventatlas/README.md` for the local image build and the `content/` layout.
+
+## The deployment model (optional, additive)
+
+A deployment can be described as a model instead of forty environment variables:
+`…event.atlas.deployment` carries `model/event-atlas-deployment.ecore` (nsURI
+`https://fennec.eclipse.org/event.atlas/deployment/1.0`, generated package
+`org.eclipse.fennec.event.atlas.model.deployment`) and the `DeploymentConfigurator` that applies an
+`EventAtlasDeployment` instance as ConfigAdmin configurations. The user-facing description is
+**`docs/event-atlas-deployment-model.md`** — read it before changing translation semantics.
+
+- **Two rules make it safe, and both are structural.** An **absent section emits nothing**, so a
+  runtime keeps every setting the model does not mention and can migrate one concern at a time.
+  And **a PID has exactly one writer**: every configuration is stamped
+  `event.atlas.deployment.owner=<deploymentId>`, and a PID that already exists *without* that stamp
+  — i.e. one a configurator JSON bundle owns — is left alone with a warning naming it. Applying
+  `model/examples/deployment-docker.xmi` to the shipped image therefore changes nothing until the
+  matching JSON blocks are deleted, which is what makes the migration reversible.
+- **The model arrives as EObject registry content**, registry `event-atlas-deployment`, keyed by
+  `deploymentId` — the same mechanism as mappings and profiles, so a `FileEObjectProvider` (both
+  config bundles declare one; the docker image reads `/opt/eventatlas/runtime/deployment`) or an
+  `AtlasEObjectProvider` can feed it. Registry callbacks run under the registry's lock, so the
+  configurator applies on a single-threaded executor: a ConfigAdmin update reactivates components
+  and must not run under that lock.
+- **`DeploymentPlanner` is pure and is where the semantics live**; the component only decides when
+  to write. That split is what makes `DeploymentPlannerTest` able to pin every refusal without a
+  framework. Refusals are collected, not thrown — a wrong section does not stop the others.
+- **`storage` under `history` is deliberately optional.** A `<history>` with only `filters` and
+  `housekeeping` claims just the two factory PIDs the history rework added, which no JSON file here
+  writes — the smallest migration step, shipped as `deployment-history-tuning.xmi`.
+- **No attribute can hold a secret, and that is structural.** `MqttBroker.passwordVariable` /
+  `TimescaleStorage.passwordVariable` name an environment *variable*, emitted as
+  `$[env:NAME;default=]`. A deployment model is content: stored in a Model Atlas it is as readable
+  as everything else there, and a Model Atlas is commonly fronted with public reads and
+  authenticated writes only (on `modelatlas.cloud`, route 8 serves every GET unauthenticated) — so
+  a password attribute would be a password on the open web. The indirection works because the Felix
+  interpolation plugin is an OSGi `ConfigurationPlugin`, which CM invokes on *delivery to the target
+  service*, not at creation, so an API-written value is interpolated like a configurator-JSON one.
+  data.atlas reached the same conclusion and keeps its JDBC credential in a Configurator resource.
+- **File mode and Model Atlas mode are one bundle and one image**, because the configurator consumes
+  the `event-atlas-deployment` *registry* rather than fetching for itself: `FileEObjectProvider~deployment`
+  seeds it, `AtlasEObjectProvider~deployment` syncs on top, and the docker `config.json` declares
+  both (inert until the Atlas actually has the registry). data.atlas needs `runtime.config` vs
+  `runtime.config.atlas` and two image tags for the same capability because its bootstrap component
+  differs per source. A deployment can share an
+  existing Atlas registry when that registry is rooted at `Ecore#//EObject` (a registry pinned to a
+  concrete type cannot hold one — `sensinactmapping` pins `ProviderMapping`); sharing wants
+  `object.ids` set, or the provider loads every object and warns once per pass per foreign one it
+  cannot key. The metamodel must be seeded as a schema in every stage the object passes through,
+  because the Atlas deserializes the instance server-side. Never seed one `deploymentId` into both
+  sources.
+- **`EDuration` needs its `create`/`convert` GenModel bodies.** EMF's default reflective conversion
+  cannot build a `java.time.Duration` from a literal (no `valueOf(String)`), so without them every
+  deployment XMI carrying a duration fails to load with `The value 'P30D' is invalid`. The bodies
+  live in the `.ecore` annotation and use `it` as the parameter. The mapping metamodel's `EInstant`
+  has the same gap — latent only because no mapping XMI writes a literal instant.
+- **The `generate` task's up-to-date check does not notice an `.ecore`-only edit.** It appears to
+  regenerate and silently does not; force it with
+  `./gradlew :org.eclipse.fennec.event.atlas.deployment:generate --rerun-tasks`. The `.genmodel` is
+  mechanically derived from the `.ecore`, so a new classifier needs its `genClasses`/`genFeatures`
+  entry too. As with the mapping metamodel: never hand-edit `src-gen`, and **ask the user** before
+  changing the `.ecore`/`.genmodel`.
 
 ## Model inference (optional, off unless configured)
 
@@ -255,7 +347,12 @@ it walks its directory once at activation and never again.
   host for the bndrun re-resolve and the docker export. Beware bnd's cache sidecar in `~/.m2`
   when checking provenance: its `"uri"` field records the **first** URL of a comma-separated
   `snapshotUrl` list, not the host the bytes came from, so it can name a URL that 404s — compare
-  the recorded `sha_1` against the candidate hosts instead.
+  the recorded `sha_1` against the candidate hosts instead. Two sharper traps, both hit on
+  2026-09-10: a local `mvn install` of the same snapshot **overwrites the jar without updating the
+  sidecar**, so the sidecar can describe a completely different build than the file beside it; and
+  the Gradle export task goes **UP-TO-DATE when `-runbundles` is unchanged**, so after a repository
+  change it happily reuses a runtime jar built from the old configuration. `sha1sum` the bundle
+  *inside* a freshly forced export (`--rerun-tasks`) rather than trusting either.
   `org.eclipse.fennec.mcp.endpoint` is unaffected: it resolves from
   `org.eclipse.fennec.mcp:org.eclipse.fennec.mcp.endpoint:0.1.0-SNAPSHOT` in `central.mvn`.
   `RemoteMCPEndpoint` (config `server.name` + `server.url`) is what makes a *remote* MCP
@@ -570,7 +667,15 @@ EPackages a runtime maps must be registered in that runtime.
   `fennecM2X` — it is in the list purely because `fennecM2X.maven` is the only index naming
   `org.antlr:antlr4-runtime`; see the third `-runbundles` trap below.
 - SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
-  `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots);
+  `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots). **The
+  history rework needs a gateway snapshot from 2026-09-10 or later.** That deployment had been
+  stalled since 2026-05-07 — `0.0.2-20260507.121009-170`, which carries no `history-core` at all —
+  and was fixed on 2026-09-10; it now publishes the whole gateway at one timestamp
+  (`0.0.2-20260910.130036-171`, verified from a pristine local repo), which is what the
+  SensorThings bundles need: they bind the `HistoryProvider` service that only the reworked
+  `history-api` exports. **The hazard is now a stale cache, not the repo** — an older snapshot
+  resolves to a history backend with no engine, silently. Check provenance against a pristine
+  local repo (`local=<tmpdir>` on the plugin), not against `~/.m2`;
   `central.mvn` additionally carries the Model Atlas client bundles
   (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / eobject.provider`) and every
   third-party bundle the northbound chain drags in: Jackson 3 (`tools.jackson.core:jackson-core`

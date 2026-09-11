@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The smallest useful step into the deployment model.
+
+  It declares no storage, so it claims none of the PIDs a configurator JSON bundle already owns -
+  the history store keeps coming from configs/timescale.json and its $[env:...] placeholders. What
+  it does own are the two factory PIDs the history rework introduced and that no JSON file here
+  writes: sensinact.history.filter and sensinact.history.housekeeping.
+
+  Drop it into the deployment directory of a running runtime and the filters and policies appear
+  without touching anything else.
+-->
+<deployment:EventAtlasDeployment xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:deployment="https://fennec.eclipse.org/event.atlas/deployment/1.0"
+    deploymentId="eventatlas-history-tuning"
+    description="Historization filters and housekeeping only - the store stays where it is.">
+
+  <history providerName="brokerHistory">
+    <!-- Store only a temperature that moved by at least 0.5 K, but at least every 30 minutes. -->
+    <filters name="temperature-deadband" changeMode="DEADBAND" changeThreshold="0.5"
+        changeMaxInterval="PT30M">
+      <targets>brokerHistory</targets>
+      <includeResources>{"resource": {"value": "temperature", "type": "EXACT"}}</includeResources>
+    </filters>
+    <!-- Everything else: store only actual changes. -->
+    <filters name="changes-only" changeMode="ON_CHANGE">
+      <targets>brokerHistory</targets>
+    </filters>
+    <housekeeping name="ninety-days" retentionPeriod="P90D" maxDelete="50000"
+        schedulePeriod="PT24H">
+      <targets>brokerHistory</targets>
+    </housekeeping>
+  </history>
+</deployment:EventAtlasDeployment>
