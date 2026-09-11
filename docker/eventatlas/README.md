@@ -308,6 +308,37 @@ Beware one thing when writing housekeeping by hand: `keepCount` and `maxDelete` 
 greater than zero rather than writing a literal `0`, which would otherwise ask it to keep no values
 at all.
 
+### Credentials stay out of it
+
+The model names the environment variable holding a password, never the password:
+`passwordVariable="TIMESCALE_PWD"` becomes the ConfigAdmin value `$[env:TIMESCALE_PWD;default=]`,
+resolved on delivery by the same interpolation plugin that fills the baked JSON. There is no
+attribute a secret could go into — which matters because a deployment model is *content*: put it in
+a Model Atlas and it is as readable as everything else there.
+
+### Or keep it in the Model Atlas instead of a mount
+
+The same image does both. The configurator consumes the `event-atlas-deployment` registry, so the
+source is whichever provider feeds it — the mounted directory above
+(`FileEObjectProvider~deployment`) or an Atlas registry (`AtlasEObjectProvider~deployment`, keyed by
+`deploymentId`). Both are declared in `config.json`; the Atlas one is inert until the registry
+exists, so it costs nothing when unused.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `EVENTATLAS_DEPLOYMENT_REGISTRY` | `eventatlas-configurations` | Atlas registry holding the deployment object. Needs its own registry — `sensinactmapping` pins `root.eclass.uri` to `ProviderMapping` |
+| `EVENTATLAS_DEPLOYMENT_REFRESH_INTERVAL_MS` | `60000` | how often the object is re-read |
+
+The metamodel has to be seeded into the Atlas as a schema (one file — it references nothing but
+Ecore), in every stage the object passes through, because the Atlas deserializes the instance
+server-side. Do not seed the same `deploymentId` into both the mount and the Atlas: two providers
+would race for one entry.
+
+Unlike the Data Atlas's atlas mode this one is **fail-soft** — an absent or unreadable object means
+the baked JSON keeps serving, not an endpoint that answers 404 forever — so no start-up gate is
+needed. The trade is silence, which is why the configurator logs what it applied, refused and
+removed on every pass.
+
 The full metamodel, the section-to-PID table, every refusal and the migration order are documented
 in [`docs/event-atlas-deployment-model.md`](../../docs/event-atlas-deployment-model.md); two ready
 examples ship in `org.eclipse.fennec.event.atlas.deployment/model/examples/`.

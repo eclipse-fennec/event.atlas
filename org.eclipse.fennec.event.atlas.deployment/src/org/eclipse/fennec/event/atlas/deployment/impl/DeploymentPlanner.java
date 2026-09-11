@@ -187,7 +187,7 @@ public final class DeploymentPlanner {
 			properties.put("host", trimmed(broker.getHost()));
 			properties.put("port", broker.getPort());
 			properties.put("user", trimmed(broker.getUser()));
-			properties.put(".password", trimmed(broker.getPassword()));
+			putSecretReference(properties, broker.getPasswordVariable());
 			properties.put("topics", strings(broker.getTopics()));
 			records.add(record(PID_MQTT_BROKER_FACTORY, id, properties));
 		}
@@ -257,7 +257,7 @@ public final class DeploymentPlanner {
 			pid = PID_TIMESCALE;
 			properties.put("url", jdbcUrl(timescale));
 			properties.put("user", trimmed(timescale.getUser()));
-			properties.put(".password", trimmed(timescale.getPassword()));
+			putSecretReference(properties, timescale.getPasswordVariable());
 		} else if (storage instanceof InMemoryStorage inMemory) {
 			pid = PID_INMEMORY;
 			if (inMemory.getMaxValuesPerResource() > 0) {
@@ -369,6 +369,26 @@ public final class DeploymentPlanner {
 		properties.put("namespace", trimmed(inference.getNamespace()));
 		properties.put("maxRunsPerInterval", inference.getMaxRunsPerInterval());
 		records.add(record(PID_INFERENCE, properties));
+	}
+
+	/**
+	 * Writes {@code .password} as an {@code $[env:NAME;default=]} reference rather than a value.
+	 * <p>
+	 * A deployment model is <em>content</em>: stored in a Model Atlas it is exactly as readable as
+	 * every other object there, and on at least one deployment every Model Atlas GET is served
+	 * unauthenticated. So the model names the environment variable and never the secret.
+	 * <p>
+	 * The indirection resolves because the Felix interpolation plugin is an OSGi
+	 * {@code ConfigurationPlugin}, which Configuration Admin invokes when properties are
+	 * <em>delivered to the target service</em> — not when the configuration is created. A value
+	 * written here through the ConfigAdmin API is therefore interpolated exactly like one that came
+	 * from a configurator JSON resource.
+	 */
+	private static void putSecretReference(Map<String, Object> properties, String variableName) {
+		String name = trimmed(variableName);
+		if (!name.isEmpty()) {
+			properties.put(".password", "$[env:" + name + ";default=]");
+		}
 	}
 
 	private static String jdbcUrl(TimescaleStorage timescale) {

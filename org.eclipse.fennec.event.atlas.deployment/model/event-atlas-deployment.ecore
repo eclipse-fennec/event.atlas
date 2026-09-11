@@ -171,7 +171,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="MqttBroker">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="A southbound MQTT broker connection. The sensinact client is the transport only - connection plus subscription; mapping and ingest happen in event.atlas's own listener, which binds this broker by its id.&#xA;&#xA;'topics' is what is SUBSCRIBED at the broker. Which of those messages each channel handles is a separate per-channel filter, and the union of the channel filters should cover this list: a topic that is subscribed but matches no channel is received and silently dropped."/>
+      <details key="documentation" value="A southbound MQTT broker connection.&#xA;&#xA;THERE IS DELIBERATELY NO CREDENTIAL HERE. The broker password stays a ConfigAdmin value fed from the environment, because a deployment model is content: stored in a Model Atlas it is as readable as every other object there - on modelatlas.cloud every GET is served unauthenticated. Declaring this section still writes the rest of the PID, and the '.password' property keeps coming from the configurator JSON's $[env:...] placeholder. The sensinact client is the transport only - connection plus subscription; mapping and ingest happen in event.atlas's own listener, which binds this broker by its id.&#xA;&#xA;'topics' is what is SUBSCRIBED at the broker. Which of those messages each channel handles is a separate per-channel filter, and the union of the channel filters should cover this list: a topic that is subscribed but matches no channel is received and silently dropped."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="id" lowerBound="1" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -185,9 +185,10 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="port" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
         defaultValueLiteral="1883"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="user" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
-    <eStructuralFeatures xsi:type="ecore:EAttribute" name="password" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="passwordVariable" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
+        defaultValueLiteral="EVENTATLAS_MQTT_PASSWORD">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Written to the private ConfigAdmin property '.password', so it is not readable back through the configuration API. Prefer leaving it blank here and supplying it through the environment."/>
+        <details key="documentation" value="The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:&lt;name&gt;;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="topics" upperBound="-1"
@@ -273,7 +274,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="TimescaleStorage" eSuperTypes="#//HistoryStorage">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The PostgreSQL/TimescaleDB backend. The TimescaleDB extension is optional - with it the history table becomes a hypertable, on plain PostgreSQL 14+ the provider falls back to date_bin. PostGIS is not required.&#xA;&#xA;Its component requires a configuration, so declaring this section is what switches history on."/>
+      <details key="documentation" value="The PostgreSQL/TimescaleDB backend.&#xA;&#xA;THERE IS DELIBERATELY NO CREDENTIAL HERE - see MqttBroker. 'user' is named because it is not a secret and a deployment needs to see which role it connects as; the password stays a ConfigAdmin value fed from the environment. The TimescaleDB extension is optional - with it the history table becomes a hypertable, on plain PostgreSQL 14+ the provider falls back to date_bin. PostGIS is not required.&#xA;&#xA;Its component requires a configuration, so declaring this section is what switches history on."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="url" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -287,9 +288,10 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="database" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
         defaultValueLiteral="sensinactHistory"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="user" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
-    <eStructuralFeatures xsi:type="ecore:EAttribute" name="password" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="passwordVariable" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
+        defaultValueLiteral="TIMESCALE_PWD">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Written to the private ConfigAdmin property '.password'. Prefer supplying it through the environment."/>
+        <details key="documentation" value="The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:&lt;name&gt;;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>

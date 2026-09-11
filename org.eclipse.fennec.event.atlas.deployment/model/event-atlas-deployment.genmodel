@@ -60,7 +60,7 @@
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/host"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/port"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/user"/>
-      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/password"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/passwordVariable"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//MqttBroker/topics"/>
     </genClasses>
     <genClasses ecoreClass="event-atlas-deployment.ecore#//IngestChannel">
@@ -88,7 +88,7 @@
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/port"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/database"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/user"/>
-      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/password"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//TimescaleStorage/passwordVariable"/>
     </genClasses>
     <genClasses ecoreClass="event-atlas-deployment.ecore#//InMemoryStorage">
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-deployment.ecore#//InMemoryStorage/maxValuesPerResource"/>

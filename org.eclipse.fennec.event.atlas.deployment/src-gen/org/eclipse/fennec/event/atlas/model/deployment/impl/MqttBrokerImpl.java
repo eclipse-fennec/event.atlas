@@ -42,7 +42,7 @@ import org.eclipse.fennec.event.atlas.model.deployment.MqttBroker;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.MqttBrokerImpl#getHost <em>Host</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.MqttBrokerImpl#getPort <em>Port</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.MqttBrokerImpl#getUser <em>User</em>}</li>
- *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.MqttBrokerImpl#getPassword <em>Password</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.MqttBrokerImpl#getPasswordVariable <em>Password Variable</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.MqttBrokerImpl#getTopics <em>Topics</em>}</li>
  * </ul>
  *
@@ -150,24 +150,24 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 	protected String user = USER_EDEFAULT;
 
 	/**
-	 * The default value of the '{@link #getPassword() <em>Password</em>}' attribute.
+	 * The default value of the '{@link #getPasswordVariable() <em>Password Variable</em>}' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @see #getPassword()
+	 * @see #getPasswordVariable()
 	 * @generated
 	 * @ordered
 	 */
-	protected static final String PASSWORD_EDEFAULT = null;
+	protected static final String PASSWORD_VARIABLE_EDEFAULT = "EVENTATLAS_MQTT_PASSWORD";
 
 	/**
-	 * The cached value of the '{@link #getPassword() <em>Password</em>}' attribute.
+	 * The cached value of the '{@link #getPasswordVariable() <em>Password Variable</em>}' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @see #getPassword()
+	 * @see #getPasswordVariable()
 	 * @generated
 	 * @ordered
 	 */
-	protected String password = PASSWORD_EDEFAULT;
+	protected String passwordVariable = PASSWORD_VARIABLE_EDEFAULT;
 
 	/**
 	 * The cached value of the '{@link #getTopics() <em>Topics</em>}' attribute list.
@@ -319,8 +319,8 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 	 * @generated
 	 */
 	@Override
-	public String getPassword() {
-		return password;
+	public String getPasswordVariable() {
+		return passwordVariable;
 	}
 
 	/**
@@ -329,11 +329,11 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 	 * @generated
 	 */
 	@Override
-	public void setPassword(String newPassword) {
-		String oldPassword = password;
-		password = newPassword;
+	public void setPasswordVariable(String newPasswordVariable) {
+		String oldPasswordVariable = passwordVariable;
+		passwordVariable = newPasswordVariable;
 		if (eNotificationRequired())
-			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.MQTT_BROKER__PASSWORD, oldPassword, password));
+			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.MQTT_BROKER__PASSWORD_VARIABLE, oldPasswordVariable, passwordVariable));
 	}
 
 	/**
@@ -367,8 +367,8 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 				return getPort();
 			case DeploymentPackage.MQTT_BROKER__USER:
 				return getUser();
-			case DeploymentPackage.MQTT_BROKER__PASSWORD:
-				return getPassword();
+			case DeploymentPackage.MQTT_BROKER__PASSWORD_VARIABLE:
+				return getPasswordVariable();
 			case DeploymentPackage.MQTT_BROKER__TOPICS:
 				return getTopics();
 		}
@@ -399,8 +399,8 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 			case DeploymentPackage.MQTT_BROKER__USER:
 				setUser((String)newValue);
 				return;
-			case DeploymentPackage.MQTT_BROKER__PASSWORD:
-				setPassword((String)newValue);
+			case DeploymentPackage.MQTT_BROKER__PASSWORD_VARIABLE:
+				setPasswordVariable((String)newValue);
 				return;
 			case DeploymentPackage.MQTT_BROKER__TOPICS:
 				getTopics().clear();
@@ -433,8 +433,8 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 			case DeploymentPackage.MQTT_BROKER__USER:
 				setUser(USER_EDEFAULT);
 				return;
-			case DeploymentPackage.MQTT_BROKER__PASSWORD:
-				setPassword(PASSWORD_EDEFAULT);
+			case DeploymentPackage.MQTT_BROKER__PASSWORD_VARIABLE:
+				setPasswordVariable(PASSWORD_VARIABLE_EDEFAULT);
 				return;
 			case DeploymentPackage.MQTT_BROKER__TOPICS:
 				getTopics().clear();
@@ -461,8 +461,8 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 				return port != PORT_EDEFAULT;
 			case DeploymentPackage.MQTT_BROKER__USER:
 				return USER_EDEFAULT == null ? user != null : !USER_EDEFAULT.equals(user);
-			case DeploymentPackage.MQTT_BROKER__PASSWORD:
-				return PASSWORD_EDEFAULT == null ? password != null : !PASSWORD_EDEFAULT.equals(password);
+			case DeploymentPackage.MQTT_BROKER__PASSWORD_VARIABLE:
+				return PASSWORD_VARIABLE_EDEFAULT == null ? passwordVariable != null : !PASSWORD_VARIABLE_EDEFAULT.equals(passwordVariable);
 			case DeploymentPackage.MQTT_BROKER__TOPICS:
 				return topics != null && !topics.isEmpty();
 		}
@@ -489,8 +489,8 @@ public class MqttBrokerImpl extends MinimalEObjectImpl.Container implements Mqtt
 		result.append(port);
 		result.append(", user: ");
 		result.append(user);
-		result.append(", password: ");
-		result.append(password);
+		result.append(", passwordVariable: ");
+		result.append(passwordVariable);
 		result.append(", topics: ");
 		result.append(topics);
 		result.append(')');

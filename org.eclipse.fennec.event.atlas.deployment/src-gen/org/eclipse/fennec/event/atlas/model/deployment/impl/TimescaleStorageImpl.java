@@ -35,7 +35,7 @@ import org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.TimescaleStorageImpl#getPort <em>Port</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.TimescaleStorageImpl#getDatabase <em>Database</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.TimescaleStorageImpl#getUser <em>User</em>}</li>
- *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.TimescaleStorageImpl#getPassword <em>Password</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.impl.TimescaleStorageImpl#getPasswordVariable <em>Password Variable</em>}</li>
  * </ul>
  *
  * @generated
@@ -142,24 +142,24 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 	protected String user = USER_EDEFAULT;
 
 	/**
-	 * The default value of the '{@link #getPassword() <em>Password</em>}' attribute.
+	 * The default value of the '{@link #getPasswordVariable() <em>Password Variable</em>}' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @see #getPassword()
+	 * @see #getPasswordVariable()
 	 * @generated
 	 * @ordered
 	 */
-	protected static final String PASSWORD_EDEFAULT = null;
+	protected static final String PASSWORD_VARIABLE_EDEFAULT = "TIMESCALE_PWD";
 
 	/**
-	 * The cached value of the '{@link #getPassword() <em>Password</em>}' attribute.
+	 * The cached value of the '{@link #getPasswordVariable() <em>Password Variable</em>}' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @see #getPassword()
+	 * @see #getPasswordVariable()
 	 * @generated
 	 * @ordered
 	 */
-	protected String password = PASSWORD_EDEFAULT;
+	protected String passwordVariable = PASSWORD_VARIABLE_EDEFAULT;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -301,8 +301,8 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 	 * @generated
 	 */
 	@Override
-	public String getPassword() {
-		return password;
+	public String getPasswordVariable() {
+		return passwordVariable;
 	}
 
 	/**
@@ -311,11 +311,11 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 	 * @generated
 	 */
 	@Override
-	public void setPassword(String newPassword) {
-		String oldPassword = password;
-		password = newPassword;
+	public void setPasswordVariable(String newPasswordVariable) {
+		String oldPasswordVariable = passwordVariable;
+		passwordVariable = newPasswordVariable;
 		if (eNotificationRequired())
-			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.TIMESCALE_STORAGE__PASSWORD, oldPassword, password));
+			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.TIMESCALE_STORAGE__PASSWORD_VARIABLE, oldPasswordVariable, passwordVariable));
 	}
 
 	/**
@@ -336,8 +336,8 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 				return getDatabase();
 			case DeploymentPackage.TIMESCALE_STORAGE__USER:
 				return getUser();
-			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD:
-				return getPassword();
+			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD_VARIABLE:
+				return getPasswordVariable();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -365,8 +365,8 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 			case DeploymentPackage.TIMESCALE_STORAGE__USER:
 				setUser((String)newValue);
 				return;
-			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD:
-				setPassword((String)newValue);
+			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD_VARIABLE:
+				setPasswordVariable((String)newValue);
 				return;
 		}
 		super.eSet(featureID, newValue);
@@ -395,8 +395,8 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 			case DeploymentPackage.TIMESCALE_STORAGE__USER:
 				setUser(USER_EDEFAULT);
 				return;
-			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD:
-				setPassword(PASSWORD_EDEFAULT);
+			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD_VARIABLE:
+				setPasswordVariable(PASSWORD_VARIABLE_EDEFAULT);
 				return;
 		}
 		super.eUnset(featureID);
@@ -420,8 +420,8 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 				return DATABASE_EDEFAULT == null ? database != null : !DATABASE_EDEFAULT.equals(database);
 			case DeploymentPackage.TIMESCALE_STORAGE__USER:
 				return USER_EDEFAULT == null ? user != null : !USER_EDEFAULT.equals(user);
-			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD:
-				return PASSWORD_EDEFAULT == null ? password != null : !PASSWORD_EDEFAULT.equals(password);
+			case DeploymentPackage.TIMESCALE_STORAGE__PASSWORD_VARIABLE:
+				return PASSWORD_VARIABLE_EDEFAULT == null ? passwordVariable != null : !PASSWORD_VARIABLE_EDEFAULT.equals(passwordVariable);
 		}
 		return super.eIsSet(featureID);
 	}
@@ -446,8 +446,8 @@ public class TimescaleStorageImpl extends HistoryStorageImpl implements Timescal
 		result.append(database);
 		result.append(", user: ");
 		result.append(user);
-		result.append(", password: ");
-		result.append(password);
+		result.append(", passwordVariable: ");
+		result.append(passwordVariable);
 		result.append(')');
 		return result.toString();
 	}

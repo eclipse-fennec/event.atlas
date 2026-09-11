@@ -21,7 +21,9 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * The PostgreSQL/TimescaleDB backend. The TimescaleDB extension is optional - with it the history table becomes a hypertable, on plain PostgreSQL 14+ the provider falls back to date_bin. PostGIS is not required.
+ * The PostgreSQL/TimescaleDB backend.
+ * 
+ * THERE IS DELIBERATELY NO CREDENTIAL HERE - see MqttBroker. 'user' is named because it is not a secret and a deployment needs to see which role it connects as; the password stays a ConfigAdmin value fed from the environment. The TimescaleDB extension is optional - with it the history table becomes a hypertable, on plain PostgreSQL 14+ the provider falls back to date_bin. PostGIS is not required.
  * 
  * Its component requires a configuration, so declaring this section is what switches history on.
  * <!-- end-model-doc -->
@@ -35,7 +37,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPort <em>Port</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getDatabase <em>Database</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getUser <em>User</em>}</li>
- *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPassword <em>Password</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPasswordVariable <em>Password Variable</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getTimescaleStorage()
@@ -161,28 +163,29 @@ public interface TimescaleStorage extends HistoryStorage {
 	void setUser(String value);
 
 	/**
-	 * Returns the value of the '<em><b>Password</b></em>' attribute.
+	 * Returns the value of the '<em><b>Password Variable</b></em>' attribute.
+	 * The default value is <code>"TIMESCALE_PWD"</code>.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Written to the private ConfigAdmin property '.password'. Prefer supplying it through the environment.
+	 * The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:<name>;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely.
 	 * <!-- end-model-doc -->
-	 * @return the value of the '<em>Password</em>' attribute.
-	 * @see #setPassword(String)
-	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getTimescaleStorage_Password()
-	 * @model
+	 * @return the value of the '<em>Password Variable</em>' attribute.
+	 * @see #setPasswordVariable(String)
+	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getTimescaleStorage_PasswordVariable()
+	 * @model default="TIMESCALE_PWD"
 	 * @generated
 	 */
-	String getPassword();
+	String getPasswordVariable();
 
 	/**
-	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPassword <em>Password</em>}' attribute.
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPasswordVariable <em>Password Variable</em>}' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @param value the new value of the '<em>Password</em>' attribute.
-	 * @see #getPassword()
+	 * @param value the new value of the '<em>Password Variable</em>' attribute.
+	 * @see #getPasswordVariable()
 	 * @generated
 	 */
-	void setPassword(String value);
+	void setPasswordVariable(String value);
 
 } // TimescaleStorage

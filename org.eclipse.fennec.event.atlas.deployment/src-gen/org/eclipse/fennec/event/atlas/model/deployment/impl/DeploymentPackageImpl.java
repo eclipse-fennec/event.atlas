@@ -545,7 +545,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 	 * @generated
 	 */
 	@Override
-	public EAttribute getMqttBroker_Password() {
+	public EAttribute getMqttBroker_PasswordVariable() {
 		return (EAttribute)mqttBrokerEClass.getEStructuralFeatures().get(5);
 	}
 
@@ -785,7 +785,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 	 * @generated
 	 */
 	@Override
-	public EAttribute getTimescaleStorage_Password() {
+	public EAttribute getTimescaleStorage_PasswordVariable() {
 		return (EAttribute)timescaleStorageEClass.getEStructuralFeatures().get(5);
 	}
 
@@ -1122,7 +1122,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 		createEAttribute(mqttBrokerEClass, MQTT_BROKER__HOST);
 		createEAttribute(mqttBrokerEClass, MQTT_BROKER__PORT);
 		createEAttribute(mqttBrokerEClass, MQTT_BROKER__USER);
-		createEAttribute(mqttBrokerEClass, MQTT_BROKER__PASSWORD);
+		createEAttribute(mqttBrokerEClass, MQTT_BROKER__PASSWORD_VARIABLE);
 		createEAttribute(mqttBrokerEClass, MQTT_BROKER__TOPICS);
 
 		ingestChannelEClass = createEClass(INGEST_CHANNEL);
@@ -1150,7 +1150,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 		createEAttribute(timescaleStorageEClass, TIMESCALE_STORAGE__PORT);
 		createEAttribute(timescaleStorageEClass, TIMESCALE_STORAGE__DATABASE);
 		createEAttribute(timescaleStorageEClass, TIMESCALE_STORAGE__USER);
-		createEAttribute(timescaleStorageEClass, TIMESCALE_STORAGE__PASSWORD);
+		createEAttribute(timescaleStorageEClass, TIMESCALE_STORAGE__PASSWORD_VARIABLE);
 
 		inMemoryStorageEClass = createEClass(IN_MEMORY_STORAGE);
 		createEAttribute(inMemoryStorageEClass, IN_MEMORY_STORAGE__MAX_VALUES_PER_RESOURCE);
@@ -1254,7 +1254,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 		initEAttribute(getMqttBroker_Host(), ecorePackage.getEString(), "host", "localhost", 0, 1, MqttBroker.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getMqttBroker_Port(), ecorePackage.getEInt(), "port", "1883", 0, 1, MqttBroker.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getMqttBroker_User(), ecorePackage.getEString(), "user", null, 0, 1, MqttBroker.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
-		initEAttribute(getMqttBroker_Password(), ecorePackage.getEString(), "password", null, 0, 1, MqttBroker.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getMqttBroker_PasswordVariable(), ecorePackage.getEString(), "passwordVariable", "EVENTATLAS_MQTT_PASSWORD", 0, 1, MqttBroker.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getMqttBroker_Topics(), ecorePackage.getEString(), "topics", null, 0, -1, MqttBroker.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(ingestChannelEClass, IngestChannel.class, "IngestChannel", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
@@ -1282,7 +1282,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 		initEAttribute(getTimescaleStorage_Port(), ecorePackage.getEInt(), "port", "5432", 0, 1, TimescaleStorage.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getTimescaleStorage_Database(), ecorePackage.getEString(), "database", "sensinactHistory", 0, 1, TimescaleStorage.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getTimescaleStorage_User(), ecorePackage.getEString(), "user", null, 0, 1, TimescaleStorage.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
-		initEAttribute(getTimescaleStorage_Password(), ecorePackage.getEString(), "password", null, 0, 1, TimescaleStorage.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getTimescaleStorage_PasswordVariable(), ecorePackage.getEString(), "passwordVariable", "TIMESCALE_PWD", 0, 1, TimescaleStorage.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(inMemoryStorageEClass, InMemoryStorage.class, "InMemoryStorage", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 		initEAttribute(getInMemoryStorage_MaxValuesPerResource(), ecorePackage.getEInt(), "maxValuesPerResource", null, 0, 1, InMemoryStorage.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);

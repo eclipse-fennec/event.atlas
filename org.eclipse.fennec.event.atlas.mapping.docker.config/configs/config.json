@@ -103,6 +103,39 @@
     "initialProvider.target": "(emf.eobject.provider.name=deployment-files)"
   },
 
+  /* Deployment models from the Model Atlas, so a deployment can be a stored, staged object
+   * instead of a mounted file - the same move data.atlas made for its DataAtlasConfiguration.
+   *
+   * This costs no second image. Because DeploymentConfigurator consumes a REGISTRY rather than
+   * fetching for itself, file mode and atlas mode are the same bundle and the same runtime:
+   * the file provider above seeds the registry, this provider syncs on top. (data.atlas needs
+   * runtime.config vs runtime.config.atlas and two image tags because its bootstrap component
+   * differs per source.)
+   *
+   * Inert until the registry exists. A registry the Atlas does not have syncs NOTHING and
+   * reports no error - the same silence as a wrong scope on the mappings provider - so shipping
+   * this block unconditionally is safe. `registries` needs its own registry on the Atlas side:
+   * `sensinactmapping` pins `root.eclass.uri` to ProviderMapping, so a deployment object cannot
+   * live there.
+   *
+   * DO NOT put a deployment XMI in BOTH this registry and the mounted directory under the same
+   * deploymentId - two providers would race to define the same entry, exactly as two providers
+   * racing on one `mid` do. */
+  "AtlasEObjectProvider~deployment": {
+    "atlasScope.target": "(atlas.scope=$[env:EVENTATLAS_ATLAS_SCOPE;default=jena])",
+    "writer.target": "(emf.eobject.registry.name=event-atlas-deployment)",
+    "emf.eobject.provider.name": "atlas-deployment",
+    "registries": ["$[env:EVENTATLAS_DEPLOYMENT_REGISTRY;default=eventatlas-configurations]"],
+    "key.feature": "deploymentId",
+    /* The deployment metamodel is carried by the deployment BUNDLE, so this gate is satisfied
+     * from the moment the framework is up - unlike the mapping gate, which waits for domain
+     * EPackages the Atlas has to publish first. */
+    "required.nsuris": [
+      "https://fennec.eclipse.org/event.atlas/deployment/1.0"
+    ],
+    "refresh.interval.ms": "$[env:EVENTATLAS_DEPLOYMENT_REFRESH_INTERVAL_MS;default=60000;type=Long]"
+  },
+
   "FileEObjectProvider~profiles": {
     "emf.eobject.provider.name": "profile-files",
     "locations": ["/opt/eventatlas/runtime/profiles"],

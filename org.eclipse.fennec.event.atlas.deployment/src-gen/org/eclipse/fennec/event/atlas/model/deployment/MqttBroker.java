@@ -25,7 +25,9 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * A southbound MQTT broker connection. The sensinact client is the transport only - connection plus subscription; mapping and ingest happen in event.atlas's own listener, which binds this broker by its id.
+ * A southbound MQTT broker connection.
+ * 
+ * THERE IS DELIBERATELY NO CREDENTIAL HERE. The broker password stays a ConfigAdmin value fed from the environment, because a deployment model is content: stored in a Model Atlas it is as readable as every other object there - on modelatlas.cloud every GET is served unauthenticated. Declaring this section still writes the rest of the PID, and the '.password' property keeps coming from the configurator JSON's $[env:...] placeholder. The sensinact client is the transport only - connection plus subscription; mapping and ingest happen in event.atlas's own listener, which binds this broker by its id.
  * 
  * 'topics' is what is SUBSCRIBED at the broker. Which of those messages each channel handles is a separate per-channel filter, and the union of the channel filters should cover this list: a topic that is subscribed but matches no channel is received and silently dropped.
  * <!-- end-model-doc -->
@@ -39,7 +41,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getHost <em>Host</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPort <em>Port</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getUser <em>User</em>}</li>
- *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPassword <em>Password</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPasswordVariable <em>Password Variable</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getTopics <em>Topics</em>}</li>
  * </ul>
  *
@@ -166,29 +168,30 @@ public interface MqttBroker extends EObject {
 	void setUser(String value);
 
 	/**
-	 * Returns the value of the '<em><b>Password</b></em>' attribute.
+	 * Returns the value of the '<em><b>Password Variable</b></em>' attribute.
+	 * The default value is <code>"EVENTATLAS_MQTT_PASSWORD"</code>.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Written to the private ConfigAdmin property '.password', so it is not readable back through the configuration API. Prefer leaving it blank here and supplying it through the environment.
+	 * The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:<name>;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely.
 	 * <!-- end-model-doc -->
-	 * @return the value of the '<em>Password</em>' attribute.
-	 * @see #setPassword(String)
-	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getMqttBroker_Password()
-	 * @model
+	 * @return the value of the '<em>Password Variable</em>' attribute.
+	 * @see #setPasswordVariable(String)
+	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getMqttBroker_PasswordVariable()
+	 * @model default="EVENTATLAS_MQTT_PASSWORD"
 	 * @generated
 	 */
-	String getPassword();
+	String getPasswordVariable();
 
 	/**
-	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPassword <em>Password</em>}' attribute.
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPasswordVariable <em>Password Variable</em>}' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @param value the new value of the '<em>Password</em>' attribute.
-	 * @see #getPassword()
+	 * @param value the new value of the '<em>Password Variable</em>' attribute.
+	 * @see #getPasswordVariable()
 	 * @generated
 	 */
-	void setPassword(String value);
+	void setPasswordVariable(String value);
 
 	/**
 	 * Returns the value of the '<em><b>Topics</b></em>' attribute list.

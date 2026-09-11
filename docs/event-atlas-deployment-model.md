@@ -101,6 +101,69 @@ From there, take over one section at a time: add `<storage>` to the model *and* 
 `configs/timescale.json` in the same change, add `<http>` and delete the whiteboard blocks from
 `configs/sensinact.json`, and so on.
 
+## Credentials are never in the model
+
+The model names the **environment variable** that holds a password, never the password:
+
+```xml
+<storage xsi:type="deployment:TimescaleStorage" host="timescale" user="snaHistory"
+    passwordVariable="TIMESCALE_PWD"/>
+```
+
+`MqttBroker.passwordVariable` and `TimescaleStorage.passwordVariable` are emitted as the
+ConfigAdmin value `$[env:<name>;default=]`; blank omits the property entirely. There is no
+attribute that could hold a secret, which makes leaking one structurally impossible rather than a
+matter of discipline.
+
+**This is not over-caution — it follows from where the model lives.** A deployment model is
+*content*: stored in a Model Atlas it is exactly as readable as every other object there, and a
+Model Atlas is commonly fronted so that reads are public while only writes are authenticated (on
+`modelatlas.cloud`, route 8 serves every GET unauthenticated and only writes take basic-auth). A
+password attribute would therefore be a password published on the open web. The Data Atlas reached
+the same conclusion for its own configuration model and keeps its JDBC credential in a Configurator
+resource instead.
+
+The indirection resolves because the Felix interpolation plugin is an OSGi
+`ConfigurationPlugin`, and Configuration Admin invokes those when properties are **delivered to the
+target service** — not when the configuration is created. A value written through the ConfigAdmin
+API is interpolated exactly like one from a configurator JSON resource, so a model-owned PID still
+gets its credential from the environment.
+
+## Model Atlas mode
+
+Because the configurator consumes a *registry* rather than fetching for itself, the same bundle and
+the same image serve both config sources — the choice is which provider feeds
+`event-atlas-deployment`:
+
+| source | provider | where the model lives |
+|---|---|---|
+| file | `FileEObjectProvider~deployment` | a mounted directory of XMIs |
+| Model Atlas | `AtlasEObjectProvider~deployment` | an object in an Atlas registry, keyed by `deploymentId` |
+
+Both are declared in the docker image's `config.json`, so atlas mode needs no second image variant
+and no second bundle. (The Data Atlas needs `runtime.config` vs `runtime.config.atlas` and two image
+tags for exactly this, because its bootstrap component differs per source.)
+
+Three things to know before seeding one:
+
+- **The registry needs its own root type.** An Atlas registry can pin `root.eclass.uri`; the
+  `sensinactmapping` registry pins it to `ProviderMapping`, so a deployment object cannot live
+  there. Give it a registry of its own.
+- **The metamodel must be seeded as a schema, in every stage the object passes through.** The Atlas
+  deserializes the stored instance server-side, so it needs `event-atlas-deployment.ecore`
+  registered — in `draft` *and* `release` if updates go through a staged transition, because each
+  stage resolves against its own schema view. The seed set is one file: the metamodel references
+  nothing but Ecore.
+- **Do not seed the same `deploymentId` into both sources.** The file provider seeds the registry
+  and the Atlas provider syncs on top; the same id from both means two writers racing for one
+  entry, exactly like a mapping mounted *and* served from the Atlas.
+
+Unlike the Data Atlas's atlas mode, this one is **fail-soft**: an unreadable or absent configuration
+means the configurator writes nothing and the baked JSON keeps serving. There is no need for a
+start-up gate that probes the object — a missing model degrades to "the image defaults apply", not
+to "every endpoint answers 404 forever". The cost of that is silence, so the configurator logs what
+it applied, refused and removed on every pass.
+
 ## What each section writes
 
 | model section | ConfigAdmin PIDs |

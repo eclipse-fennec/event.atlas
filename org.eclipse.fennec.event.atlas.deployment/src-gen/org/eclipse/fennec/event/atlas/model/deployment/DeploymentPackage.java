@@ -41,7 +41,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = DeploymentPackage.eNS_URI, fingerprint = "fp1:5ab9b092deb99fdfbcdf8355576e7b2202df0b56795bb27b52c73c3d7da9cb44", genModel = "/model/event-atlas-deployment.genmodel", genModelSourceLocations = {"model/event-atlas-deployment.genmodel","org.eclipse.fennec.event.atlas.deployment/model/event-atlas-deployment.genmodel"}, ecore = "/model/event-atlas-deployment.ecore", ecoreSourceLocations = "/model/event-atlas-deployment.ecore")
+@EPackage(uri = DeploymentPackage.eNS_URI, fingerprint = "fp1:7022a4cf7af08275061036727f56e4c1334cb100204dd9c179caab1aa1a8803e", genModel = "/model/event-atlas-deployment.genmodel", genModelSourceLocations = {"model/event-atlas-deployment.genmodel","org.eclipse.fennec.event.atlas.deployment/model/event-atlas-deployment.genmodel"}, ecore = "/model/event-atlas-deployment.ecore", ecoreSourceLocations = "/model/event-atlas-deployment.ecore")
 public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -413,13 +413,13 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	int MQTT_BROKER__USER = 4;
 
 	/**
-	 * The feature id for the '<em><b>Password</b></em>' attribute.
+	 * The feature id for the '<em><b>Password Variable</b></em>' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int MQTT_BROKER__PASSWORD = 5;
+	int MQTT_BROKER__PASSWORD_VARIABLE = 5;
 
 	/**
 	 * The feature id for the '<em><b>Topics</b></em>' attribute list.
@@ -732,13 +732,13 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	int TIMESCALE_STORAGE__USER = HISTORY_STORAGE_FEATURE_COUNT + 4;
 
 	/**
-	 * The feature id for the '<em><b>Password</b></em>' attribute.
+	 * The feature id for the '<em><b>Password Variable</b></em>' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int TIMESCALE_STORAGE__PASSWORD = HISTORY_STORAGE_FEATURE_COUNT + 5;
+	int TIMESCALE_STORAGE__PASSWORD_VARIABLE = HISTORY_STORAGE_FEATURE_COUNT + 5;
 
 	/**
 	 * The number of structural features of the '<em>Timescale Storage</em>' class.
@@ -1448,15 +1448,15 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	EAttribute getMqttBroker_User();
 
 	/**
-	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPassword <em>Password</em>}'.
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPasswordVariable <em>Password Variable</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @return the meta object for the attribute '<em>Password</em>'.
-	 * @see org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPassword()
+	 * @return the meta object for the attribute '<em>Password Variable</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getPasswordVariable()
 	 * @see #getMqttBroker()
 	 * @generated
 	 */
-	EAttribute getMqttBroker_Password();
+	EAttribute getMqttBroker_PasswordVariable();
 
 	/**
 	 * Returns the meta object for the attribute list '{@link org.eclipse.fennec.event.atlas.model.deployment.MqttBroker#getTopics <em>Topics</em>}'.
@@ -1708,15 +1708,15 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	EAttribute getTimescaleStorage_User();
 
 	/**
-	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPassword <em>Password</em>}'.
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPasswordVariable <em>Password Variable</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @return the meta object for the attribute '<em>Password</em>'.
-	 * @see org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPassword()
+	 * @return the meta object for the attribute '<em>Password Variable</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.deployment.TimescaleStorage#getPasswordVariable()
 	 * @see #getTimescaleStorage()
 	 * @generated
 	 */
-	EAttribute getTimescaleStorage_Password();
+	EAttribute getTimescaleStorage_PasswordVariable();
 
 	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.deployment.InMemoryStorage <em>In Memory Storage</em>}'.
@@ -2292,12 +2292,12 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 		EAttribute MQTT_BROKER__USER = eINSTANCE.getMqttBroker_User();
 
 		/**
-		 * The meta object literal for the '<em><b>Password</b></em>' attribute feature.
+		 * The meta object literal for the '<em><b>Password Variable</b></em>' attribute feature.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
 		 * @generated
 		 */
-		EAttribute MQTT_BROKER__PASSWORD = eINSTANCE.getMqttBroker_Password();
+		EAttribute MQTT_BROKER__PASSWORD_VARIABLE = eINSTANCE.getMqttBroker_PasswordVariable();
 
 		/**
 		 * The meta object literal for the '<em><b>Topics</b></em>' attribute list feature.
@@ -2492,12 +2492,12 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 		EAttribute TIMESCALE_STORAGE__USER = eINSTANCE.getTimescaleStorage_User();
 
 		/**
-		 * The meta object literal for the '<em><b>Password</b></em>' attribute feature.
+		 * The meta object literal for the '<em><b>Password Variable</b></em>' attribute feature.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
 		 * @generated
 		 */
-		EAttribute TIMESCALE_STORAGE__PASSWORD = eINSTANCE.getTimescaleStorage_Password();
+		EAttribute TIMESCALE_STORAGE__PASSWORD_VARIABLE = eINSTANCE.getTimescaleStorage_PasswordVariable();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.deployment.impl.InMemoryStorageImpl <em>In Memory Storage</em>}' class.

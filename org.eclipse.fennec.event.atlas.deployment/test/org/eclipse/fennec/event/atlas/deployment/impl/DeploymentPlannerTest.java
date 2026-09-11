@@ -171,6 +171,38 @@ class DeploymentPlannerTest {
 	}
 
 	@Test
+	void theModelNamesTheSecretsVariableAndNeverTheSecret() {
+		DeploymentPlan plan = DeploymentPlanner.plan(withHistory(timescale(null)));
+
+		assertThat(plan.record("sensinact.history.timescale").properties())
+				.containsEntry(".password", "$[env:TIMESCALE_PWD;default=]");
+	}
+
+	@Test
+	void aBlankPasswordVariableOmitsThePropertyEntirely() {
+		TimescaleStorage storage = timescale(null);
+		storage.setPasswordVariable("  ");
+
+		DeploymentPlan plan = DeploymentPlanner.plan(withHistory(storage));
+
+		assertThat(plan.record("sensinact.history.timescale").properties()).doesNotContainKey(".password");
+	}
+
+	@Test
+	void aBrokerReferencesItsOwnPasswordVariable() {
+		EventAtlasDeployment deployment = deployment();
+		MqttBroker broker = FACTORY.createMqttBroker();
+		broker.setId("eventatlas-broker");
+		broker.setPasswordVariable("MY_BROKER_SECRET");
+		deployment.getBrokers().add(broker);
+
+		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
+
+		assertThat(plan.record("sensinact.southbound.mqtt~eventatlas-broker").properties())
+				.containsEntry(".password", "$[env:MY_BROKER_SECRET;default=]");
+	}
+
+	@Test
 	void timescaleStorageComposesTheJdbcUrlFromHostPortAndDatabase() {
 		DeploymentPlan plan = DeploymentPlanner.plan(withHistory(timescale(null)));
 

@@ -227,6 +227,23 @@ A deployment can be described as a model instead of forty environment variables:
 - **`storage` under `history` is deliberately optional.** A `<history>` with only `filters` and
   `housekeeping` claims just the two factory PIDs the history rework added, which no JSON file here
   writes — the smallest migration step, shipped as `deployment-history-tuning.xmi`.
+- **No attribute can hold a secret, and that is structural.** `MqttBroker.passwordVariable` /
+  `TimescaleStorage.passwordVariable` name an environment *variable*, emitted as
+  `$[env:NAME;default=]`. A deployment model is content: stored in a Model Atlas it is as readable
+  as everything else there, and a Model Atlas is commonly fronted with public reads and
+  authenticated writes only (on `modelatlas.cloud`, route 8 serves every GET unauthenticated) — so
+  a password attribute would be a password on the open web. The indirection works because the Felix
+  interpolation plugin is an OSGi `ConfigurationPlugin`, which CM invokes on *delivery to the target
+  service*, not at creation, so an API-written value is interpolated like a configurator-JSON one.
+  data.atlas reached the same conclusion and keeps its JDBC credential in a Configurator resource.
+- **File mode and Model Atlas mode are one bundle and one image**, because the configurator consumes
+  the `event-atlas-deployment` *registry* rather than fetching for itself: `FileEObjectProvider~deployment`
+  seeds it, `AtlasEObjectProvider~deployment` syncs on top, and the docker `config.json` declares
+  both (inert until the Atlas actually has the registry). data.atlas needs `runtime.config` vs
+  `runtime.config.atlas` and two image tags for the same capability because its bootstrap component
+  differs per source. An Atlas registry for deployments needs its own `root.eclass.uri` —
+  `sensinactmapping` pins it to `ProviderMapping` — and the metamodel must be seeded as a schema in
+  every stage the object passes through. Never seed one `deploymentId` into both sources.
 - **`EDuration` needs its `create`/`convert` GenModel bodies.** EMF's default reflective conversion
   cannot build a `java.time.Duration` from a literal (no `valueOf(String)`), so without them every
   deployment XMI carrying a duration fails to load with `The value 'P30D' is invalid`. The bodies

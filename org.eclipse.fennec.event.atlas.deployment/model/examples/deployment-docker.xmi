@@ -38,8 +38,11 @@
   <channels name="eventatlas-rest" transport="REST" format="XMI"/>
 
   <history providerName="brokerHistory">
+    <!-- passwordVariable names the ENV VAR, never the password: this document is content, and in
+         a Model Atlas it is as readable as anything else there. -->
     <storage xsi:type="deployment:TimescaleStorage" host="timescale" port="5432"
-        database="sensinactHistory" user="snaHistory" maxPageSize="10000">
+        database="sensinactHistory" user="snaHistory" passwordVariable="TIMESCALE_PWD"
+        maxPageSize="10000">
       <!-- Location state, not measurements. -->
       <excludeResources>{"resource": {"value": "observedArea", "type": "EXACT"}}</excludeResources>
       <excludeResources>{"resource": {"value": "viewport", "type": "EXACT"}}</excludeResources>
