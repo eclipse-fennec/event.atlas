@@ -72,6 +72,21 @@
     "initialProvider.target": "(emf.eobject.provider.name=mapping-files)"
   },
 
+  /* Deployment models. Like the two above it carries no `locations`, so it is empty and inert:
+   * the DeploymentConfigurator binds the registry and writes nothing until an
+   * EventAtlasDeployment turns up. Add a `locations` entry pointing at a directory of deployment
+   * XMIs - ../org.eclipse.fennec.event.atlas.deployment/model/examples has two - or let an
+   * AtlasEObjectProvider feed it. */
+  "FileEObjectProvider~deployment": {
+    "emf.eobject.provider.name": "deployment-files",
+    "key.feature": "deploymentId"
+  },
+
+  "EObjectRegistry~deployment": {
+    "name": "event-atlas-deployment",
+    "initialProvider.target": "(emf.eobject.provider.name=deployment-files)"
+  },
+
   "FileEObjectProvider~profiles": {
     "emf.eobject.provider.name": "profile-files"
   },

@@ -38,7 +38,7 @@ COPY content/runtime/ "${RUNTIME_DIR}/"
 # The .keep placeholders exist only to keep the mount-point directories in git;
 # the file provider would try (and fail) to parse them as XMI.
 RUN set -eux; \
-    mkdir -p "${RUNTIME_DIR}/mappings" "${RUNTIME_DIR}/profiles" "${WORK_DIR}"; \
+    mkdir -p "${RUNTIME_DIR}/mappings" "${RUNTIME_DIR}/profiles" "${RUNTIME_DIR}/deployment" "${WORK_DIR}"; \
     find "${RUNTIME_DIR}" -name '.keep' -delete; \
     chown -R 65532:65532 "${APP_HOME}"
 

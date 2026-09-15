@@ -1,5 +1,11 @@
 sensinact.version: 0.0.2-SNAPSHOT
 
+# The history rework (gateway PR #758, merged 2026-09-07) needs a snapshot built on or after
+# 2026-09-10: it introduced `history-core`, and the Eclipse snapshot deployment had been stalled
+# since 2026-05-07, so any older build in a cache lacks that bundle entirely and resolves to a
+# history backend with no engine. The deployment is running again and publishes the whole gateway
+# at one timestamp, which is what the SensorThings bundles need - they bind the `HistoryProvider`
+# service that only the reworked `history-api` exports.
 -plugin.3.sensinact: \
 	aQute.bnd.repository.maven.provider.MavenBndRepository;\
 		releaseUrl=https://repo.eclipse.org/content/repositories/sensinact-releases/;\

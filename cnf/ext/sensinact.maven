@@ -66,11 +66,22 @@ org.eclipse.sensinact.gateway.southbound.mqtt:mqtt-device-factory:${sensinact.ve
 ## virtual
 org.eclipse.sensinact.gateway.southbound.virtual:virtual-temperature-sensor:${sensinact.version}
 ## history
+# history-core is the engine introduced by the history rework (gateway PR #758): it tracks the
+# HistoryStorage backends, wires the typed-event listener, registers the HistoryProvider service
+# plus the legacy ACT facade, and owns the sensinact.history.filter / .housekeeping factory PIDs.
+# The timescale provider is now a storage backend only and does nothing without it.
+# history-inmemory is the non-persistent backend (PID sensinact.history.inmemory) - indexed so a
+# runtime can historize without a database, not deployed by any bndrun here.
 org.eclipse.sensinact.gateway.southbound.history:history-api:${sensinact.version}
+org.eclipse.sensinact.gateway.southbound.history:history-core:${sensinact.version}
+org.eclipse.sensinact.gateway.southbound.history:history-inmemory:${sensinact.version}
 org.eclipse.sensinact.gateway.southbound.history:timescale-provider:${sensinact.version}
-org.postgresql:postgresql:42.7.3
-org.apache.aries.tx-control:tx-control-service-local:1.0.1
-org.apache.aries.tx-control:tx-control-provider-jdbc-local:1.0.1
+# postgresql, org.osgi.service.jdbc and the two Aries tx-control bundles are declared in
+# central.mvn, NOT here: the Eclipse SensiNact repos do not host third-party artifacts, so an
+# entry in this index resolves only out of a developer's ~/.m2 and 404s on a clean CI runner
+# (trap 2 in CLAUDE.md). They used to be duplicated here at postgresql 42.7.3 while central.mvn
+# carried 42.7.13 - the stale copy won nothing and was one unfetchable coordinate away from
+# breaking the export.
 
 io.dropwizard.metrics:metrics-core:4.2.37
 org.eclipse.sensinact.gateway.filters:esri.geometry:${sensinact.version}

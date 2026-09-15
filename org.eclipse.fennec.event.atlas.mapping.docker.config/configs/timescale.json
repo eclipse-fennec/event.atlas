@@ -4,13 +4,31 @@
     ":configurator:version": "1.0.0",
 
     /*
-     * History for the digital twin: the SensiNact timescale provider subscribes to the twin's
-     * resource updates and writes them into a TimescaleDB (postgres) instance, and exposes them
-     * as the provider named below. sensinact.json points the SensorThings northbound at that
-     * same name ("history.provider": "brokerHistory"), which is what makes Observations return
-     * more than the current value.
+     * History for the digital twin. Since the history rework (gateway PR #758) the layering is
+     * explicit, and it matters for reading the log:
      *
-     * The provider's component is configuration-policy=require, so this file is the on/off
+     *   timescale-provider  a HistoryStorage BACKEND - it only stores and queries
+     *   history-core        the ENGINE - subscribes the backend to the twin's update
+     *                       notifications, registers the HistoryProvider service and the
+     *                       legacy ACT facade, and owns the sensinact.history.filter /
+     *                       sensinact.history.housekeeping factory PIDs
+     *
+     * Both bundles are in the runbundles; the backend alone would store nothing, because the
+     * event wiring now lives in the engine. history-core exports no packages, so it is listed
+     * by identity in the bndrun - the resolver would never pull it in on its own.
+     *
+     * The PID and every key below are unchanged by the rework. What changed underneath:
+     *   - ONE table (sensinact.history) with a kind discriminator instead of three, exact
+     *     NUMERIC values plus the Java type, and JSONB for any GeoJSON object. This is what
+     *     issue #31 reported as a docs/reality mismatch - the docs now describe what is built.
+     *   - PostGIS is no longer required, and the TimescaleDB extension is OPTIONAL: with it the
+     *     table becomes a hypertable and aggregation uses time_bucket, on plain PostgreSQL 14+
+     *     it falls back to date_bin.
+     *   - An existing three-table database is MIGRATED on first start: rows are copied over and
+     *     numeric_data / text_data / geo_data are renamed *_migrated, not dropped. Verify, then
+     *     drop them yourself.
+     *
+     * The component is still configuration-policy=require, so this file remains the on/off
      * switch: without it the bundles sit inactive and the runtime behaves exactly as before.
      * With it, the runtime expects a reachable database - see docker/eventatlas/README.md for
      * the compose example that starts one, and the environment table for the variables.
@@ -18,6 +36,7 @@
      * Values are $[env:...] placeholders resolved at configuration-delivery time, so one image
      * serves every environment (same mechanism as config.json).
      */
+
     "sensinact.history.timescale": {
         "url": "jdbc:postgresql://$[env:TIMESCALE_HOST;default=localhost]:$[env:TIMESCALE_PORT;default=5432]/$[env:TIMESCALE_DB;default=sensinactHistory]",
         "user": "$[env:TIMESCALE_USER;default=snaHistory]",
@@ -25,10 +44,24 @@
         "provider": "$[env:TIMESCALE_PROVIDER;default=brokerHistory]",
 
         /* Values that are not sensible history: the location/area resources a twin carries for
-         * every provider. Written as resource-selector JSON, one filter per entry. */
+         * every provider. Written as resource-selector JSON, one filter per entry. Changes to
+         * the selector keys take effect immediately now - the database connection is not
+         * restarted, and the rework also fixed the @Modified bug that used to ignore them.
+         *
+         * These two keys decide WHICH resources reach the backend at all. Runtime refinement -
+         * on-change / deadband suppression, retention, keep-count - belongs to the engine's
+         * sensinact.history.filter and sensinact.history.housekeeping factory PIDs, which the
+         * event.atlas deployment model emits; see the deployment guide. Deliberately not
+         * duplicated here, so exactly one writer owns each PID. */
         "exclude.resources": [
             "{\"resource\": {\"value\": \"observedArea\", \"type\": \"EXACT\"}}",
             "{\"resource\": {\"value\": \"viewport\", \"type\": \"EXACT\"}}"
-        ]
+        ],
+
+        /* Largest page a single range query returns (the backend clamps to it). 10000 is the
+         * provider's own default; the SensorThings northbound pages within it now that $top /
+         * $skip / $orderby are pushed into SQL, so it caps memory per request rather than
+         * capping the dataset the way the old 500-row ACT limit did. */
+        "max.page.size": "$[env:TIMESCALE_MAX_PAGE_SIZE;default=10000;type=Integer]"
     }
 }

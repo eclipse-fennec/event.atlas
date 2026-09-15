@@ -8,6 +8,7 @@
 // EXAMPLES -> /examples/ (worked examples)
 export const GUIDES = [
   { file: 'sensinact-mapping-user-guide.md', slug: 'sensinact-mapping', title: 'SensiNact mapping' },
+  { file: 'event-atlas-deployment-model.md', slug: 'deployment-model', title: 'Deployment model' },
 ];
 
 export const EXAMPLES = [

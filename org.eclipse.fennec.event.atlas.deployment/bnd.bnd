@@ -1,0 +1,31 @@
+Bundle-Name: Fennec Event Atlas :: Deployment Configuration Model
+Bundle-Description: The event.atlas deployment configuration metamodel and the configurator that \
+ applies it: a deployment is described as an instance of EventAtlasDeployment - HTTP endpoint, \
+ Model Atlas binding, southbound brokers and ingest channels, history storage with its \
+ historization filters and housekeeping policies, and optional model inference - and the \
+ DeploymentConfigurator turns that instance into ConfigAdmin configurations. Sections the model \
+ does not declare are not written, so a deployment can adopt it one concern at a time.
+
+-workingset: SensiNact
+
+src: src-gen,src
+-library: enableEMF
+
+# Code generation of the deployment metamodel. Comment it out when the model is unchanged and
+# the build should be quicker.
+-generate:\
+	model/event-atlas-deployment.genmodel;\
+		generate=fennecEMF;\
+		genmodel=model/event-atlas-deployment.genmodel;\
+		output=src-gen
+
+# Ships the metamodel next to the code, the way the mapping bundle does, so a tool reading the
+# bundle finds the .ecore. examples/ travels with it as documentation.
+-includeresource.model: model=model
+
+Bundle-Version: 1.0.0.SNAPSHOT
+
+-buildpath: \
+	org.eclipse.fennec.emf.osgi.eobject.registry;version=latest,\
+	org.osgi.service.cm;version=latest,\
+	org.osgi.util.converter;version=latest
