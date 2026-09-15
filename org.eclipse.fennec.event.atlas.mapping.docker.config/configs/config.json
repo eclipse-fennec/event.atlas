@@ -171,7 +171,15 @@
     "codec.typeMapId": "$[env:EVENTATLAS_CODEC_TYPE_MAP_ID;default=jena-sensors]"
   },
 
-  /* `;type=String[]` is REQUIRED on every list property, not optional next to `delimiter`: the
+  /* THE FACTORY INSTANCE NAME MUST EQUAL THE `id` / `name` PROPERTY BELOW, and that is not
+   * cosmetic. A deployment model derives the instance name of an MQTT broker from its `id` and of
+   * a channel from its `name`, so a JSON instance called `~broker` while its id is
+   * `eventatlas-broker` is a DIFFERENT PID from the one the model writes. The ownership guard
+   * never sees it, both configurations end up active, and every message is ingested twice - once
+   * per MQTT client. Renamed 2026-09-15 to close exactly that (PR #53 review); the Felix
+   * Configurator handles the rename on upgrade, and the settings are unchanged.
+   *
+   * `;type=String[]` is REQUIRED on every list property, not optional next to `delimiter`: the
    * interpolation plugin only converts a value when the `type` directive is present
    * (InterpolationConfigurationPlugin:196 -> convertType), so `delimiter=,` ALONE is silently
    * ignored and the property stays one comma-joined String. sensiNact then hands that whole
@@ -183,7 +191,17 @@
    *
    * `topics` here is what is SUBSCRIBED at the broker. Which of those messages each ingest
    * channel handles is a separate, per-channel filter — see the two adapter instances below. */
-  "sensinact.southbound.mqtt~broker": {
+  /* The REST ingest application's whiteboard binding, stated rather than left implicit. A
+   * Jakarta-RS application with no `osgi.jakartars.whiteboard.target` joins whichever whiteboard
+   * happens to match, and the SensorThings application shadows the default one - so pinning it to
+   * the named `eventrest` whiteboard is the same hygiene `sensinact.northbound.rest` already
+   * practises. It also means a deployment model declaring a REST channel CLAIMS this PID instead
+   * of creating one, which is what keeps "applying the model changes nothing" true. */
+  "event.atlas.southbound.rest": {
+    "osgi.jakartars.whiteboard.target": "(jersey.jakartars.whiteboard.name=eventrest)"
+  },
+
+  "sensinact.southbound.mqtt~eventatlas-broker": {
     "id": "eventatlas-broker",
     "protocol": "$[env:EVENTATLAS_MQTT_PROTOCOL;default=tcp]",
     "host": "$[env:EVENTATLAS_MQTT_HOST;default=localhost]",
@@ -205,13 +223,13 @@
    *
    * A filter that matches nothing is harmless — it costs no subscription — so the JSON channel's
    * default is inert rather than empty (empty topics is a hard activation failure by design). */
-  "event.atlas.southbound.mqtt~xmi": {
+  "event.atlas.southbound.mqtt~eventatlas-mqtt-xmi": {
     "mqttTopics": "$[env:EVENTATLAS_MQTT_XMI_TOPICS;default=eventatlas/#;delimiter=,;type=String[]]",
     "mqtt.handler.id": "eventatlas-broker",
     "format": "xmi",
     "name": "eventatlas-mqtt-xmi"
   },
-  "event.atlas.southbound.mqtt~json": {
+  "event.atlas.southbound.mqtt~eventatlas-mqtt-json": {
     "mqttTopics": "$[env:EVENTATLAS_MQTT_JSON_TOPICS;default=eventatlas/json/#;delimiter=,;type=String[]]",
     "mqtt.handler.id": "eventatlas-broker",
     "format": "json",

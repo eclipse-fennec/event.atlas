@@ -78,10 +78,22 @@ public class DeploymentConfiguratorImpl implements EObjectRegistryListener {
 	/** PIDs written per deployment id, so a shrinking model deletes what it no longer asks for. */
 	private final Map<String, Set<String>> writtenPids = new ConcurrentHashMap<>();
 
+	/**
+	 * Deployment ids whose {@link #writtenPids} entry has been reconciled with ConfigAdmin.
+	 * <p>
+	 * In-memory bookkeeping alone is not enough: ConfigAdmin is persistent, so after a restart it
+	 * has restored every stamped configuration while this map starts empty. A model edited while
+	 * the runtime was down would then compute an empty stale set and leave the previous PIDs
+	 * behind - owned, orphaned, and still active. The first pass for a deployment therefore reads
+	 * back what it wrote last time, keyed off the owner stamp.
+	 */
+	private final Set<String> reconciled = ConcurrentHashMap.newKeySet();
+
 	private volatile ExecutorService applier;
 
+	/** Package-private so the tests can supply a mock; DS injects it either way. */
 	@Reference
-	private ConfigurationAdmin configurationAdmin;
+	ConfigurationAdmin configurationAdmin;
 
 	@Activate
 	void activate() {
@@ -146,6 +158,7 @@ public class DeploymentConfiguratorImpl implements EObjectRegistryListener {
 	 * one no longer does.
 	 */
 	void apply(String deploymentId, EventAtlasDeployment deployment) {
+		reconcileWithConfigAdmin(deploymentId);
 		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
 		plan.problems().forEach(problem -> logger.warning("Deployment '" + deploymentId + "': " + problem));
 
@@ -163,8 +176,42 @@ public class DeploymentConfiguratorImpl implements EObjectRegistryListener {
 				+ stale.size() + " removed" + (plan.hasProblems() ? ", " + plan.problems().size() + " refused" : ""));
 	}
 
+	/**
+	 * Adopts the configurations a previous run of this deployment left in ConfigAdmin, once per
+	 * deployment id. Without it a restart loses track of them and a shrunken model deletes nothing.
+	 */
+	private void reconcileWithConfigAdmin(String deploymentId) {
+		if (!reconciled.add(deploymentId)) {
+			return;
+		}
+		try {
+			Configuration[] owned = configurationAdmin
+					.listConfigurations("(" + OWNER_PROPERTY + "=" + escapeFilterValue(deploymentId) + ")");
+			if (owned == null || owned.length == 0) {
+				return;
+			}
+			Set<String> restored = new LinkedHashSet<>();
+			for (Configuration configuration : owned) {
+				restored.add(configuration.getPid());
+			}
+			writtenPids.merge(deploymentId, restored, (existing, found) -> {
+				existing.addAll(found);
+				return existing;
+			});
+			logger.info(() -> "Deployment '" + deploymentId + "': adopted " + restored.size()
+					+ " configuration(s) written by an earlier run");
+		} catch (IOException | InvalidSyntaxException e) {
+			// Not fatal: the pass still applies what the model asks for. Only the deletion of
+			// PIDs this deployment wrote BEFORE the restart is lost, and it is retried next time.
+			reconciled.remove(deploymentId);
+			logger.log(Level.WARNING, e, () -> "Could not read back the configurations of '" + deploymentId + "'");
+		}
+	}
+
 	/** Deletes everything a deployment wrote, because the model itself is gone. */
 	void retract(String deploymentId) {
+		reconcileWithConfigAdmin(deploymentId);
+		reconciled.remove(deploymentId);
 		Set<String> pids = writtenPids.remove(deploymentId);
 		if (pids == null || pids.isEmpty()) {
 			return;
@@ -219,11 +266,33 @@ public class DeploymentConfiguratorImpl implements EObjectRegistryListener {
 	private Configuration[] existing(String pid) throws IOException {
 		try {
 			Configuration[] found = configurationAdmin
-					.listConfigurations("(" + Constants.SERVICE_PID + "=" + pid + ")");
+					.listConfigurations("(" + Constants.SERVICE_PID + "=" + escapeFilterValue(pid) + ")");
 			return found == null ? new Configuration[0] : found;
 		} catch (InvalidSyntaxException e) {
 			throw new IOException(e);
 		}
+	}
+
+	/**
+	 * Escapes an LDAP filter value (RFC 4515).
+	 * <p>
+	 * PID components come from the model — a broker id, a filter name — and reach a filter here.
+	 * Unescaped, a {@code *} would turn an exact match into a wildcard and delete configurations
+	 * the model never named, and a {@code )} would throw. Escaping rather than rejecting, because
+	 * ConfigAdmin itself permits these characters in a PID and the filter is our problem, not the
+	 * model's.
+	 */
+	static String escapeFilterValue(String value) {
+		StringBuilder escaped = new StringBuilder(value.length());
+		for (int i = 0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			switch (c) {
+			case '\\', '*', '(', ')' -> escaped.append('\\').append(c);
+			case '\0' -> escaped.append("\\00");
+			default -> escaped.append(c);
+			}
+		}
+		return escaped.toString();
 	}
 
 	private static String ownerOf(Configuration configuration) {

@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.eclipse.fennec.event.atlas.deployment.ConfigurationRecord;
@@ -89,7 +90,7 @@ public final class DeploymentPlanner {
 			problems.add("No deployment given");
 			return new DeploymentPlan(records, problems);
 		}
-		planHttp(deployment.getHttp(), records);
+		planHttp(deployment.getHttp(), records, problems);
 		planAtlas(deployment.getAtlas(), records, problems);
 		planBrokers(deployment.getBrokers(), records, problems);
 		planChannels(deployment, records, problems);
@@ -98,8 +99,19 @@ public final class DeploymentPlanner {
 		return new DeploymentPlan(records, problems);
 	}
 
-	private static void planHttp(HttpEndpoint http, List<ConfigurationRecord> records) {
+	private static void planHttp(HttpEndpoint http, List<ConfigurationRecord> records, List<String> problems) {
 		if (http == null) {
+			return;
+		}
+		// A blank whiteboard name is worse than a missing section: it yields a factory instance
+		// with an empty name and the filter (jersey.jakartars.whiteboard.name=), which matches
+		// nothing, so northbound REST and the ingest application would both go quietly unbound.
+		if (trimmed(http.getWhiteboardName()).isEmpty()) {
+			problems.add("The http section needs a whiteboardName - a blank one matches no whiteboard, section skipped");
+			return;
+		}
+		if (trimmed(http.getContextPath()).isEmpty()) {
+			problems.add("The http section needs a contextPath - section skipped");
 			return;
 		}
 		String contextPath = trimmed(http.getContextPath());
@@ -196,7 +208,11 @@ public final class DeploymentPlanner {
 	private static void planChannels(EventAtlasDeployment deployment, List<ConfigurationRecord> records,
 			List<String> problems) {
 		List<IngestChannel> channels = deployment.getChannels();
+		// ONE type map per runtime, so several channels naming different ones cannot all be
+		// honoured. First non-blank wins - deterministically, rather than by document order
+		// accident - and a disagreement is reported rather than silently resolved.
 		String codecTypeMapId = "";
+		String codecTypeMapChannel = "";
 		boolean restChannelDeclared = false;
 		for (IngestChannel channel : channels) {
 			String name = trimmed(channel.getName());
@@ -204,8 +220,16 @@ public final class DeploymentPlanner {
 				problems.add("An ingest channel without a name cannot be configured - skipped");
 				continue;
 			}
-			if (!trimmed(channel.getCodecTypeMapId()).isEmpty()) {
-				codecTypeMapId = trimmed(channel.getCodecTypeMapId());
+			String declaredTypeMap = trimmed(channel.getCodecTypeMapId());
+			if (!declaredTypeMap.isEmpty()) {
+				if (codecTypeMapId.isEmpty()) {
+					codecTypeMapId = declaredTypeMap;
+					codecTypeMapChannel = name;
+				} else if (!codecTypeMapId.equals(declaredTypeMap)) {
+					problems.add("Channel '" + name + "' declares codecTypeMapId '" + declaredTypeMap
+							+ "' but '" + codecTypeMapChannel + "' already declared '" + codecTypeMapId
+							+ "' - there is one type map per runtime, so '" + codecTypeMapId + "' is used");
+				}
 			}
 			if (channel.getTransport() == ChannelTransport.REST) {
 				restChannelDeclared = true;
@@ -400,13 +424,19 @@ public final class DeploymentPlanner {
 				+ trimmed(timescale.getDatabase());
 	}
 
-	/** {@code ON_CHANGE} is spelled {@code on-change} on the wire. */
+	/**
+	 * {@code ON_CHANGE} is spelled {@code on-change} on the wire.
+	 * <p>
+	 * {@code Locale.ROOT} rather than the default locale: under a Turkish default,
+	 * {@code "XMI".toLowerCase()} is {@code "xm\u0131"} and the format silently stops being
+	 * recognised. These are wire constants, not display text.
+	 */
 	private static String changeMode(ChangeMode mode) {
-		return mode.getName().toLowerCase().replace('_', '-');
+		return mode.getName().toLowerCase(Locale.ROOT).replace('_', '-');
 	}
 
 	private static String format(IngestChannel channel) {
-		return channel.getFormat() == null ? "xmi" : channel.getFormat().getName().toLowerCase();
+		return channel.getFormat() == null ? "xmi" : channel.getFormat().getName().toLowerCase(Locale.ROOT);
 	}
 
 	private static String whiteboardTarget(String whiteboardName) {

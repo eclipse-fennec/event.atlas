@@ -281,7 +281,11 @@ Two properties make this safe to try on a running deployment:
 - **A PID has exactly one writer.** Each configuration is stamped with
   `event.atlas.deployment.owner`, and a PID that already exists without that stamp - one of the
   baked-in JSON blocks - is left untouched, with a log line naming it. So a full deployment model
-  applied to the stock image changes nothing until you start deleting JSON blocks.
+  applied to the stock image changes nothing until you start deleting JSON blocks. That holds only
+  while both sides spell a PID identically: a factory instance name comes from the model (a
+  broker's `id`, a channel's `name`), so the baked JSON has to use the same instance name it
+  carries as its `id`/`name` property. The three MQTT instances were renamed for that on
+  2026-09-15, and a test now compares the two sides on every build.
 
 The immediately useful case is the history tuning the previous section pointed at, because
 `sensinact.history.filter` and `sensinact.history.housekeeping` are owned by no JSON file here. A

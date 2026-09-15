@@ -77,6 +77,36 @@ class DeploymentPlannerTest {
 	}
 
 	@Test
+	void aBlankWhiteboardNameIsRefusedRatherThanMatchingNothing() {
+		EventAtlasDeployment deployment = deployment();
+		HttpEndpoint http = FACTORY.createHttpEndpoint();
+		http.setWhiteboardName("  ");
+		deployment.setHttp(http);
+
+		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
+
+		assertThat(plan.records()).isEmpty();
+		assertThat(plan.problems()).singleElement().asString().contains("whiteboardName");
+	}
+
+	@Test
+	void channelsDisagreeingOnTheTypeMapAreReportedAndTheFirstWins() {
+		EventAtlasDeployment deployment = deployment();
+		IngestChannel first = mqttChannel("first", PayloadFormat.JSON, "a/#");
+		first.setCodecTypeMapId("jena-sensors");
+		IngestChannel second = mqttChannel("second", PayloadFormat.JSON, "b/#");
+		second.setCodecTypeMapId("something-else");
+		deployment.getChannels().add(first);
+		deployment.getChannels().add(second);
+
+		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
+
+		assertThat(plan.record("event.atlas.southbound.ingest").properties())
+				.containsEntry("codec.typeMapId", "jena-sensors");
+		assertThat(plan.problems()).singleElement().asString().contains("one type map per runtime");
+	}
+
+	@Test
 	void atlasBindingAlwaysRequiresTheMappingMetamodel() {
 		EventAtlasDeployment deployment = deployment();
 		deployment.setAtlas(atlas("http://localhost:8080/atlas/rest", "jena"));

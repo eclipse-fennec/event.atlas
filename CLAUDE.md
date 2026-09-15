@@ -61,11 +61,12 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-09-10: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus **227 plain-JUnit tests** across nine projects. The
+Baseline as of 2026-09-15: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus **241 plain-JUnit tests** across nine projects. The
 mapping project contributes 39 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`); the
-deployment project 24 (`DeploymentPlannerTest`, `ExampleDeploymentTest`).
+deployment project 38 (`DeploymentPlannerTest`, `DeploymentConfiguratorImplTest`,
+`ExampleDeploymentTest`, `ShippedConfigOverlapTest`).
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -215,6 +216,12 @@ A deployment can be described as a model instead of forty environment variables:
   — i.e. one a configurator JSON bundle owns — is left alone with a warning naming it. Applying
   `model/examples/deployment-docker.xmi` to the shipped image therefore changes nothing until the
   matching JSON blocks are deleted, which is what makes the migration reversible.
+  **A factory instance name comes from the model** (a broker's `id`, a channel's or filter's
+  `name`), so a shipped JSON block whose instance name differs from the `id`/`name` property it
+  carries is a *different* PID: the guard never sees it and both configurations end up active — for
+  MQTT, one ingest per client. `docker.config`'s three MQTT instances were renamed to match on
+  2026-09-15 for exactly that reason, and `ShippedConfigOverlapTest` now reads the shipped JSONs and
+  fails if the example would create a PID rather than claim it.
 - **The model arrives as EObject registry content**, registry `event-atlas-deployment`, keyed by
   `deploymentId` — the same mechanism as mappings and profiles, so a `FileEObjectProvider` (both
   config bundles declare one; the docker image reads `/opt/eventatlas/runtime/deployment`) or an

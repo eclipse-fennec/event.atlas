@@ -53,10 +53,26 @@ That is not a failure — it is the model telling you which JSON block to delete
 applying `deployment-docker.xmi` to the shipped image changes nothing until you start removing
 blocks, which makes the migration reversible at every step.
 
+**That claim only holds while both sides spell a PID identically, and it is enforced rather than
+asserted.** A factory instance name is derived from the model — a broker's `id`, a channel's
+`name`, a filter's `name` — so a shipped JSON block called `~broker` whose `id` property is
+`eventatlas-broker` is a *different* PID from the one the model writes. The guard never sees it,
+both configurations end up active, and for the MQTT channels that means every payload ingested once
+per client. The shipped configuration was wrong in exactly that way until 2026-09-15.
+`ShippedConfigOverlapTest` now reads the configurator JSONs the image actually ships and fails if
+the example would create any PID instead of claiming it, so the two cannot drift apart again.
+
 A model that shrinks cleans up after itself: PIDs a previous version of the same deployment wrote
 and this one no longer asks for are deleted. Removing the model from the registry deletes
 everything it wrote. Deactivating the *bundle* deletes nothing — ConfigAdmin is persistent by
 design, and a bundle refresh must not tear down a running runtime.
+
+**That survives a restart**, which takes a deliberate read-back: ConfigAdmin is persistent while
+the configurator's own bookkeeping is not, so after a restart it would otherwise compute an empty
+stale set and leave every previously written PID behind — owned, orphaned and still active. Edit a
+model while the runtime is down (rename a filter, drop a channel) and you would get both the old
+and the new. The first pass for a deployment therefore adopts what it wrote last time by listing
+configurations carrying its own `event.atlas.deployment.owner` stamp.
 
 ## How the model reaches the runtime
 
