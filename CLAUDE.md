@@ -62,7 +62,7 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ```
 
 Baseline as of 2026-09-15: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus **241 plain-JUnit tests** across nine projects. The
+(the known admin-service read gap) — plus **243 plain-JUnit tests** across nine projects. The
 mapping project contributes 39 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`); the
 deployment project 38 (`DeploymentPlannerTest`, `DeploymentConfiguratorImplTest`,
@@ -448,7 +448,9 @@ it walks its directory once at activation and never again.
     by clause, since Fennec-generated bundles put `uri=` *after* `class=`.
   - A missing `ClassCastException` is **no longer evidence** of anything: with the mirror off
     that clobber is structurally impossible. The suppression count is the evidence for `c37f91d`;
-    a real ingest reporting `1 mapping(s) applied` is the evidence for #207.
+    a real ingest reporting `1 mapping(s) applied` is the evidence for #207 — that line is
+    **`FINE` since #58**, so enable it for `…southbound.common.impl.PayloadIngestImpl` before
+    looking for it; a working ingest is otherwise silent.
   - Verified end to end in `inference.bndrun` on 2026-09-08. `docker.config` and `local.config`
     are changed the same way but **not re-verified in their own runtimes**.
 - **Reading the twin in `inference.bndrun` means the Gogo shell, and it needs two things.** That

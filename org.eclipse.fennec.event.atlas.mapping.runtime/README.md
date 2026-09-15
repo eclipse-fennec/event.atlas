@@ -163,11 +163,19 @@ At startup you should see:
 INFO: MQTT southbound adapter 'weather-mqtt' listening on [eventatlas/weather] (format xmi, broker 'local-broker')
 ```
 
-and on delivery:
+and on delivery — but only with `FINE` enabled for
+`org.eclipse.fennec.event.atlas.southbound.common.impl.PayloadIngestImpl`:
 
 ```
-INFO: Pushed payload from 'eventatlas/weather' - 5 object(s), 1 mapping(s) applied
+FINE: Pushed payload from 'eventatlas/weather' - 5 object(s), 1 mapping(s) applied
 ```
+
+**The routine success line is `FINE`, not `INFO` (issue #58).** It fires once per payload, and at
+a modest sensor rate that was enough to make it 95 % of a whole host's log volume and collapse
+journald's retention to hours — evicting the diagnostics of unrelated incidents. Only the
+exceptional outcomes below are logged per payload at `WARNING`/`SEVERE`, so **silence on a working
+ingest is the expected state**. To confirm ingest positively, either enable `FINE` for that logger
+or read the twin (the SensorThings `Observations`, or `providers` in the Gogo shell).
 
 ## Testing the REST adapter
 
@@ -216,7 +224,7 @@ Both adapters share one ingest, so the outcomes are the same; only the reporting
 
 | Log | HTTP | Meaning |
 |---|---|---|
-| `Pushed payload … N mapping(s) applied` | 200 | in the twin |
+| `Pushed payload … N mapping(s) applied` (**`FINE`** — see above) | 200 | in the twin |
 | `no provider mapping is registered for it` | 202 | model resolved, no mapping for that `EClass` — check the mapping's nsURI and that it reached the registry |
 | `model '<nsURI>' is not available` | 422 | neither deployed nor resolvable via the Model Atlas |
 | `Cannot deserialize … dropping payload` | 400 | malformed payload |
