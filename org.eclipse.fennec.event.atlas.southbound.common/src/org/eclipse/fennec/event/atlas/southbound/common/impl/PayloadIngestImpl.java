@@ -240,8 +240,22 @@ public class PayloadIngestImpl implements PayloadIngest {
 			return IngestResult.noMapping(roots.size(), eClasses);
 		}
 
-		logger.info(String.format("Pushed payload from '%s' - %s object(s), %s mapping(s) applied", origin,
-				roots.size(), applied));
+		// FINE, not INFO: this is the ROUTINE outcome, and it fires once per payload. At a modest
+		// sensor rate that made this one line 95% of a whole host's log volume (~262 messages/s),
+		// which collapsed journald's retention to ~7 hours and evicted everyone else's
+		// diagnostics - including this component's own - exactly when an unrelated incident
+		// needed them (issue #58). Only the exceptional outcomes above stay at WARNING/SEVERE.
+		// It is demoted rather than removed so it stays available for diagnosis: enable FINE for
+		// this logger to get per-payload confirmation back.
+		//
+		// Supplier form because the level is normally disabled and, at this call rate, the
+		// String.format that would otherwise always run is itself measurable.
+		//
+		// Same reasoning as logDrop below, which already refuses to log one line per payload
+		// while a channel is being sampled.
+		int appliedMappings = applied;
+		logger.fine(() -> String.format("Pushed payload from '%s' - %s object(s), %s mapping(s) applied", origin,
+				roots.size(), appliedMappings));
 		return IngestResult.applied(roots.size(), applied);
 	}
 

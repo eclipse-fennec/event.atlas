@@ -95,9 +95,81 @@ public class PayloadIngestImplTest {
 
 	@AfterEach
 	void tearDown() {
+		if (capturedLogCleanup != null) {
+			capturedLogCleanup.run();
+			capturedLogCleanup = null;
+		}
 		// the component's hand-off thread is a daemon, but leaking one per test is still noise
 		ingest.deactivate();
 	}
+
+	@Test
+	@DisplayName("The routine success path logs nothing at INFO or above (issue #58)")
+	void ingest_whenApplied_logsNothingAtInfoOrAbove() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		List<LogRecord> captured = captureIngestLog();
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		// One line per payload at INFO made this component 95% of a host's log volume and
+		// collapsed journald's retention, evicting unrelated diagnostics. The success line is
+		// FINE; only exceptional outcomes may be louder.
+		List<String> loud = captured.stream()
+				.filter(record -> record.getLevel().intValue() >= Level.INFO.intValue())
+				.map(LogRecord::getMessage).toList();
+		assertTrue(loud.isEmpty(), "routine ingest must stay quiet, but logged: " + loud);
+	}
+
+	@Test
+	@DisplayName("The success line is still available at FINE, for deliberate diagnosis")
+	void ingest_whenApplied_stillReportsTheDetailAtFine() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		List<LogRecord> captured = captureIngestLog();
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
+
+		assertTrue(captured.stream().anyMatch(record -> Level.FINE.equals(record.getLevel())
+				&& record.getMessage().contains("1 mapping(s) applied")),
+				"expected the per-payload confirmation at FINE");
+	}
+
+	/**
+	 * Captures this component's log for the duration of one test, restoring the logger afterwards.
+	 * The level is forced to ALL so the FINE assertion above sees the record regardless of the
+	 * JVM's default configuration.
+	 */
+	private List<LogRecord> captureIngestLog() {
+		List<LogRecord> records = new java.util.concurrent.CopyOnWriteArrayList<>();
+		Logger logger = Logger.getLogger(PayloadIngestImpl.class.getName());
+		Level previousLevel = logger.getLevel();
+		boolean previousUseParent = logger.getUseParentHandlers();
+		Handler handler = new Handler() {
+			@Override
+			public void publish(LogRecord record) {
+				records.add(record);
+			}
+
+			@Override
+			public void flush() {
+			}
+
+			@Override
+			public void close() {
+			}
+		};
+		handler.setLevel(Level.ALL);
+		logger.addHandler(handler);
+		logger.setLevel(Level.ALL);
+		logger.setUseParentHandlers(false);
+		capturedLogCleanup = () -> {
+			logger.removeHandler(handler);
+			logger.setLevel(previousLevel);
+			logger.setUseParentHandlers(previousUseParent);
+		};
+		return records;
+	}
+
+	private Runnable capturedLogCleanup;
 
 	@Test
 	@DisplayName("A payload whose model resolves and whose mapping applies reports APPLIED")

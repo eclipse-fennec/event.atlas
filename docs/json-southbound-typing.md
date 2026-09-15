@@ -125,7 +125,7 @@ string-typed resource reports plain `"OK"/"WARN"/"CRIT"`. Rule of thumb:
 ## Verified end to end
 
 Sim → MQTT `waterpark/sensors/#` (JSON with `deduplicationId`) →
-`PayloadIngest` (`Pushed payload … 1 mapping(s) applied`) → twin →
+`PayloadIngest` (`Pushed payload … 1 mapping(s) applied`, at `FINE` since #58) → twin →
 SensorThings v1.1: 8 Things (4 pools × temperature + quality), live
 observations for `ph`, `freeChlorine`, `redox`, `temperature`, and `status`
 as a proper string. The airquality channel (`format: json` all along) keeps
