@@ -41,7 +41,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = DeploymentPackage.eNS_URI, fingerprint = "fp1:7022a4cf7af08275061036727f56e4c1334cb100204dd9c179caab1aa1a8803e", genModel = "/model/event-atlas-deployment.genmodel", genModelSourceLocations = {"model/event-atlas-deployment.genmodel","org.eclipse.fennec.event.atlas.deployment/model/event-atlas-deployment.genmodel"}, ecore = "/model/event-atlas-deployment.ecore", ecoreSourceLocations = "/model/event-atlas-deployment.ecore")
+@EPackage(uri = DeploymentPackage.eNS_URI, fingerprint = "fp1:48b1c618f863aa041d1127269fd2d6ca779eeaef3c626cda9b9f3d3a65952e02", genModel = "/model/event-atlas-deployment.genmodel", genModelSourceLocations = {"model/event-atlas-deployment.genmodel","org.eclipse.fennec.event.atlas.deployment/model/event-atlas-deployment.genmodel"}, ecore = "/model/event-atlas-deployment.ecore", ecoreSourceLocations = "/model/event-atlas-deployment.ecore")
 public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -1103,7 +1103,7 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	 * The meta object id for the '<em>EDuration</em>' data type.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @see java.time.Duration
+	 * @see java.lang.String
 	 * @see org.eclipse.fennec.event.atlas.model.deployment.impl.DeploymentPackageImpl#getEDuration()
 	 * @generated
 	 */
@@ -1997,17 +1997,17 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 	EEnum getChangeMode();
 
 	/**
-	 * Returns the meta object for data type '{@link java.time.Duration <em>EDuration</em>}'.
+	 * Returns the meta object for data type '{@link java.lang.String <em>EDuration</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
      * <!-- begin-model-doc -->
-     * An ISO-8601 duration, e.g. P30D or PT15M.
+     * An ISO-8601 duration literal: P30D, PT15M, PT24H, P1DT2H30M.
      * 
-     * The create/convert bodies below are not decoration: EMF's default reflective conversion cannot build a java.time.Duration from a literal (it has no valueOf(String)), so without them every deployment XMI carrying a duration fails to load with "The value 'P30D' is invalid".
+     * Days, hours, minutes and seconds are accepted; weeks, months and years are not. A literal that cannot be parsed is reported as a refusal and the filter or policy carrying it is skipped.
      * <!-- end-model-doc -->
 	 * @return the meta object for data type '<em>EDuration</em>'.
-	 * @see java.time.Duration
-	 * @model instanceClass="java.time.Duration"
+	 * @see java.lang.String
+	 * @model instanceClass="java.lang.String"
 	 * @generated
 	 */
 	EDataType getEDuration();
@@ -2727,7 +2727,7 @@ public interface DeploymentPackage extends org.eclipse.emf.ecore.EPackage {
 		 * The meta object literal for the '<em>EDuration</em>' data type.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
-		 * @see java.time.Duration
+		 * @see java.lang.String
 		 * @see org.eclipse.fennec.event.atlas.model.deployment.impl.DeploymentPackageImpl#getEDuration()
 		 * @generated
 		 */

@@ -27,7 +27,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * and utility methods for working with them.
  * <!-- end-user-doc -->
  * <!-- begin-model-doc -->
- * The payload format a channel declares. It is stated, never guessed: EMF answers an unknown file extension with its wildcard factory, so a JSON payload on an XMI channel dies in a SAX parser.
+ * The payload format a channel accepts. It is declared, never detected, so a payload that does not match its channel's format is rejected rather than read as the declared one.
  * <!-- end-model-doc -->
  * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getPayloadFormat()
  * @model

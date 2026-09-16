@@ -55,13 +55,15 @@ class ExampleDeploymentTest {
 	}
 
 	@Test
-	void durationsInTheExampleSurviveTheRoundTrip() throws IOException {
+	void durationsInTheExampleAreIsoLiteralsThatParse() throws IOException {
 		EventAtlasDeployment deployment = load("deployment-docker.xmi");
 
 		HistorizationFilter filter = deployment.getHistory().getFilters().get(0);
-		assertThat(filter.getChangeMaxInterval()).isEqualTo(Duration.ofMinutes(15));
-		assertThat(deployment.getHistory().getHousekeeping().get(0).getRetentionPeriod())
-				.isEqualTo(Duration.ofDays(90));
+		assertThat(filter.getChangeMaxInterval()).isEqualTo("PT15M");
+		assertThat(Duration.parse(filter.getChangeMaxInterval())).isEqualTo(Duration.ofMinutes(15));
+		String retentionPeriod = deployment.getHistory().getHousekeeping().get(0).getRetentionPeriod();
+		assertThat(retentionPeriod).isEqualTo("P90D");
+		assertThat(Duration.parse(retentionPeriod)).isEqualTo(Duration.ofDays(90));
 	}
 
 	@Test

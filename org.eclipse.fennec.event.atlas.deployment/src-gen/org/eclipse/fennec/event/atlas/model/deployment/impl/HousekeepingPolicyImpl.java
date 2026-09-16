@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.deployment.impl;
 
-import java.time.Duration;
-
 import java.util.Collection;
 
 import org.eclipse.emf.common.notify.Notification;
@@ -88,7 +86,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 * @ordered
 	 */
-	protected static final Duration RETENTION_PERIOD_EDEFAULT = null;
+	protected static final String RETENTION_PERIOD_EDEFAULT = null;
 
 	/**
 	 * The cached value of the '{@link #getRetentionPeriod() <em>Retention Period</em>}' attribute.
@@ -98,7 +96,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 * @ordered
 	 */
-	protected Duration retentionPeriod = RETENTION_PERIOD_EDEFAULT;
+	protected String retentionPeriod = RETENTION_PERIOD_EDEFAULT;
 
 	/**
 	 * The default value of the '{@link #getKeepCount() <em>Keep Count</em>}' attribute.
@@ -148,7 +146,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 * @ordered
 	 */
-	protected static final Duration SCHEDULE_PERIOD_EDEFAULT = null;
+	protected static final String SCHEDULE_PERIOD_EDEFAULT = null;
 
 	/**
 	 * The cached value of the '{@link #getSchedulePeriod() <em>Schedule Period</em>}' attribute.
@@ -158,7 +156,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 * @ordered
 	 */
-	protected Duration schedulePeriod = SCHEDULE_PERIOD_EDEFAULT;
+	protected String schedulePeriod = SCHEDULE_PERIOD_EDEFAULT;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -221,7 +219,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 */
 	@Override
-	public Duration getRetentionPeriod() {
+	public String getRetentionPeriod() {
 		return retentionPeriod;
 	}
 
@@ -231,8 +229,8 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 */
 	@Override
-	public void setRetentionPeriod(Duration newRetentionPeriod) {
-		Duration oldRetentionPeriod = retentionPeriod;
+	public void setRetentionPeriod(String newRetentionPeriod) {
+		String oldRetentionPeriod = retentionPeriod;
 		retentionPeriod = newRetentionPeriod;
 		if (eNotificationRequired())
 			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.HOUSEKEEPING_POLICY__RETENTION_PERIOD, oldRetentionPeriod, retentionPeriod));
@@ -290,7 +288,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 */
 	@Override
-	public Duration getSchedulePeriod() {
+	public String getSchedulePeriod() {
 		return schedulePeriod;
 	}
 
@@ -300,8 +298,8 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 	 * @generated
 	 */
 	@Override
-	public void setSchedulePeriod(Duration newSchedulePeriod) {
-		Duration oldSchedulePeriod = schedulePeriod;
+	public void setSchedulePeriod(String newSchedulePeriod) {
+		String oldSchedulePeriod = schedulePeriod;
 		schedulePeriod = newSchedulePeriod;
 		if (eNotificationRequired())
 			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.HOUSEKEEPING_POLICY__SCHEDULE_PERIOD, oldSchedulePeriod, schedulePeriod));
@@ -348,7 +346,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 				getTargets().addAll((Collection<? extends String>)newValue);
 				return;
 			case DeploymentPackage.HOUSEKEEPING_POLICY__RETENTION_PERIOD:
-				setRetentionPeriod((Duration)newValue);
+				setRetentionPeriod((String)newValue);
 				return;
 			case DeploymentPackage.HOUSEKEEPING_POLICY__KEEP_COUNT:
 				setKeepCount((Integer)newValue);
@@ -357,7 +355,7 @@ public class HousekeepingPolicyImpl extends MinimalEObjectImpl.Container impleme
 				setMaxDelete((Integer)newValue);
 				return;
 			case DeploymentPackage.HOUSEKEEPING_POLICY__SCHEDULE_PERIOD:
-				setSchedulePeriod((Duration)newValue);
+				setSchedulePeriod((String)newValue);
 				return;
 		}
 		super.eSet(featureID, newValue);

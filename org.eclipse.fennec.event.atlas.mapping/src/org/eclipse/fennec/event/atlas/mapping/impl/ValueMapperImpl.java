@@ -665,9 +665,12 @@ public class ValueMapperImpl implements ValueMapper {
 			}
 		}
 
-		// Second try: Use the static timestamp value
-		if (timestampMapping.getTimestamp() != null) {
-			return timestampMapping.getTimestamp();
+		// Second try: the static timestamp literal. EInstant is backed by String so that a mapping
+		// stored in a Model Atlas survives being loaded dynamically (issue #61), so the literal is
+		// parsed here - through the same conversion a string picked up from the feature path gets.
+		String staticTimestamp = timestampMapping.getTimestamp();
+		if (staticTimestamp != null && !staticTimestamp.isBlank()) {
+			return convertToInstant(staticTimestamp.trim(), timestampMapping.getHint());
 		}
 
 		return null;

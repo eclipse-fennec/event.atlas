@@ -25,7 +25,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- begin-model-doc -->
  * Optional model inference for payloads with no resolvable model.
  * 
- * Two switches gate different costs, and both default to off: samplingEnabled gates BUFFERING, namespace gates the RUN, which is what costs money. Sampling on with a blank namespace is a deliberate state - the log shows what would be inferred at no API cost.
+ * Both switches are off by default: samplingEnabled turns the collecting of unknown payloads on, namespace turns the inference run on. With sampling on and namespace blank, unknown payloads are collected and logged but no run is made, and nothing is charged.
  * <!-- end-model-doc -->
  *
  * <p>
