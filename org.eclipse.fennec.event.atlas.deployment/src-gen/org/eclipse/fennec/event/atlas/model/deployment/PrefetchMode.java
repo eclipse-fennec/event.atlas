@@ -29,7 +29,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- begin-model-doc -->
  * How the Model Atlas client fetches EPackages: EAGER pre-fetches them at activation, LAZY resolves on demand.
  * 
- * LAZY is rarely useful here: a discriminator lookup searches REGISTERED packages and never asks for a specific nsURI, so there is nothing for a lazy registry to resolve.
+ * Use EAGER. With LAZY the domain EPackages are never requested, so the mappings that need them stay unresolved.
  * <!-- end-model-doc -->
  * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getPrefetchMode()
  * @model

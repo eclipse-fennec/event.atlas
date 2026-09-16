@@ -15,7 +15,6 @@ package org.eclipse.fennec.event.atlas.deployment.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Duration;
 import java.util.List;
 
 import org.eclipse.fennec.event.atlas.deployment.ConfigurationRecord;
@@ -277,7 +276,7 @@ class DeploymentPlannerTest {
 		filter.setName("slow-drift");
 		filter.setChangeMode(ChangeMode.DEADBAND);
 		filter.setChangeThresholdPercent(5.0);
-		filter.setChangeMaxInterval(Duration.ofMinutes(15));
+		filter.setChangeMaxInterval("PT15M");
 		deployment.getHistory().getFilters().add(filter);
 
 		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
@@ -302,6 +301,23 @@ class DeploymentPlannerTest {
 	}
 
 	@Test
+	void aFilterWithAnUnparseableMaxIntervalIsRefused() {
+		EventAtlasDeployment deployment = withHistory(timescale(null));
+		HistorizationFilter filter = FACTORY.createHistorizationFilter();
+		filter.setName("typo");
+		filter.setChangeMode(ChangeMode.DEADBAND);
+		filter.setChangeThresholdPercent(5.0);
+		filter.setChangeMaxInterval("15 minutes");
+		deployment.getHistory().getFilters().add(filter);
+
+		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
+
+		assertThat(pids(plan)).doesNotContain("sensinact.history.filter~typo");
+		assertThat(plan.problems()).singleElement().asString()
+				.contains("invalid ISO-8601 changeMaxInterval '15 minutes'");
+	}
+
+	@Test
 	void onChangeModeIsHyphenatedOnTheWire() {
 		EventAtlasDeployment deployment = withHistory(timescale(null));
 		HistorizationFilter filter = FACTORY.createHistorizationFilter();
@@ -320,7 +336,7 @@ class DeploymentPlannerTest {
 		EventAtlasDeployment deployment = withHistory(timescale(null));
 		HousekeepingPolicy policy = FACTORY.createHousekeepingPolicy();
 		policy.setName("retention-only");
-		policy.setRetentionPeriod(Duration.ofDays(30));
+		policy.setRetentionPeriod("P30D");
 		deployment.getHistory().getHousekeeping().add(policy);
 
 		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
@@ -356,6 +372,35 @@ class DeploymentPlannerTest {
 
 		assertThat(pids(plan)).doesNotContain("sensinact.history.housekeeping~nothing-to-do");
 		assertThat(plan.problems()).singleElement().asString().contains("retentionPeriod and keepCount");
+	}
+
+	@Test
+	void aHousekeepingPolicyWithAnUnparseableRetentionPeriodIsRefused() {
+		EventAtlasDeployment deployment = withHistory(timescale(null));
+		HousekeepingPolicy policy = FACTORY.createHousekeepingPolicy();
+		policy.setName("typo");
+		policy.setRetentionPeriod("90d");
+		deployment.getHistory().getHousekeeping().add(policy);
+
+		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
+
+		assertThat(pids(plan)).doesNotContain("sensinact.history.housekeeping~typo");
+		assertThat(plan.problems()).singleElement().asString().contains("invalid ISO-8601 retentionPeriod '90d'");
+	}
+
+	@Test
+	void aDayBasedRetentionPeriodIsNormalisedToHours() {
+		EventAtlasDeployment deployment = withHistory(timescale(null));
+		HousekeepingPolicy policy = FACTORY.createHousekeepingPolicy();
+		policy.setName("ninety-days");
+		policy.setRetentionPeriod("P90D");
+		policy.setSchedulePeriod("PT24H");
+		deployment.getHistory().getHousekeeping().add(policy);
+
+		DeploymentPlan plan = DeploymentPlanner.plan(deployment);
+
+		assertThat(plan.record("sensinact.history.housekeeping~ninety-days").properties())
+				.containsEntry("retention.period", "PT2160H").containsEntry("schedule.period", "PT24H");
 	}
 
 	@Test

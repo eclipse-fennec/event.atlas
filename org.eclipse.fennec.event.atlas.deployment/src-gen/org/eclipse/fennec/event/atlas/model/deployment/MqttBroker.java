@@ -27,7 +27,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- begin-model-doc -->
  * A southbound MQTT broker connection.
  * 
- * THERE IS DELIBERATELY NO CREDENTIAL HERE. The broker password stays a ConfigAdmin value fed from the environment, because a deployment model is content: stored in a Model Atlas it is as readable as every other object there - on modelatlas.cloud every GET is served unauthenticated. Declaring this section still writes the rest of the PID, and the '.password' property keeps coming from the configurator JSON's $[env:...] placeholder. The sensinact client is the transport only - connection plus subscription; mapping and ingest happen in event.atlas's own listener, which binds this broker by its id.
+ * No password is declared here - name the environment variable holding it in 'passwordVariable' instead.
  * 
  * 'topics' is what is SUBSCRIBED at the broker. Which of those messages each channel handles is a separate per-channel filter, and the union of the channel filters should cover this list: a topic that is subscribed but matches no channel is received and silently dropped.
  * <!-- end-model-doc -->
@@ -173,7 +173,7 @@ public interface MqttBroker extends EObject {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:<name>;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely.
+	 * The NAME of the environment variable holding the password - a reference, never the secret. The password is read from that variable in the runtime's environment and never becomes part of the deployment. Blank omits the property entirely.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Password Variable</em>' attribute.
 	 * @see #setPasswordVariable(String)

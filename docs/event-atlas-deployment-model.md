@@ -174,7 +174,10 @@ Three things to know before seeding one:
   deserializes the stored instance server-side, so it needs `event-atlas-deployment.ecore`
   registered — in `draft` *and* `release` if updates go through a staged transition, because each
   stage resolves against its own schema view. The seed set is one file: the metamodel references
-  nothing but Ecore.
+  nothing but Ecore. **Re-seed it after any `.ecore` change**, in every stage — the Atlas
+  deserializes against the schema it holds, not the one in your checkout, and the nsURI does not
+  move on a datatype change. An Atlas still holding the pre-#61 schema rejects durations exactly
+  as before.
 - **Do not seed the same `deploymentId` into both sources.** The file provider seeds the registry
   and the Atlas provider syncs on top; the same id from both means two writers racing for one
   entry, exactly like a mapping mounted *and* served from the Atlas.
@@ -240,12 +243,25 @@ history engine uses `-1` as its unset sentinel for both. A literal `0` would the
 "no limit" but "keep no values" and "delete no rows" — the first of which deletes the whole table
 on the next run. The planner omits any value that is not greater than zero, and a test pins that.
 
-**Durations are ISO-8601 and typed.** `changeMaxInterval`, `retentionPeriod` and `schedulePeriod`
-are `java.time.Duration`, written as `PT30M`, `P90D`, `PT24H`. The `EDuration` datatype carries
-`create`/`convert` bodies in the `.ecore`'s GenModel annotation, because EMF's default reflective
-conversion cannot build a `Duration` from a literal — without them every deployment XMI carrying a
-duration fails to load with `The value 'P30D' is invalid`. If you add another `java.time` datatype
-to this metamodel, give it the same treatment.
+**Durations are ISO-8601 literals, and the `EDuration` datatype is a `String` on purpose.**
+`changeMaxInterval`, `retentionPeriod` and `schedulePeriod` are written as `PT30M`, `P90D`,
+`PT24H`, and the planner parses them with `Duration.parse` — an unparseable one is a refusal that
+skips that filter or policy, not a load failure.
+
+Typing them as `java.time.Duration` is what you would reach for first, and it makes the model
+unusable in a Model Atlas (issue #61). A Duration has no `valueOf(String)` and no `String`
+constructor, so its only conversion can live in a GenModel `create`/`convert` body — which is
+applied at *code generation* time and reaches the generated factory only. A Model Atlas loads a
+registered `.ecore` **dynamically**, with no generated code on its classpath, so the reflective
+`EFactoryImpl.createFromString` runs instead and rejects every instance carrying a duration with
+`The value 'PT10M' is invalid`. The failure is silent in the direction that matters: the
+configurator is fail-soft, so a runtime whose deployment object never arrived starts cleanly and
+simply keeps its baked-in configuration. `DynamicDeploymentPackageTest` loads the examples against
+a package built from the `.ecore` alone and is the guard.
+
+**So: no `java.time` type, and no other type without a string form, belongs in this metamodel.**
+Carry the literal as a `String` and parse it where it is consumed. The mapping metamodel's
+`EInstant` is the same datatype for the same reason.
 
 ## Changing the metamodel
 
@@ -266,3 +282,7 @@ after adding a classifier, add the matching `genClasses` / `genFeatures` entry t
 above — against `DeploymentPlanner`, which is pure and needs no framework.
 `ExampleDeploymentTest` loads the shipped example XMIs the way a runtime would and plans them,
 so an example that stops parsing fails the build rather than misleading a reader.
+`DynamicDeploymentPackageTest` loads the same examples against a package built from the `.ecore`
+alone, with the generated one deliberately shadowed — the way a Model Atlas loads a registered
+schema. That is the pass a generated factory hides, so run it in your head before adding a
+datatype.

@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.deployment.impl;
 
-import java.time.Duration;
-
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EDataType;
@@ -1329,7 +1327,7 @@ public class DeploymentPackageImpl extends EPackageImpl implements DeploymentPac
 		addEEnumLiteral(changeModeEEnum, ChangeMode.DEADBAND);
 
 		// Initialize data types
-		initEDataType(eDurationEDataType, Duration.class, "EDuration", IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS);
+		initEDataType(eDurationEDataType, String.class, "EDuration", IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS);
 
 		// Create resource
 		createResource(eNS_URI);

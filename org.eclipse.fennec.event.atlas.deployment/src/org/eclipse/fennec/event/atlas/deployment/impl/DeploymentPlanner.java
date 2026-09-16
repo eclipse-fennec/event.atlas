@@ -14,6 +14,7 @@
 package org.eclipse.fennec.event.atlas.deployment.impl;
 
 import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -341,8 +342,13 @@ public final class DeploymentPlanner {
 			if (filter.getChangeThresholdPercent() > 0) {
 				properties.put("change.threshold.percent", String.valueOf(filter.getChangeThresholdPercent()));
 			}
-			if (filter.getChangeMaxInterval() != null) {
-				properties.put("change.max.interval", iso(filter.getChangeMaxInterval()));
+			DurationLiteral maxInterval = duration(filter.getChangeMaxInterval(), "changeMaxInterval",
+					"Filter '" + name + "'", problems);
+			if (maxInterval.invalid()) {
+				continue;
+			}
+			if (maxInterval.present()) {
+				properties.put("change.max.interval", iso(maxInterval.value()));
 			}
 			records.add(record(PID_HISTORY_FILTER_FACTORY, name, properties));
 		}
@@ -356,9 +362,14 @@ public final class DeploymentPlanner {
 				problems.add("A housekeeping policy without a name cannot be configured - skipped");
 				continue;
 			}
-			if (policy.getRetentionPeriod() == null && policy.getKeepCount() <= 0) {
-				problems.add("Housekeeping policy '" + name
-						+ "' needs at least one of retentionPeriod and keepCount - skipped");
+			String where = "Housekeeping policy '" + name + "'";
+			DurationLiteral retention = duration(policy.getRetentionPeriod(), "retentionPeriod", where, problems);
+			DurationLiteral schedule = duration(policy.getSchedulePeriod(), "schedulePeriod", where, problems);
+			if (retention.invalid() || schedule.invalid()) {
+				continue;
+			}
+			if (!retention.present() && policy.getKeepCount() <= 0) {
+				problems.add(where + " needs at least one of retentionPeriod and keepCount - skipped");
 				continue;
 			}
 			Map<String, Object> properties = new LinkedHashMap<>();
@@ -366,8 +377,8 @@ public final class DeploymentPlanner {
 			if (!policy.getTargets().isEmpty()) {
 				properties.put("target", strings(policy.getTargets()));
 			}
-			if (policy.getRetentionPeriod() != null) {
-				properties.put("retention.period", iso(policy.getRetentionPeriod()));
+			if (retention.present()) {
+				properties.put("retention.period", iso(retention.value()));
 			}
 			// keep.count and max.delete default to -1 for "unset"; a written 0 would mean
 			// "keep nothing" and "delete nothing", so an unset value is omitted instead.
@@ -377,8 +388,8 @@ public final class DeploymentPlanner {
 			if (policy.getMaxDelete() > 0) {
 				properties.put("max.delete", (long) policy.getMaxDelete());
 			}
-			if (policy.getSchedulePeriod() != null) {
-				properties.put("schedule.period", iso(policy.getSchedulePeriod()));
+			if (schedule.present()) {
+				properties.put("schedule.period", iso(schedule.value()));
 			}
 			records.add(record(PID_HOUSEKEEPING_FACTORY, name, properties));
 		}
@@ -445,6 +456,44 @@ public final class DeploymentPlanner {
 
 	private static String iso(Duration duration) {
 		return duration.toString();
+	}
+
+	/**
+	 * An {@code EDuration} literal that has been through {@link Duration#parse}: absent when the
+	 * literal was blank, {@link #invalid()} when it could not be parsed.
+	 */
+	private record DurationLiteral(Duration value, boolean invalid) {
+
+		static final DurationLiteral ABSENT = new DurationLiteral(null, false);
+		static final DurationLiteral INVALID = new DurationLiteral(null, true);
+
+		boolean present() {
+			return value != null;
+		}
+	}
+
+	/**
+	 * Parses an ISO-8601 duration literal, collecting an unparseable one as a problem.
+	 * <p>
+	 * {@code EDuration} is typed as {@code String} rather than {@code java.time.Duration} so that
+	 * the package survives being loaded <em>dynamically</em> by a Model Atlas, where no generated
+	 * factory is on the classpath and a GenModel conversion body never runs (issue #61). That
+	 * moves the parse here, which is where it belongs anyway: a bad literal joins the collected
+	 * refusals rather than failing the whole resource load, so the rest of the deployment still
+	 * applies.
+	 */
+	private static DurationLiteral duration(String literal, String attribute, String where,
+			List<String> problems) {
+		String value = trimmed(literal);
+		if (value.isEmpty()) {
+			return DurationLiteral.ABSENT;
+		}
+		try {
+			return new DurationLiteral(Duration.parse(value), false);
+		} catch (DateTimeParseException e) {
+			problems.add(where + " has an invalid ISO-8601 " + attribute + " '" + value + "' - skipped");
+			return DurationLiteral.INVALID;
+		}
 	}
 
 	private static String[] strings(List<String> values) {

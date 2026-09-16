@@ -204,6 +204,20 @@ value, and finally falling back to the current time — so a bare `<timestamp>` 
 feature path behaves like `FEATURE`. `Instant`, `java.util.Date`, epoch-millis `Long`, and
 (with a `hint`) formatted strings are all understood.
 
+The static value is the `timestamp` attribute on the `<timestamp>` element itself, an ISO-8601
+instant literal:
+
+```xml
+<timestamp timestamp="2026-09-16T10:15:30Z"/>
+```
+
+Its datatype `EInstant` is deliberately backed by a `String` rather than `java.time.Instant`, and
+that is not a detail you can change back: a mapping stored in a Model Atlas is loaded from the
+registered `.ecore` **dynamically**, where no generated factory exists and EMF's reflective
+conversion has nothing to build an `Instant` from. Typed as `Instant`, the literal above failed to
+load — in the runtime too. The same reasoning fixed `EDuration` in the deployment metamodel
+(issue #61), and it applies to any `java.time` type either metamodel might grow.
+
 Timestamps can be set at three levels; the most specific one wins per resource:
 provider (`ProviderMapping/timestamp`) → service (`ServiceMapping/timestamp`) →
 resource (`ResourceMapping/timestamp`). A resource can also *reference* a timestamp defined

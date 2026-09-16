@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.mapping.impl;
 
-import java.time.Instant;
-
 import java.util.Map;
 
 import org.eclipse.emf.ecore.EClass;
@@ -471,8 +469,8 @@ public class MappingFactoryImpl extends EFactoryImpl implements MappingFactory {
 	 * <!-- end-user-doc -->
 	 * @generated
 	 */
-	public Instant createEInstantFromString(EDataType eDataType, String initialValue) {
-		return (Instant)super.createFromString(eDataType, initialValue);
+	public String createEInstantFromString(EDataType eDataType, String initialValue) {
+		return (String)super.createFromString(eDataType, initialValue);
 	}
 
 	/**

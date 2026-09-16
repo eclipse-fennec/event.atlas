@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.mapping.impl;
 
-import java.time.Instant;
-
 import java.util.Map;
 
 import java.util.function.Function;
@@ -1961,7 +1959,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		addEEnumLiteral(durationUnitEEnum, DurationUnit.DAYS);
 
 		// Initialize data types
-		initEDataType(eInstantEDataType, Instant.class, "EInstant", IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS);
+		initEDataType(eInstantEDataType, String.class, "EInstant", IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS);
 		initEDataType(javaStringFunctionEDataType, Function.class, "JavaStringFunction", !IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS, "java.util.function.Function<org.eclipse.emf.ecore.EObject, java.lang.String>");
 		initEDataType(javaInstantFunctionEDataType, Function.class, "JavaInstantFunction", !IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS, "java.util.function.Function<org.eclipse.emf.ecore.EObject, java.time.Instant>");
 		initEDataType(javaObjectFunctionEDataType, Function.class, "JavaObjectFunction", !IS_SERIALIZABLE, !IS_GENERATED_INSTANCE_CLASS, "java.util.function.Function<org.eclipse.emf.ecore.EObject, ?>");

@@ -154,7 +154,7 @@ public interface IngestChannel extends EObject {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * MQTT only: the subset of the broker's subscribed topics this channel handles. A filter matching nothing is harmless; an EMPTY topic list is an activation failure by design.
+	 * MQTT only: the subset of the broker's subscribed topics this channel handles. A filter matching nothing is harmless; an EMPTY topic list is an activation failure.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Topics</em>' attribute list.
 	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getIngestChannel_Topics()
@@ -168,9 +168,9 @@ public interface IngestChannel extends EObject {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Discriminator registry that types JSON payloads, which do not name their model. One registry per runtime, so the LAST non-blank value across all channels wins and is written once.
+	 * Discriminator registry that types JSON payloads, which do not name their model. One registry per runtime, so the LAST non-blank value across all channels wins.
 	 * 
-	 * NOT OPTIONAL for a JSON deployment: an empty map id passes no load option, the deserializer finds no type information and every JSON payload is dropped.
+	 * NOT OPTIONAL for a JSON deployment: left blank, every JSON payload is dropped.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Codec Type Map Id</em>' attribute.
 	 * @see #setCodecTypeMapId(String)

@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.deployment;
 
-import java.time.Duration;
-
 import org.eclipse.emf.common.util.EList;
 
 import org.eclipse.emf.ecore.EObject;
@@ -198,12 +196,12 @@ public interface HistorizationFilter extends EObject {
 	 * Heartbeat: store a value regardless of the deadband once the last stored value is older than this.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Change Max Interval</em>' attribute.
-	 * @see #setChangeMaxInterval(Duration)
+	 * @see #setChangeMaxInterval(String)
 	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getHistorizationFilter_ChangeMaxInterval()
 	 * @model dataType="org.eclipse.fennec.event.atlas.model.deployment.EDuration"
 	 * @generated
 	 */
-	Duration getChangeMaxInterval();
+	String getChangeMaxInterval();
 
 	/**
 	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.HistorizationFilter#getChangeMaxInterval <em>Change Max Interval</em>}' attribute.
@@ -213,6 +211,6 @@ public interface HistorizationFilter extends EObject {
 	 * @see #getChangeMaxInterval()
 	 * @generated
 	 */
-	void setChangeMaxInterval(Duration value);
+	void setChangeMaxInterval(String value);
 
 } // HistorizationFilter

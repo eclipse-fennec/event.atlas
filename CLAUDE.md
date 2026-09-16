@@ -61,12 +61,13 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-09-15: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus **243 plain-JUnit tests** across nine projects. The
-mapping project contributes 39 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
-`BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`); the
-deployment project 38 (`DeploymentPlannerTest`, `DeploymentConfiguratorImplTest`,
-`ExampleDeploymentTest`, `ShippedConfigOverlapTest`).
+Baseline as of 2026-09-16: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus **250 plain-JUnit tests** across nine projects. The
+mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+`BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
+`DynamicMappingPackageTest`); the deployment project 44 (`DeploymentPlannerTest`,
+`DeploymentConfiguratorImplTest`, `ExampleDeploymentTest`, `ShippedConfigOverlapTest`,
+`DynamicDeploymentPackageTest`).
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -255,11 +256,19 @@ A deployment can be described as a model instead of forty environment variables:
   cannot key. The metamodel must be seeded as a schema in every stage the object passes through,
   because the Atlas deserializes the instance server-side. Never seed one `deploymentId` into both
   sources.
-- **`EDuration` needs its `create`/`convert` GenModel bodies.** EMF's default reflective conversion
-  cannot build a `java.time.Duration` from a literal (no `valueOf(String)`), so without them every
-  deployment XMI carrying a duration fails to load with `The value 'P30D' is invalid`. The bodies
-  live in the `.ecore` annotation and use `it` as the parameter. The mapping metamodel's `EInstant`
-  has the same gap — latent only because no mapping XMI writes a literal instant.
+- **No `java.time` type belongs in either metamodel — `EDuration` and `EInstant` are `String`s.**
+  A GenModel `create`/`convert` body is applied at *code generation* time, so it only ever reaches
+  the generated factory; a Model Atlas loads a registered `.ecore` **dynamically** and runs the
+  reflective `EFactoryImpl.createFromString`, which needs a `valueOf(String)` or a `String`
+  constructor that neither `Duration` nor `Instant` has. Typed as `Duration`, every
+  `EventAtlasDeployment` carrying one was rejected at upload with `The value 'PT10M' is invalid` —
+  i.e. the model was unusable in the store it exists to be deployed from, and *silently*, because
+  the configurator is fail-soft and the runtime just keeps its baked-in configuration (issue #61,
+  fixed 2026-09-16). Both datatypes now carry the ISO-8601 literal as a `String` and it is parsed
+  where it is consumed: `DeploymentPlanner.duration` (an unparseable literal is a collected
+  refusal that skips that filter or policy) and `ValueMapperImpl.extractTimestamp`.
+  `DynamicDeploymentPackageTest` and `DynamicMappingPackageTest` load against a package built from
+  the `.ecore` alone and are the guards — both fail with the original datatypes.
 - **The `generate` task's up-to-date check does not notice an `.ecore`-only edit.** It appears to
   regenerate and silently does not; force it with
   `./gradlew :org.eclipse.fennec.event.atlas.deployment:generate --rerun-tasks`. The `.genmodel` is

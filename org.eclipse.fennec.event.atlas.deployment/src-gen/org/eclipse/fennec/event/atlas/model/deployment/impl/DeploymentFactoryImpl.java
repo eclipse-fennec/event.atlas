@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.deployment.impl;
 
-import java.time.Duration;
-
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EDataType;
 import org.eclipse.emf.ecore.EObject;
@@ -338,26 +336,8 @@ public class DeploymentFactoryImpl extends EFactoryImpl implements DeploymentFac
 	 * <!-- end-user-doc -->
 	 * @generated
 	 */
-	public Duration createEDuration(final String it) {
-		return it == null || it.isBlank() ? null : java.time.Duration.parse(it);
-	}
-
-	/**
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 */
-	public Duration createEDurationFromString(EDataType eDataType, String initialValue) {
-		return createEDuration(initialValue);
-	}
-
-	/**
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 */
-	public String convertEDuration(final Duration it) {
-		return it == null ? null : it.toString();
+	public String createEDurationFromString(EDataType eDataType, String initialValue) {
+		return (String)super.createFromString(eDataType, initialValue);
 	}
 
 	/**
@@ -366,7 +346,7 @@ public class DeploymentFactoryImpl extends EFactoryImpl implements DeploymentFac
 	 * @generated
 	 */
 	public String convertEDurationToString(EDataType eDataType, Object instanceValue) {
-		return convertEDuration((Duration)instanceValue);
+		return super.convertToString(eDataType, instanceValue);
 	}
 
 	/**

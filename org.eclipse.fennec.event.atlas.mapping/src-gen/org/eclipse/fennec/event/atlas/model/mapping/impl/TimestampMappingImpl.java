@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.mapping.impl;
 
-import java.time.Instant;
-
 import org.eclipse.emf.common.notify.Notification;
 
 import org.eclipse.emf.ecore.EClass;
@@ -69,7 +67,7 @@ public class TimestampMappingImpl extends FeatureMappingImpl implements Timestam
 	 * @generated
 	 * @ordered
 	 */
-	protected static final Instant TIMESTAMP_EDEFAULT = null;
+	protected static final String TIMESTAMP_EDEFAULT = null;
 
 	/**
 	 * The cached value of the '{@link #getTimestamp() <em>Timestamp</em>}' attribute.
@@ -79,7 +77,7 @@ public class TimestampMappingImpl extends FeatureMappingImpl implements Timestam
 	 * @generated
 	 * @ordered
 	 */
-	protected Instant timestamp = TIMESTAMP_EDEFAULT;
+	protected String timestamp = TIMESTAMP_EDEFAULT;
 
 	/**
 	 * The default value of the '{@link #getHint() <em>Hint</em>}' attribute.
@@ -149,7 +147,7 @@ public class TimestampMappingImpl extends FeatureMappingImpl implements Timestam
 	 * @generated
 	 */
 	@Override
-	public Instant getTimestamp() {
+	public String getTimestamp() {
 		return timestamp;
 	}
 
@@ -159,8 +157,8 @@ public class TimestampMappingImpl extends FeatureMappingImpl implements Timestam
 	 * @generated
 	 */
 	@Override
-	public void setTimestamp(Instant newTimestamp) {
-		Instant oldTimestamp = timestamp;
+	public void setTimestamp(String newTimestamp) {
+		String oldTimestamp = timestamp;
 		timestamp = newTimestamp;
 		if (eNotificationRequired())
 			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.TIMESTAMP_MAPPING__TIMESTAMP, oldTimestamp, timestamp));
@@ -219,7 +217,7 @@ public class TimestampMappingImpl extends FeatureMappingImpl implements Timestam
 				setStrategy((TimestampStrategy)newValue);
 				return;
 			case MappingPackage.TIMESTAMP_MAPPING__TIMESTAMP:
-				setTimestamp((Instant)newValue);
+				setTimestamp((String)newValue);
 				return;
 			case MappingPackage.TIMESTAMP_MAPPING__HINT:
 				setHint((String)newValue);

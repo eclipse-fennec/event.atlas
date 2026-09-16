@@ -253,6 +253,8 @@ public class ChangeRuleFilterImpl implements ChangeRuleFilter {
 		if (rule.getInterval() == null || rule.getIntervalUnit() == null) {
 			return 0L;
 		}
+		// DurationUnit's literal names are TimeUnit's, which is what makes this conversion possible -
+		// a literal added to the metamodel without a TimeUnit counterpart fails here at runtime.
 		return TimeUnit.valueOf(rule.getIntervalUnit().getName()).toMillis(rule.getInterval());
 	}
 

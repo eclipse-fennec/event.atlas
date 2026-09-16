@@ -8,16 +8,14 @@
     <details key="basePackage" value="org.eclipse.fennec.event.atlas.model"/>
     <details key="resource" value="XMI"/>
   </eAnnotations>
-  <eClassifiers xsi:type="ecore:EDataType" name="EDuration" instanceClassName="java.time.Duration">
+  <eClassifiers xsi:type="ecore:EDataType" name="EDuration" instanceClassName="java.lang.String">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="An ISO-8601 duration, e.g. P30D or PT15M.&#xA;&#xA;The create/convert bodies below are not decoration: EMF's default reflective conversion cannot build a java.time.Duration from a literal (it has no valueOf(String)), so without them every deployment XMI carrying a duration fails to load with &quot;The value 'P30D' is invalid&quot;."/>
-      <details key="create" value="return it == null || it.isBlank() ? null : java.time.Duration.parse(it);"/>
-      <details key="convert" value="return it == null ? null : it.toString();"/>
+      <details key="documentation" value="An ISO-8601 duration literal: P30D, PT15M, PT24H, P1DT2H30M.&#xA;&#xA;Days, hours, minutes and seconds are accepted; weeks, months and years are not. A literal that cannot be parsed is reported as a refusal and the filter or policy carrying it is skipped."/>
     </eAnnotations>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EEnum" name="PrefetchMode">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="How the Model Atlas client fetches EPackages: EAGER pre-fetches them at activation, LAZY resolves on demand.&#xA;&#xA;LAZY is rarely useful here: a discriminator lookup searches REGISTERED packages and never asks for a specific nsURI, so there is nothing for a lazy registry to resolve."/>
+      <details key="documentation" value="How the Model Atlas client fetches EPackages: EAGER pre-fetches them at activation, LAZY resolves on demand.&#xA;&#xA;Use EAGER. With LAZY the domain EPackages are never requested, so the mappings that need them stay unresolved."/>
     </eAnnotations>
     <eLiterals name="EAGER"/>
     <eLiterals name="LAZY" value="1"/>
@@ -31,7 +29,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EEnum" name="PayloadFormat">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The payload format a channel declares. It is stated, never guessed: EMF answers an unknown file extension with its wildcard factory, so a JSON payload on an XMI channel dies in a SAX parser."/>
+      <details key="documentation" value="The payload format a channel accepts. It is declared, never detected, so a payload that does not match its channel's format is rejected rather than read as the declared one."/>
     </eAnnotations>
     <eLiterals name="XMI"/>
     <eLiterals name="JSON" value="1"/>
@@ -171,7 +169,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="MqttBroker">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="A southbound MQTT broker connection.&#xA;&#xA;THERE IS DELIBERATELY NO CREDENTIAL HERE. The broker password stays a ConfigAdmin value fed from the environment, because a deployment model is content: stored in a Model Atlas it is as readable as every other object there - on modelatlas.cloud every GET is served unauthenticated. Declaring this section still writes the rest of the PID, and the '.password' property keeps coming from the configurator JSON's $[env:...] placeholder. The sensinact client is the transport only - connection plus subscription; mapping and ingest happen in event.atlas's own listener, which binds this broker by its id.&#xA;&#xA;'topics' is what is SUBSCRIBED at the broker. Which of those messages each channel handles is a separate per-channel filter, and the union of the channel filters should cover this list: a topic that is subscribed but matches no channel is received and silently dropped."/>
+      <details key="documentation" value="A southbound MQTT broker connection.&#xA;&#xA;No password is declared here - name the environment variable holding it in 'passwordVariable' instead.&#xA;&#xA;'topics' is what is SUBSCRIBED at the broker. Which of those messages each channel handles is a separate per-channel filter, and the union of the channel filters should cover this list: a topic that is subscribed but matches no channel is received and silently dropped."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="id" lowerBound="1" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -188,7 +186,7 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="passwordVariable" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
         defaultValueLiteral="EVENTATLAS_MQTT_PASSWORD">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:&lt;name&gt;;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely."/>
+        <details key="documentation" value="The NAME of the environment variable holding the password - a reference, never the secret. The password is read from that variable in the runtime's environment and never becomes part of the deployment. Blank omits the property entirely."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="topics" upperBound="-1"
@@ -215,29 +213,29 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="topics" upperBound="-1"
         eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="MQTT only: the subset of the broker's subscribed topics this channel handles. A filter matching nothing is harmless; an EMPTY topic list is an activation failure by design."/>
+        <details key="documentation" value="MQTT only: the subset of the broker's subscribed topics this channel handles. A filter matching nothing is harmless; an EMPTY topic list is an activation failure."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="codecTypeMapId" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Discriminator registry that types JSON payloads, which do not name their model. One registry per runtime, so the LAST non-blank value across all channels wins and is written once.&#xA;&#xA;NOT OPTIONAL for a JSON deployment: an empty map id passes no load option, the deserializer finds no type information and every JSON payload is dropped."/>
+        <details key="documentation" value="Discriminator registry that types JSON payloads, which do not name their model. One registry per runtime, so the LAST non-blank value across all channels wins.&#xA;&#xA;NOT OPTIONAL for a JSON deployment: left blank, every JSON payload is dropped."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="HistoryConfig">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The history store and the engine settings around it.&#xA;&#xA;Layering, since the history rework: the storage is a backend that only stores and queries, while the engine subscribes it to the twin's updates, publishes the HistoryProvider service and applies the filters and housekeeping policies below."/>
+      <details key="documentation" value="The history store and the engine settings around it: a storage backend holding the values, plus the historization filters and housekeeping policies applied to it."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="providerName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
         defaultValueLiteral="brokerHistory">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="Name the store is registered under. The SensorThings northbound asks for this same name, and both are written from this one value - which is the point of having it here."/>
+        <details key="documentation" value="Name the store is registered under. The SensorThings northbound reads history under this same name."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EReference" name="storage" eType="#//HistoryStorage"
         containment="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="The storage backend. Optional on purpose: a deployment whose store is still configured by a configurator JSON bundle can leave it out and declare only the filters and housekeeping policies below, which no JSON file here owns. That is the smallest useful step into the model."/>
+        <details key="documentation" value="The storage backend. Optional: leave it out to declare only the filters and housekeeping policies below and keep the backend configured elsewhere."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EReference" name="filters" upperBound="-1"
@@ -274,7 +272,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="TimescaleStorage" eSuperTypes="#//HistoryStorage">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The PostgreSQL/TimescaleDB backend.&#xA;&#xA;THERE IS DELIBERATELY NO CREDENTIAL HERE - see MqttBroker. 'user' is named because it is not a secret and a deployment needs to see which role it connects as; the password stays a ConfigAdmin value fed from the environment. The TimescaleDB extension is optional - with it the history table becomes a hypertable, on plain PostgreSQL 14+ the provider falls back to date_bin. PostGIS is not required.&#xA;&#xA;Its component requires a configuration, so declaring this section is what switches history on."/>
+      <details key="documentation" value="The PostgreSQL/TimescaleDB backend. Declaring this section is what switches persistent history on.&#xA;&#xA;No password is declared here - name the environment variable holding it in 'passwordVariable' instead. 'user' is part of the deployment because it is not a secret.&#xA;&#xA;The TimescaleDB extension is optional: with it the history table becomes a hypertable, and plain PostgreSQL 14+ works without it. PostGIS is not required."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="url" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -291,7 +289,7 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="passwordVariable" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
         defaultValueLiteral="TIMESCALE_PWD">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:&lt;name&gt;;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely."/>
+        <details key="documentation" value="The NAME of the environment variable holding the password - a reference, never the secret. The password is read from that variable in the runtime's environment and never becomes part of the deployment. Blank omits the property entirely."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>
@@ -376,7 +374,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="InferenceConfig">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="Optional model inference for payloads with no resolvable model.&#xA;&#xA;Two switches gate different costs, and both default to off: samplingEnabled gates BUFFERING, namespace gates the RUN, which is what costs money. Sampling on with a blank namespace is a deliberate state - the log shows what would be inferred at no API cost."/>
+      <details key="documentation" value="Optional model inference for payloads with no resolvable model.&#xA;&#xA;Both switches are off by default: samplingEnabled turns the collecting of unknown payloads on, namespace turns the inference run on. With sampling on and namespace blank, unknown payloads are collected and logged but no run is made, and nothing is charged."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="samplingEnabled" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
         defaultValueLiteral="false"/>

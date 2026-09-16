@@ -25,11 +25,10 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * A standalone container for persistence rules.
- * Nothing in the runtime reads it: rules are contained by the ResourceMapping or the
- * ReferenceResourceBinding that uses them, so a registry file is a catalogue to copy rules out
- * of - a place to keep the shapes an installation has agreed on - not a source the engine
- * resolves against. It is kept because a shared rule source may be wanted again later.
+ * A standalone catalogue of persistence rules to copy from.
+ * Nothing in the runtime reads it - rules are contained by the ResourceMapping or the
+ * ReferenceResourceBinding that uses them - so a registry file does not belong in a
+ * runtime's mappings directory.
  * <!-- end-model-doc -->
  *
  * <p>

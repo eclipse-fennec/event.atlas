@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.mapping;
 
-import java.time.Instant;
-
 import org.osgi.annotation.versioning.ProviderType;
 
 /**
@@ -67,12 +65,12 @@ public interface TimestampMapping extends FeatureMapping {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @return the value of the '<em>Timestamp</em>' attribute.
-	 * @see #setTimestamp(Instant)
+	 * @see #setTimestamp(String)
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getTimestampMapping_Timestamp()
 	 * @model dataType="org.eclipse.fennec.event.atlas.model.mapping.EInstant"
 	 * @generated
 	 */
-	Instant getTimestamp();
+	String getTimestamp();
 
 	/**
 	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping#getTimestamp <em>Timestamp</em>}' attribute.
@@ -82,7 +80,7 @@ public interface TimestampMapping extends FeatureMapping {
 	 * @see #getTimestamp()
 	 * @generated
 	 */
-	void setTimestamp(Instant value);
+	void setTimestamp(String value);
 
 	/**
 	 * Returns the value of the '<em><b>Hint</b></em>' attribute.

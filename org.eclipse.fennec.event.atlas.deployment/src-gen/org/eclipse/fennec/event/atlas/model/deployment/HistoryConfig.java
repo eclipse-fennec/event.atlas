@@ -25,9 +25,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * The history store and the engine settings around it.
- * 
- * Layering, since the history rework: the storage is a backend that only stores and queries, while the engine subscribes it to the twin's updates, publishes the HistoryProvider service and applies the filters and housekeeping policies below.
+ * The history store and the engine settings around it: a storage backend holding the values, plus the historization filters and housekeeping policies applied to it.
  * <!-- end-model-doc -->
  *
  * <p>
@@ -52,7 +50,7 @@ public interface HistoryConfig extends EObject {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * Name the store is registered under. The SensorThings northbound asks for this same name, and both are written from this one value - which is the point of having it here.
+	 * Name the store is registered under. The SensorThings northbound reads history under this same name.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Provider Name</em>' attribute.
 	 * @see #setProviderName(String)
@@ -77,7 +75,7 @@ public interface HistoryConfig extends EObject {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * The storage backend. Optional on purpose: a deployment whose store is still configured by a configurator JSON bundle can leave it out and declare only the filters and housekeeping policies below, which no JSON file here owns. That is the smallest useful step into the model.
+	 * The storage backend. Optional: leave it out to declare only the filters and housekeeping policies below and keep the backend configured elsewhere.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Storage</em>' containment reference.
 	 * @see #setStorage(HistoryStorage)

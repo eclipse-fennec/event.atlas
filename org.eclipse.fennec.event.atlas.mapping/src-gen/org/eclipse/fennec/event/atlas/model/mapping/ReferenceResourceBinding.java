@@ -29,15 +29,13 @@ import org.osgi.annotation.versioning.ProviderType;
  * Attaches persistence rules and metadata overrides to a subset of the resources that a
  * ReferenceMapping generates.
  * 
- * A reference mapping generates one resource per attribute of the referenced type, so a single
- * rule on the reference itself would have to fit all of them - which it rarely does: wind speed
- * and temperature do not tolerate the same absolute delta. A binding names the attributes it
- * applies to and carries the settings for exactly those.
+ * A reference mapping generates one resource per attribute of the referenced type. Use a binding
+ * when those resources need different settings - wind speed and temperature rarely tolerate the
+ * same absolute delta. A binding names the attributes it applies to and carries the settings for
+ * exactly those.
  * 
  * Every setting resolves independently: for a generated resource, each feature is taken from the
- * most specific binding that sets it, and stays unset when no binding does. Resolution happens
- * when the resources are generated, so the mapping engine only ever reads these settings from the
- * generated ResourceMapping - it never looks at the binding itself.
+ * most specific binding that sets it, and stays unset when no binding does.
  * <!-- end-model-doc -->
  *
  * <p>

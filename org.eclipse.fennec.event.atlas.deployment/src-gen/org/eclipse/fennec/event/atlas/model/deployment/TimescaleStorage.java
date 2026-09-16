@@ -21,11 +21,11 @@ import org.osgi.annotation.versioning.ProviderType;
  * <!-- end-user-doc -->
  *
  * <!-- begin-model-doc -->
- * The PostgreSQL/TimescaleDB backend.
+ * The PostgreSQL/TimescaleDB backend. Declaring this section is what switches persistent history on.
  * 
- * THERE IS DELIBERATELY NO CREDENTIAL HERE - see MqttBroker. 'user' is named because it is not a secret and a deployment needs to see which role it connects as; the password stays a ConfigAdmin value fed from the environment. The TimescaleDB extension is optional - with it the history table becomes a hypertable, on plain PostgreSQL 14+ the provider falls back to date_bin. PostGIS is not required.
+ * No password is declared here - name the environment variable holding it in 'passwordVariable' instead. 'user' is part of the deployment because it is not a secret.
  * 
- * Its component requires a configuration, so declaring this section is what switches history on.
+ * The TimescaleDB extension is optional: with it the history table becomes a hypertable, and plain PostgreSQL 14+ works without it. PostGIS is not required.
  * <!-- end-model-doc -->
  *
  * <p>
@@ -168,7 +168,7 @@ public interface TimescaleStorage extends HistoryStorage {
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * <!-- begin-model-doc -->
-	 * The NAME of the environment variable holding the password - a reference, never the secret. It is emitted as the ConfigAdmin value $[env:<name>;default=], which the Felix interpolation plugin resolves at configuration-DELIVERY time. That plugin is an OSGi ConfigurationPlugin, so it applies to configurations written through the ConfigAdmin API exactly as it does to configurator JSON - which is what lets a model-owned PID still get its credential from the environment. Blank omits the property entirely.
+	 * The NAME of the environment variable holding the password - a reference, never the secret. The password is read from that variable in the runtime's environment and never becomes part of the deployment. Blank omits the property entirely.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Password Variable</em>' attribute.
 	 * @see #setPasswordVariable(String)

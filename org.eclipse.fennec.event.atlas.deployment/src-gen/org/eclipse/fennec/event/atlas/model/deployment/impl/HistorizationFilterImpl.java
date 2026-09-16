@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.deployment.impl;
 
-import java.time.Duration;
-
 import java.util.Collection;
 
 import org.eclipse.emf.common.notify.Notification;
@@ -171,7 +169,7 @@ public class HistorizationFilterImpl extends MinimalEObjectImpl.Container implem
 	 * @generated
 	 * @ordered
 	 */
-	protected static final Duration CHANGE_MAX_INTERVAL_EDEFAULT = null;
+	protected static final String CHANGE_MAX_INTERVAL_EDEFAULT = null;
 
 	/**
 	 * The cached value of the '{@link #getChangeMaxInterval() <em>Change Max Interval</em>}' attribute.
@@ -181,7 +179,7 @@ public class HistorizationFilterImpl extends MinimalEObjectImpl.Container implem
 	 * @generated
 	 * @ordered
 	 */
-	protected Duration changeMaxInterval = CHANGE_MAX_INTERVAL_EDEFAULT;
+	protected String changeMaxInterval = CHANGE_MAX_INTERVAL_EDEFAULT;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -339,7 +337,7 @@ public class HistorizationFilterImpl extends MinimalEObjectImpl.Container implem
 	 * @generated
 	 */
 	@Override
-	public Duration getChangeMaxInterval() {
+	public String getChangeMaxInterval() {
 		return changeMaxInterval;
 	}
 
@@ -349,8 +347,8 @@ public class HistorizationFilterImpl extends MinimalEObjectImpl.Container implem
 	 * @generated
 	 */
 	@Override
-	public void setChangeMaxInterval(Duration newChangeMaxInterval) {
-		Duration oldChangeMaxInterval = changeMaxInterval;
+	public void setChangeMaxInterval(String newChangeMaxInterval) {
+		String oldChangeMaxInterval = changeMaxInterval;
 		changeMaxInterval = newChangeMaxInterval;
 		if (eNotificationRequired())
 			eNotify(new ENotificationImpl(this, Notification.SET, DeploymentPackage.HISTORIZATION_FILTER__CHANGE_MAX_INTERVAL, oldChangeMaxInterval, changeMaxInterval));
@@ -418,7 +416,7 @@ public class HistorizationFilterImpl extends MinimalEObjectImpl.Container implem
 				setChangeThresholdPercent((Double)newValue);
 				return;
 			case DeploymentPackage.HISTORIZATION_FILTER__CHANGE_MAX_INTERVAL:
-				setChangeMaxInterval((Duration)newValue);
+				setChangeMaxInterval((String)newValue);
 				return;
 		}
 		super.eSet(featureID, newValue);

@@ -13,8 +13,6 @@
  */
 package org.eclipse.fennec.event.atlas.model.deployment;
 
-import java.time.Duration;
-
 import org.eclipse.emf.common.util.EList;
 
 import org.eclipse.emf.ecore.EObject;
@@ -95,12 +93,12 @@ public interface HousekeepingPolicy extends EObject {
 	 * Values older than this are deleted.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Retention Period</em>' attribute.
-	 * @see #setRetentionPeriod(Duration)
+	 * @see #setRetentionPeriod(String)
 	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getHousekeepingPolicy_RetentionPeriod()
 	 * @model dataType="org.eclipse.fennec.event.atlas.model.deployment.EDuration"
 	 * @generated
 	 */
-	Duration getRetentionPeriod();
+	String getRetentionPeriod();
 
 	/**
 	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.HousekeepingPolicy#getRetentionPeriod <em>Retention Period</em>}' attribute.
@@ -110,7 +108,7 @@ public interface HousekeepingPolicy extends EObject {
 	 * @see #getRetentionPeriod()
 	 * @generated
 	 */
-	void setRetentionPeriod(Duration value);
+	void setRetentionPeriod(String value);
 
 	/**
 	 * Returns the value of the '<em><b>Keep Count</b></em>' attribute.
@@ -170,12 +168,12 @@ public interface HousekeepingPolicy extends EObject {
 	 * Time between runs. The first run happens one full period after activation.
 	 * <!-- end-model-doc -->
 	 * @return the value of the '<em>Schedule Period</em>' attribute.
-	 * @see #setSchedulePeriod(Duration)
+	 * @see #setSchedulePeriod(String)
 	 * @see org.eclipse.fennec.event.atlas.model.deployment.DeploymentPackage#getHousekeepingPolicy_SchedulePeriod()
 	 * @model dataType="org.eclipse.fennec.event.atlas.model.deployment.EDuration"
 	 * @generated
 	 */
-	Duration getSchedulePeriod();
+	String getSchedulePeriod();
 
 	/**
 	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.deployment.HousekeepingPolicy#getSchedulePeriod <em>Schedule Period</em>}' attribute.
@@ -185,6 +183,6 @@ public interface HousekeepingPolicy extends EObject {
 	 * @see #getSchedulePeriod()
 	 * @generated
 	 */
-	void setSchedulePeriod(Duration value);
+	void setSchedulePeriod(String value);
 
 } // HousekeepingPolicy

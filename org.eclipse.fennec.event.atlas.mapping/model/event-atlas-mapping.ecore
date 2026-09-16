@@ -11,7 +11,11 @@
     <details key="basePackage" value="org.eclipse.fennec.event.atlas.model"/>
     <details key="resource" value="XMI"/>
   </eAnnotations>
-  <eClassifiers xsi:type="ecore:EDataType" name="EInstant" instanceClassName="java.time.Instant"/>
+  <eClassifiers xsi:type="ecore:EDataType" name="EInstant" instanceClassName="java.lang.String">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="An ISO-8601 instant literal, e.g. 2026-09-16T10:15:30Z.&#xA;&#xA;A literal that cannot be parsed is logged and treated as no timestamp, so the next timestamp source applies."/>
+    </eAnnotations>
+  </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="MappingProfile">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
       <details key="documentation" value="Defines a reusable provider structure template that multiple mappings can conform to.&#xA;This enables different domain models to map to the same target provider structure."/>
@@ -341,7 +345,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EEnum" name="DurationUnit">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="Time unit for a duration amount. Literal names match java.util.concurrent.TimeUnit so the&#xA;runtime proxy can convert an (amount, unit) pair with TimeUnit.valueOf(unit.getName())."/>
+      <details key="documentation" value="Time unit for a duration amount."/>
     </eAnnotations>
     <eLiterals name="MILLISECONDS"/>
     <eLiterals name="SECONDS" value="1"/>
@@ -351,7 +355,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="PersistenceRuleRegistry">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="A standalone container for persistence rules.&#xA;Nothing in the runtime reads it: rules are contained by the ResourceMapping or the&#xA;ReferenceResourceBinding that uses them, so a registry file is a catalogue to copy rules out&#xA;of - a place to keep the shapes an installation has agreed on - not a source the engine&#xA;resolves against. It is kept because a shared rule source may be wanted again later."/>
+      <details key="documentation" value="A standalone catalogue of persistence rules to copy from.&#xA;Nothing in the runtime reads it - rules are contained by the ResourceMapping or the&#xA;ReferenceResourceBinding that uses them - so a registry file does not belong in a&#xA;runtime's mappings directory."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EReference" name="changeRules" upperBound="-1"
         eType="#//ChangeRule" containment="true"/>
@@ -429,7 +433,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ReferenceResourceBinding">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="Attaches persistence rules and metadata overrides to a subset of the resources that a&#xA;ReferenceMapping generates.&#xA;&#xA;A reference mapping generates one resource per attribute of the referenced type, so a single&#xA;rule on the reference itself would have to fit all of them - which it rarely does: wind speed&#xA;and temperature do not tolerate the same absolute delta. A binding names the attributes it&#xA;applies to and carries the settings for exactly those.&#xA;&#xA;Every setting resolves independently: for a generated resource, each feature is taken from the&#xA;most specific binding that sets it, and stays unset when no binding does. Resolution happens&#xA;when the resources are generated, so the mapping engine only ever reads these settings from the&#xA;generated ResourceMapping - it never looks at the binding itself."/>
+      <details key="documentation" value="Attaches persistence rules and metadata overrides to a subset of the resources that a&#xA;ReferenceMapping generates.&#xA;&#xA;A reference mapping generates one resource per attribute of the referenced type. Use a binding&#xA;when those resources need different settings - wind speed and temperature rarely tolerate the&#xA;same absolute delta. A binding names the attributes it applies to and carries the settings for&#xA;exactly those.&#xA;&#xA;Every setting resolves independently: for a generated resource, each feature is taken from the&#xA;most specific binding that sets it, and stays unset when no binding does."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EReference" name="attributes" upperBound="-1"
         eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EAttribute">

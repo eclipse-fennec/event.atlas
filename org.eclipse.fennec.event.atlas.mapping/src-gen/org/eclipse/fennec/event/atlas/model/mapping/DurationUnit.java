@@ -27,8 +27,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * and utility methods for working with them.
  * <!-- end-user-doc -->
  * <!-- begin-model-doc -->
- * Time unit for a duration amount. Literal names match java.util.concurrent.TimeUnit so the
- * runtime proxy can convert an (amount, unit) pair with TimeUnit.valueOf(unit.getName()).
+ * Time unit for a duration amount.
  * <!-- end-model-doc -->
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getDurationUnit()
  * @model

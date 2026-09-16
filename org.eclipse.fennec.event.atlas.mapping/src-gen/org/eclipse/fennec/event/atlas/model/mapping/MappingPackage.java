@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:0c2751f0b84184da40c7defd5d861085d0ed91ee9ba4bc97062765bbba93c57b", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:a9227d7920f93e8572463f1e350d2e2e5a22a8da1f5e98ebf78db0cf0e35fe8f", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -2370,7 +2370,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * The meta object id for the '<em>EInstant</em>' data type.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
-	 * @see java.time.Instant
+	 * @see java.lang.String
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getEInstant()
 	 * @generated
 	 */
@@ -3665,12 +3665,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EEnum getDurationUnit();
 
 	/**
-	 * Returns the meta object for data type '{@link java.time.Instant <em>EInstant</em>}'.
+	 * Returns the meta object for data type '{@link java.lang.String <em>EInstant</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
+     * <!-- begin-model-doc -->
+     * An ISO-8601 instant literal, e.g. 2026-09-16T10:15:30Z.
+     * 
+     * A literal that cannot be parsed is logged and treated as no timestamp, so the next timestamp source applies.
+     * <!-- end-model-doc -->
 	 * @return the meta object for data type '<em>EInstant</em>'.
-	 * @see java.time.Instant
-	 * @model instanceClass="java.time.Instant"
+	 * @see java.lang.String
+	 * @model instanceClass="java.lang.String"
 	 * @generated
 	 */
 	EDataType getEInstant();
@@ -4729,7 +4734,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * The meta object literal for the '<em>EInstant</em>' data type.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
-		 * @see java.time.Instant
+		 * @see java.lang.String
 		 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getEInstant()
 		 * @generated
 		 */
