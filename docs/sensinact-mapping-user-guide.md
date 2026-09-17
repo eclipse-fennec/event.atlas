@@ -681,6 +681,17 @@ is service-driven:
   registry through its providers — local files via emf.osgi's `FileEObjectProvider`
   (the registry's initial provider), a Model Atlas via the atlas provider — or
   programmatically via `registerModelMapping`.
+- **Replacing a mapping under an unchanged `mid` rebuilds its model.** Every content
+  change — a re-read file, an edited object syncing in from a Model Atlas — arrives under
+  the same key, so the old mapping's model is dropped *before* the new one is registered.
+  That is deliberate in both directions: registering first would have deleted the model the
+  new mapping had just been mapped onto (both mappings answer the same provider id), and
+  dropping first is also what makes a removed service or resource actually disappear, since
+  a registration only ever adds to a model it finds. The cost is a brief window in which a
+  payload for that provider finds no mapping, and the provider instance itself is re-created
+  by the next push. A mapping onto a **shared** provider (`providerStrategy` `UNIFIED`) is
+  the exception: its model survives as long as another mapping is still registered onto it.
+
 - `MappingProfile`s flow the same way through the registry **`sensinact-profiles`**
   (entry keys = `profileId`) into `MappingProfileRegistryImpl`, which validates
   conformance.

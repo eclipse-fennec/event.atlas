@@ -293,11 +293,16 @@ public class ProviderModelSensinactMapper {
 	 * Determines the provider ID to use based on the mapping strategy.
 	 * For UNIFIED strategy, uses the profile's providerId.
 	 * For SEPARATE strategy, uses the mapping's own ID.
+	 * <p>
+	 * Package private and static because it is also the name of the sensinact model a mapping
+	 * is registered under, and therefore what {@link ProviderMappingRegistryImpl} has to
+	 * compare to tell a replacement of a mapping from the arrival of a second one: two
+	 * mappings that answer the same id here share one model.
 	 * 
 	 * @param providerMapping the provider mapping
 	 * @return the provider ID to use
 	 */
-	private String determineProviderId(ProviderMapping providerMapping) {
+	static String determineProviderId(ProviderMapping providerMapping) {
 		MappingProfile profile = providerMapping.getProfile();
 		if (profile != null && profile.getProviderStrategy() == ProviderStrategy.UNIFIED) {
 			// Use the profile's providerId for unified strategy

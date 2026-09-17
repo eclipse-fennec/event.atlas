@@ -61,7 +61,7 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-09-16: `./gradlew clean build` is green — **70 OSGi tests, 1 `@Disabled`**
+Baseline as of 2026-09-17: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
 (the known admin-service read gap) — plus **250 plain-JUnit tests** across nine projects. The
 mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
@@ -614,6 +614,15 @@ important thing to know, and the part that changed most recently:
   Storing a `MappingProfile` in a Model Atlas additionally needs its own atlas registry: the
   `sensinactmapping` registry pins `root.eclass.uri` to `ProviderMapping` (tracked in
   `eclipse-fennec/model.atlas`).
+- **An update replaces the twin model, and the old mapping goes first.** `entryUpdated`
+  unregisters the old mapping before registering the new one. The key *is* the `mid`, so both
+  answer the same provider id — registering first made the old one's `deleteModel` delete the
+  model the new one had just been mapped onto, and every payload then failed with "Failed to
+  map instance to provider" until a restart (issue #63, fixed 2026-09-17). The order also
+  makes the replacement real: `mapProvider` only ever adds to a model it finds, so a service
+  the edit dropped would otherwise survive. `unregisterModelMapping` skips `deleteModel` while
+  another registered mapping still answers the same provider id, which is what keeps a
+  `UNIFIED` shared model alive. `MappingUpdateTest` is the guard.
 - **Resources generated from a `ReferenceMapping` are expanded before anything reads them.**
   `ProviderModelSensinactMapper.registerModelMapping` runs `generateReferencedResources` first,
   so profile validation and the twin model both see `temporaryResources`; generation clears

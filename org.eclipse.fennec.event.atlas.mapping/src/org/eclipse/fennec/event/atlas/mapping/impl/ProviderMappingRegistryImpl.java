@@ -207,10 +207,18 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	 */
 	@Override
 	public void entryUpdated(EObjectRegistryEntry entry, EObjectRegistryEntry oldEntry) {
-		// the new mapping is registered before the old one is dropped, so lookups never
-		// see a gap - the remove-after-add ordering of the former service whiteboard
-		validMapping(entry, false).ifPresent(this::registerModelMapping);
+		// The old mapping goes first, although that costs a sub-second gap in which a payload
+		// finds no mapping. Registering first was worse: an update keeps the key, the key is
+		// the mid, so both mappings answer the same provider id - and the deleteModel of the
+		// old one then removed the very model the new one had just been mapped onto, together
+		// with every provider of it. The registry still routed payloads to the new mapping, so
+		// every push failed with "Failed to map instance to provider" until the runtime was
+		// restarted (issue #63).
+		// Dropping the model first also makes the replacement a real one: mapProvider only ever
+		// adds to a model it finds, so a service or resource the edit removed would otherwise
+		// survive the update.
 		validMapping(oldEntry, true).ifPresent(this::unregisterModelMapping);
+		validMapping(entry, false).ifPresent(this::registerModelMapping);
 		// The rules themselves may have changed with the entry, and a baseline gathered under
 		// the previous rule applies neither faithfully.
 		validMapping(entry, true).ifPresent(m -> resetChangeRuleState(m.getMid()));
@@ -495,6 +503,17 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			logger.fine(String.format("Un-registering provider mapping for '%s' into registry", mapping.getMid()));
 			registry.getOrDefault(ec, Collections.emptyList()).remove(mapping);
 		});
+		// Under ProviderStrategy.UNIFIED several mappings are registered onto one shared model,
+		// so deleting it on behalf of one of them would take the others' services with it. The
+		// check runs after the registry entries above are gone, so a mapping never keeps its
+		// own model alive.
+		String providerId = ProviderModelSensinactMapper.determineProviderId(mapping);
+		if (stillMapped(providerId)) {
+			logger.fine(String.format("Keeping model '%s' - other mappings are still registered onto it", providerId));
+			return;
+		}
+		// Not waited for, unlike the registration: the gateway executes its commands in
+		// submission order, so a registration submitted afterwards sees the model gone.
 		gatewayThread.execute(new AbstractSensinactEMFCommand<Boolean>() {
 
 			@Override
@@ -511,6 +530,15 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 				}
 			}
 		});
+	}
+
+	/** Whether any mapping left in the registry is still registered onto the given provider id. */
+	private boolean stillMapped(String providerId) {
+		if (providerId == null) {
+			return false;
+		}
+		return registry.values().stream().flatMap(List::stream)
+				.anyMatch(other -> providerId.equals(ProviderModelSensinactMapper.determineProviderId(other)));
 	}
 
 	/*
