@@ -349,8 +349,14 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 					"Stopped waiting for completion batch '%s' - it is still running and can be read back by id",
 					batchId), e);
 		} catch (IOException e) {
-			throw new IllegalStateException(
-					String.format("Completion batch '%s' could not be read: %s", batchId, describe(e)), e);
+			// The batch was accepted, so it is still running at the provider and still being paid
+			// for. A blocked host here is the emf.osgi URI handler refusing the poll, not the
+			// provider refusing the batch (issue #68).
+			throw new IllegalStateException(String.format(
+					"Completion batch '%s' could not be read: %s. It is still running at the provider and can be "
+							+ "read back by id. If the host was blocked, add it to 'allowedHosts' on "
+							+ "org.eclipse.fennec.emf.osgi.urihandler.http.",
+					batchId, describe(e)), e);
 		}
 	}
 

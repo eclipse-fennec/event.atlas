@@ -22,7 +22,7 @@ Gradle graph automatically):
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
 | `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles,deployment}` mount-point skeleton |
 | `…event.atlas.mapping.local.config` | resource-only configurator bundle for `launch.bndrun` (Model Atlas client + file providers, including the `event-atlas-deployment` registry + the MQTT/REST southbound wiring + the timescale history store) |
-| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — four resources: `config.json` (file providers — mappings, profiles and the `event-atlas-deployment` registry — + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker), `timescale.json` (the history store) and `inference.json` (model inference, **off unless `EVENTATLAS_INFERENCE_ENABLED` and `INFERENCE_NAMESPACE` are set**) |
+| `…event.atlas.mapping.docker.config` | resource-only configurator bundle baked into the docker image — four resources: `config.json` (file providers — mappings, profiles and the `event-atlas-deployment` registry — + Model Atlas client + MQTT southbound), `sensinact.json` (session manager, the named HTTP/Jersey whiteboards, northbound REST, SensorThings REST + MQTT broker), `timescale.json` (the history store) and `inference.json` (model inference, **off unless `EVENTATLAS_INFERENCE_ENABLED` and `INFERENCE_NAMESPACE` are set**; it also carries the outbound host allow-list the batch path needs) |
 | `…event.atlas.mapping.test.component` | test-only southbound simulator (`WeatherReportsSimulator`), renders a WeatherReports XMI periodically and pushes it |
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload (XMI or JSON), pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, `FORMAT_UNSUPPORTED`, …), plus the optional `UnknownModelHandler` hook it offers unhandled payloads to |
 | `…event.atlas.southbound.sampling` | `PayloadSampleCollector` — the `UnknownModelHandler` implementation that buffers unhandled payloads per channel and hands a closed `PayloadSampleSet` to a `PayloadSampleSetHandler` |
@@ -61,8 +61,8 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-09-17: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus **250 plain-JUnit tests** across nine projects. The
+Baseline as of 2026-09-22: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus **256 plain-JUnit tests** across ten projects. The
 mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
 `DynamicMappingPackageTest`); the deployment project 44 (`DeploymentPlannerTest`,
@@ -388,6 +388,20 @@ it walks its directory once at activation and never again.
   `RemoteMCPEndpoint` into `org.eclipse.fennec.mcp.endpoint`, whose `Import-Package` is
   `java.lang` and nothing else. Both bndruns dropped all three (91 bundles in `inference.bndrun`,
   down from 94) and `central.mvn` no longer declares them.
+- **A run goes through the *batch* API, and that path needs two things the synchronous one does
+  not.** `BatchChatCompletionAdapter` is `configuration-policy=require` with `service.ranking=100`,
+  so an `event.atlas.model.inference.chat.batch` configuration is what selects it. Both extras fail
+  *after* the batch has been accepted, so a missing one burns a billed run, a rate-limiter token and
+  a fingerprint claim (issue #68): `org.eclipse.fennec.codec.jsonschema` renders the request's
+  output schema and is listed **by identity** in `inference.bndrun` and
+  `eventatlas.runtime_docker.bndrun` (nothing imports it as a package); and the provider host must
+  be in `org.eclipse.fennec.emf.osgi.urihandler.http`'s `allowedHosts` — submitting a batch is an
+  EMF Resource *save* and is ungated, while every status poll and the result fetch are *loads* and
+  are blocked as SSRF. Both config bundles carry `["api.anthropic.com"]` as a literal, so
+  repointing `ANTHROPIC_BASE_URL` / `ANTHROPIC_BATCH_URL` needs the bundle rebuilt.
+  `BatchInferenceWiringTest` (in `…mapping.docker.config`) pins both against the shipped configs
+  and the *resolved* `-runbundles`, skipping a config bundle with no `ClaudeBatchMessageService` —
+  which is why `local.config` / `launch.bndrun`, on the synchronous path, need neither.
 - **Credentials come from the environment**, never from a config file: `api.key` is
   `$[env:ANTHROPIC_API_KEY]`, interpolated at configuration delivery by
   `org.apache.felix.configadmin.plugin.interpolation` (already in the runtime, enabled through
