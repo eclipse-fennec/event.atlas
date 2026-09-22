@@ -160,6 +160,14 @@
       "post_to_model_atlas"
     ]
   },
+  /* emf.osgi's REST URI handler blocks outbound http(s) resolution unless the host is allow-listed.
+   * The batch path needs it: submitting a batch is a Resource save and is ungated, but every status
+   * poll and the result fetch are Resource loads and are blocked, so the batch runs and costs money
+   * and can never be read back (issue #68). A literal, as in mapping.inference.config - repointing
+   * ANTHROPIC_BASE_URL or ANTHROPIC_BATCH_URL means adding that host here too. Never "*". */
+  "org.eclipse.fennec.emf.osgi.urihandler.http": {
+    "allowedHosts": ["api.anthropic.com"]
+  },
   "event.atlas.model.inference.chat.batch": {
     "pollSeconds": "$[env:INFERENCE_BATCH_POLL;default=$[prop:INFERENCE_BATCH_POLL;default=20]]",
     "maxContinuations": "$[env:INFERENCE_MAX_CONTINUATIONS;default=$[prop:INFERENCE_MAX_CONTINUATIONS;default=2]]"

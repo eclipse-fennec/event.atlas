@@ -28,6 +28,8 @@
 # identity below because the resolver only sees package requirements, not DS service
 # references - the chain is wired entirely through services (UnknownModelHandler,
 # PayloadSampleSetHandler, ChatCompletion), so nothing would pull them in on its own.
+# org.eclipse.fennec.codec.jsonschema renders the output schema of a batch request; without it
+# the provider rejects the batch after accepting it, so the run is billed and lost (issue #68).
 -runrequires: \
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.command)',\
@@ -55,6 +57,7 @@
 	bnd.identity;id='org.eclipse.fennec.event.atlas.rest.southbound.adapter',\
 	bnd.identity;id='org.apache.felix.configadmin.plugin.interpolation',\
 	bnd.identity;id='org.eclipse.fennec.codec',\
+	bnd.identity;id='org.eclipse.fennec.codec.jsonschema',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.southbound.history.timescale-provider',\
 	bnd.identity;id='org.eclipse.sensinact.gateway.southbound.history.history-core',\
 	bnd.identity;id='org.eclipse.fennec.event.atlas.southbound.sampling',\
@@ -209,4 +212,5 @@
 	tx-control-provider-jdbc-local;version='[1.0.1,1.0.2)',\
 	tx-control-service-local;version='[1.0.1,1.0.2)',\
 	org.eclipse.sensinact.gateway.southbound.history.history-core;version='[0.0.2,0.0.3)',\
-	org.eclipse.fennec.event.atlas.deployment;version=snapshot
+	org.eclipse.fennec.event.atlas.deployment;version=snapshot,\
+	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)'

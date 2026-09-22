@@ -102,7 +102,7 @@ The runtime wiring is baked into the
 `org.eclipse.fennec.event.atlas.mapping.docker.config` configurator bundle — deliberately
 not a mounted file: the Felix configurator's `configurator.initial` pass runs before the
 runtime's JSON provider is wired and fails with "Invalid JSON", so file-based bootstrap
-config does not work here. The bundle ships two configurator resources
+config does not work here. The bundle ships four configurator resources
 (`-includeresource: OSGI-INF/configurator/=configs/` picks up everything in `configs/`):
 
 | Resource | Contents |
@@ -110,7 +110,7 @@ config does not work here. The bundle ships two configurator resources
 | `config.json` | the event.atlas side: file providers → EObject registries `sensinact-mappings` / `sensinact-profiles` / `event-atlas-deployment`, the Model Atlas REST client + `AtlasEObjectProvider`, and the MQTT southbound (SensiNact MQTT client + `MqttPayloadListener`) |
 | `sensinact.json` | the SensiNact side: session manager `ALLOW_ALL`, the named Felix HTTP whiteboard + Jersey whiteboard, northbound REST (anonymous), SensorThings REST (`history.provider`) and the SensorThings MQTT broker ports/keystore |
 | `timescale.json` | the history *storage backend*: where the twin's value updates are written, and under which provider name they are served back. The filters and retention policies around it belong to the [deployment model](#deployment-model) — see [History](#history) |
-| `inference.json` | optional model inference: the sample collector, the inference service, the remote MCP endpoint and the Claude chat services — **off unless switched on**, see [Model inference](#model-inference) |
+| `inference.json` | optional model inference: the sample collector, the inference service, the remote MCP endpoint, the Claude chat services (synchronous **and** batch) and the outbound host allow-list the batch path needs — **off unless switched on**, see [Model inference](#model-inference) |
 
 Deployment-specific values are `$[env:…]` placeholders resolved at configuration-delivery
 time by `org.apache.felix.configadmin.plugin.interpolation`, so one published image serves
@@ -433,10 +433,32 @@ Three things that surprise people:
 - **An unset `ANTHROPIC_API_KEY` does not stop anything starting.** The chat service activates
   and the first run fails at the provider, landing as an `UNAVAILABLE` receipt. `INFERENCE_NAMESPACE`
   is the switch that governs spend, not the key.
-- **`INFERENCE_MODEL` defaults to `claude-sonnet-4-6` on purpose.** Current-generation models run
-  adaptive thinking by default and emit `thinking` content blocks, which the Claude model in
-  `fennec-ai` cannot yet deserialize (`Cannot instantiate abstract EClass: ContentBlock`) — the
-  run is paid for and then discarded client-side. Raise the default once that is fixed.
+- **`INFERENCE_MODEL` defaults to `claude-sonnet-4-6` on purpose.** Not because of a blocker —
+  the one that used to force it is gone, since `fennec-ai` build 4 (2026-09-04) declares
+  `ThinkingBlock`, so a `thinking` content block no longer fails to deserialize with
+  `Cannot instantiate abstract EClass: ContentBlock`. It is simply the model this chain has
+  actually been proven on end to end. Raise the default after a successful run, not before.
+- **The provider's host is allow-listed in the image, as a literal** (`api.anthropic.com`). So
+  repointing `ANTHROPIC_BASE_URL` or `ANTHROPIC_BATCH_URL` is not enough on its own — that host
+  has to be added to `allowedHosts` too, which means rebuilding the config bundle. See
+  [The batch path](#the-batch-path).
+
+### The batch path
+
+A run goes through the **batch** API: `event.atlas.model.inference.chat.batch` is configured, and
+`BatchChatCompletionAdapter` (`configuration-policy=require`, higher ranking) is what selects it. A
+synchronous request hits the provider's ~10-iteration tool budget and returns `pause_turn` with no
+receipt; a batch runs about twice as far and resumes a paused turn.
+
+It needs two things the synchronous path does not, and **both fail after the batch has been
+accepted**, so a missing one costs a billed run (issue #68):
+
+- `org.eclipse.fennec.codec.jsonschema` must be deployed — it renders the request's output schema.
+  Nothing imports it as a package, so `eventatlas.runtime_docker.bndrun` lists it by identity.
+- the provider host must be in `org.eclipse.fennec.emf.osgi.urihandler.http`'s `allowedHosts` —
+  submitting a batch is ungated, but every status poll and the result fetch are blocked without it.
+
+`BatchInferenceWiringTest` pins both against the shipped configs and the resolved bndrun.
 
 ### Several southbound adapters share one run budget
 
