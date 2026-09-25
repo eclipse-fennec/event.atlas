@@ -213,4 +213,5 @@
 	tx-control-service-local;version='[1.0.1,1.0.2)',\
 	org.eclipse.sensinact.gateway.southbound.history.history-core;version='[0.0.2,0.0.3)',\
 	org.eclipse.fennec.event.atlas.deployment;version=snapshot,\
-	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)'
+	org.eclipse.fennec.codec.jsonschema;version='[0.1.0,0.1.1)',\
+	org.eclipse.fennec.model.atlas.action.api;version='[0.1.0,0.1.1)'

@@ -6,6 +6,11 @@ sensinact.version: 0.0.2-SNAPSHOT
 # history backend with no engine. The deployment is running again and publishes the whole gateway
 # at one timestamp, which is what the SensorThings bundles need - they bind the `HistoryProvider`
 # service that only the reworked `history-api` exports.
+#
+# It has stalled again: nothing has been published since 0.0.2-20260910.130036 (built from
+# 9bab89a8, 2026-09-08), so gateway PR #769 is not reachable from here. cnf/local carries a local
+# build of the one bundle that needs it - see cnf/local/README.md. maven-metadata.xml gets a fresh
+# lastUpdated without a new build behind it, so check the Git-SHA in the jar's manifest.
 -plugin.3.sensinact: \
 	aQute.bnd.repository.maven.provider.MavenBndRepository;\
 		releaseUrl=https://repo.eclipse.org/content/repositories/sensinact-releases/;\
