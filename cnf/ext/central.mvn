@@ -239,6 +239,7 @@ org.apache.aries.tx-control:tx-control-provider-jdbc-local:1.0.1
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.api:0.1.0-SNAPSHOT
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.impl:0.1.0-SNAPSHOT
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.rest.client.osgi:0.1.0-SNAPSHOT
+org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.action.api:0.1.0-SNAPSHOT
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.scope.api:0.1.0-SNAPSHOT
 org.eclipse.fennec.model.atlas:org.eclipse.fennec.model.atlas.eobject.provider:0.1.0-SNAPSHOT
 

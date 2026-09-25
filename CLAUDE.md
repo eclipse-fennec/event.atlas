@@ -718,7 +718,10 @@ EPackages a runtime maps must be registered in that runtime.
   resolves to a history backend with no engine, silently. Check provenance against a pristine
   local repo (`local=<tmpdir>` on the plugin), not against `~/.m2`;
   `central.mvn` additionally carries the Model Atlas client bundles
-  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / eobject.provider`) and every
+  (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / action.api / eobject.provider` —
+  `action.api` was split out of the client in the 2026-09-25 snapshot and had to be indexed on
+  2026-09-26, because `scope.api` imports it and the floating `0.1.0-SNAPSHOT` picked the new
+  build up on its own, breaking every resolve until the index caught up) and every
   third-party bundle the northbound chain drags in: Jackson 3 (`tools.jackson.core:jackson-core`
   + `jackson-databind`, `jackson-jakarta-rs-*`, `jackson-module-jakarta-xmlbind-annotations`, all
   on one 3.2.x version — 3.2 is a floor, the Fennec codec imports `tools.jackson.*` as
