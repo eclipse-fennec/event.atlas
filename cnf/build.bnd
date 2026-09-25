@@ -5,3 +5,11 @@
 	"No translation found for macro: fennec-baselining";is:=ignore,\
 	"No translation found for macro: maven-central";is:=ignore
 	
+
+# Temporary local repository - see cnf/local/README.md. It shadows any artifact with the same
+# bundle symbolic name, so it must stay empty unless a published one is broken or missing.
+-plugin.0.Local: \
+	aQute.bnd.deployer.repository.LocalIndexedRepo; \
+		name = Local; \
+		pretty = true; \
+		local = ${build}/local

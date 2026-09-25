@@ -350,10 +350,13 @@ restart. `inference.bndrun` now carries `org.eclipse.fennec.model.atlas.eobject.
 `AtlasEObjectProvider~jena` block for exactly this; a `FileEObjectProvider` cannot do it, because
 it walks its directory once at activation and never again.
 
-- **The four chat-completion bundles come from a Maven repo now — `cnf/local` is gone.** Since
+- **The four chat-completion bundles come from a Maven repo now.** Since
   2026-09-04 `eclipse-fennec/fennec-ai` publishes a snapshot, so the `LocalIndexedRepo` that used
-  to carry local builds of the AI api/impl/models has been deleted along with its
-  `-plugin.0.Local` registration in `cnf/build.bnd`. They are declared in **`cnf/ext/nexus.maven`
+  to carry local builds of the AI api/impl/models stopped carrying them, and `cnf/local` was
+  deleted along with its `-plugin.0.Local` registration in `cnf/build.bnd`. Both came back on
+  2026-09-26 for an unrelated bundle — see the SensiNact bullet under *Workspace & OSGi
+  conventions* — so a local build shadowing a published artifact is again possible here; keep
+  that directory empty of anything a repository can serve. They are declared in **`cnf/ext/nexus.maven`
   at `1.0.0-SNAPSHOT`** (so both bndruns' `-runbundles` name them `[1.0.0,1.0.1)`) and fetched by
   the `-plugin.6.nexus` repo in `cnf/ext/nexus.bnd` (`.6` because `fennec.bnd` already holds
   `.5.Central`).
@@ -716,7 +719,25 @@ EPackages a runtime maps must be registered in that runtime.
   SensorThings bundles need: they bind the `HistoryProvider` service that only the reworked
   `history-api` exports. **The hazard is now a stale cache, not the repo** — an older snapshot
   resolves to a history backend with no engine, silently. Check provenance against a pristine
-  local repo (`local=<tmpdir>` on the plugin), not against `~/.m2`;
+  local repo (`local=<tmpdir>` on the plugin), not against `~/.m2`.
+  - **The deployment has stalled again, and `cnf/local` is the workaround.** Nothing has been
+    published since `0.0.2-20260910.130036` (manifest `Git-SHA` `9bab89a8`, 2026-09-08); the
+    `maven-metadata.xml` keeps getting a fresh `lastUpdated` with no new build behind it, so
+    compare the `Git-SHA` in the jar against the commit you are looking for rather than the
+    metadata. That leaves gateway PR #769 (merged 2026-09-17) unreachable — without it a
+    SensorThings Datastream answers with one Observation, the current value, whenever the history
+    provider registers *after* the SensorThings application, which is the normal order here.
+    Since 2026-09-26 `cnf/local` carries a local build of
+    `…northbound.sensorthings.rest.gateway` (`0.0.2.202609240827`) and `cnf/build.bnd` registers
+    the `LocalIndexedRepo` again; `cnf/local/README.md` says when to delete both. **Override that
+    one bundle only** — its manifest is byte-identical to the published build apart from build
+    metadata, while master as a whole carries #765, whose `geo-json` imports
+    `org.jspecify.annotations`, which no index here provides.
+  - **Never `mvn install` the gateway into `~/.m2`.** It overwrites all 64 `0.0.2-SNAPSHOT` jars
+    bnd reads without touching the `.jar.json` sidecars, so the cache serves a build it does not
+    describe, local resolves stop matching CI, and with master's jspecify import they stop
+    resolving at all (hit on 2026-09-26). Build the single module and copy its jar into
+    `cnf/local` instead.
   `central.mvn` additionally carries the Model Atlas client bundles
   (`org.eclipse.fennec.model.atlas:…rest.client.* / scope.api / action.api / eobject.provider` —
   `action.api` was split out of the client in the 2026-09-25 snapshot and had to be indexed on
