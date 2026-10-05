@@ -177,9 +177,9 @@ io.dropwizard.metrics:metrics-core:4.2.37
 
 # PoC: pinned to a concrete released version (the original template used ${Bundle-Version},
 # which only resolves during mustache template processing, not in a plain workspace).
-org.eclipse.fennec.bnd:org.eclipse.fennec.bnd.library:0.0.9
-org.eclipse.fennec.bnd:org.eclipse.fennec.jacoco.bnd.library:0.0.9
-org.eclipse.fennec.bnd:org.eclipse.fennec.osgitest.bnd.library:0.0.9
+org.eclipse.fennec.bnd:org.eclipse.fennec.bnd.library:0.0.10
+org.eclipse.fennec.bnd:org.eclipse.fennec.jacoco.bnd.library:0.0.10
+org.eclipse.fennec.bnd:org.eclipse.fennec.osgitest.bnd.library:0.0.10
 
 org.bndtools:org.bndtools.templates.osgi:${bndversion}
 

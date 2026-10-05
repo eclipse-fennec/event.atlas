@@ -61,7 +61,7 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-09-22: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
+Baseline as of 2026-10-05: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
 (the known admin-service read gap) — plus **256 plain-JUnit tests** across ten projects. The
 mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
@@ -275,6 +275,10 @@ A deployment can be described as a model instead of forty environment variables:
   mechanically derived from the `.ecore`, so a new classifier needs its `genClasses`/`genFeatures`
   entry too. As with the mapping metamodel: never hand-edit `src-gen`, and **ask the user** before
   changing the `.ecore`/`.genmodel`.
+- **Every `-generate` instruction pins `lineEndings=lf`.** `src-gen` is committed with LF, and the
+  emf.osgi codegen defaults to the *platform* line separator, so without it a Windows build
+  rewrote all 189 generated files with CRLF (first seen with the emf.osgi `1.1.0` snapshot of
+  2026-10-02). A new generated project needs the attribute too.
 
 ## Model inference (optional, off unless configured)
 
@@ -460,7 +464,9 @@ it walks its directory once at activation and never again.
     reads the `org.eclipse.emf.ecore.generated_package` capability every generated model bundle
     carries, so local-first suppression sees what a bundle *declares* from the moment it is
     installed. It needs no maintenance and is not tied to a scope. The client snapshot the
-    runtime resolves is `0.1.0.202609081837-SNAPSHOT` from `central.mvn`, which carries `c37f91d`
+    runtime resolves comes from `central.mvn` (`0.1.0.202610031950-SNAPSHOT` as of 2026-10-05,
+    which also carries model.atlas #330: a fetched schema binds a locally shipped package instead
+    of an Atlas copy); it carries `c37f91d`
     and `5f9401c` (#254, `include.atlas.scope` dropped as a property) — so no local build is
     involved any more; verify with the export, since a green resolve says nothing about
     provenance.
