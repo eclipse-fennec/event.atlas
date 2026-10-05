@@ -17,6 +17,7 @@ src: src-gen,src
 	model/event-atlas-deployment.genmodel;\
 		generate=fennecEMF;\
 		genmodel=model/event-atlas-deployment.genmodel;\
+		lineEndings=lf;\
 		output=src-gen
 
 # Ships the metamodel next to the code, the way the mapping bundle does, so a tool reading the

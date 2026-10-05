@@ -13,6 +13,7 @@ src: src-gen,src
 	model/event-atlas-mapping.genmodel;\
 		generate=fennecEMF;\
 		genmodel=model/event-atlas-mapping.genmodel;\
+		lineEndings=lf;\
 		output=src-gen
 # Add this attribute to find some logging information
 #		logfile=test.log;\

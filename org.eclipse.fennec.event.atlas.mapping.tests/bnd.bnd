@@ -15,6 +15,7 @@ src=${^src},src-gen
 	model/lora-test.genmodel;\
 		generate=fennecEMF;\
 		genmodel=model/lora-test.genmodel;\
+		lineEndings=lf;\
 		output=src-gen
 
 # sets the usually required buildpath using the bnd library, you can extend it with the normal -buildpath to your liking

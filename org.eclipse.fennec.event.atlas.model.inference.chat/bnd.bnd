@@ -17,6 +17,7 @@ src: src-gen,src
 	model/inference.genmodel;\
 		generate=fennecEMF;\
 		genmodel=model/inference.genmodel;\
+		lineEndings=lf;\
 		output=src-gen
 # Add this attribute to find some logging information
 #		logfile=test.log;\
