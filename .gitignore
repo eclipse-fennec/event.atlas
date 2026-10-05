@@ -6,6 +6,7 @@ build/
 bin/
 bin_test/
 /cnf/cache
+/cnf/release
 
 # local A/B experiment working files (see the shape-delta notes)
 /docs/shape-delta-ab-runs.jsonl

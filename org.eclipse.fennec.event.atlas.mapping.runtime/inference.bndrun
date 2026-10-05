@@ -112,11 +112,9 @@
 	org.eclipse.fennec.codec;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.codec.api;version='[0.1.0,0.1.1)',\
 	org.eclipse.fennec.codec.metadata;version='[0.1.0,0.1.1)',\
-	org.eclipse.fennec.emf.gecko.compatibility.api;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.component.minimal;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.eobject.registry;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.emf.osgi.metadata;version='[1.1.0,1.1.1)',\
-	org.eclipse.fennec.emf.osgi.model.info;version='[1.1.0,1.1.1)',\
 	org.eclipse.fennec.event.atlas.mapping;version=snapshot,\
 	org.eclipse.fennec.event.atlas.mapping.inference.config;version=snapshot,\
 	org.eclipse.fennec.event.atlas.model.inference;version=snapshot,\
@@ -158,7 +156,6 @@
 	org.objectweb.asm.tree;version='[9.9.1,9.9.2)',\
 	org.objectweb.asm.tree.analysis;version='[9.9.1,9.9.2)',\
 	org.objectweb.asm.util;version='[9.9.1,9.9.2)',\
-	org.osgi.service.cm;version='[1.6.1,1.6.2)',\
 	org.osgi.service.component;version='[1.5.1,1.5.2)',\
 	org.osgi.service.jakartars;version='[2.0.0,2.0.1)',\
 	org.osgi.service.typedevent;version='[1.0.0,1.0.1)',\
@@ -180,4 +177,5 @@
 	org.eclipse.fennec.ai.apis.meta.model;version='[1.0.0,1.0.1)',\
 	org.eclipse.fennec.ai.chat.completion.api;version='[1.0.0,1.0.1)',\
 	org.eclipse.fennec.ai.chat.completion.claude.model;version='[1.0.0,1.0.1)',\
-	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)'
+	org.eclipse.fennec.ai.chat.completion.impl.claude;version='[1.0.0,1.0.1)',\
+	org.eclipse.fennec.model.atlas.action.api;version='[0.1.0,0.1.1)'
