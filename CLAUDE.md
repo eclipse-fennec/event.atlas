@@ -73,7 +73,10 @@ mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFi
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
 - **bnd `resolve`/`export` tasks are not parallel-safe in this workspace** — CI passes
   `gradle-parallel: false` for exactly this reason. Don't add `--parallel` locally when
-  resolving or exporting.
+  resolving or exporting. Nor can one invocation both resolve and export the *same* bndrun:
+  `resolve.eventatlas.runtime_docker` writes the file `export.eventatlas.runtime_docker` reads
+  with no declared dependency, so Gradle's task validation fails the export. Run them as two
+  invocations (CI resolves only `launch`, so it is unaffected).
 - Plain-JUnit tests live in each bnd project's **`test/`** folder (JUnit 5 + Mockito + AssertJ,
   pinned in the root `build.gradle`, applied to every subproject). OSGi tests live in
   `…mapping.tests/src/` and run in a real framework via `@ExtendWith(ServiceExtension.class)` +
@@ -464,9 +467,12 @@ it walks its directory once at activation and never again.
     reads the `org.eclipse.emf.ecore.generated_package` capability every generated model bundle
     carries, so local-first suppression sees what a bundle *declares* from the moment it is
     installed. It needs no maintenance and is not tied to a scope. The client snapshot the
-    runtime resolves comes from `central.mvn` (`0.1.0.202610031950-SNAPSHOT` as of 2026-10-05,
-    which also carries model.atlas #330: a fetched schema binds a locally shipped package instead
-    of an Atlas copy); it carries `c37f91d`
+    runtime resolves comes from `central.mvn` (`0.1.0.202610071121-SNAPSHOT` as of 2026-10-07,
+    which also carries model.atlas #330 — a fetched schema binds a locally shipped package instead
+    of an Atlas copy — and #347: every read of one stage binds one set of EPackage instances, and
+    a read naming the final stage binds the stage-free ones, so the docker config's
+    `eager.stages: release` no longer yields a second copy of each package. Before #347 a
+    stage-explicit read fetched every referenced package anew); it carries `c37f91d`
     and `5f9401c` (#254, `include.atlas.scope` dropped as a property) — so no local build is
     involved any more; verify with the export, since a green resolve says nothing about
     provenance.
