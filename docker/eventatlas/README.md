@@ -110,7 +110,7 @@ config does not work here. The bundle ships four configurator resources
 | `config.json` | the event.atlas side: file providers → EObject registries `sensinact-mappings` / `sensinact-profiles` / `event-atlas-deployment`, the Model Atlas REST client + `AtlasEObjectProvider`, and the MQTT southbound (SensiNact MQTT client + `MqttPayloadListener`) |
 | `sensinact.json` | the SensiNact side: session manager `ALLOW_ALL`, the named Felix HTTP whiteboard + Jersey whiteboard, northbound REST (anonymous), SensorThings REST (`history.provider`) and the SensorThings MQTT broker ports/keystore |
 | `timescale.json` | the history *storage backend*: where the twin's value updates are written, and under which provider name they are served back. The filters and retention policies around it belong to the [deployment model](#deployment-model) — see [History](#history) |
-| `inference.json` | optional model inference: the sample collector, the inference service, the remote MCP endpoint, the Claude chat services (synchronous **and** batch) and the outbound host allow-list the batch path needs — **off unless switched on**, see [Model inference](#model-inference) |
+| `inference.json` | optional model inference: the sample collector, the inference service, the remote MCP endpoint, the Claude **batch** chat service and the outbound host allow-list the batch path needs — **off unless switched on**, see [Model inference](#model-inference) |
 
 Deployment-specific values are `$[env:…]` placeholders resolved at configuration-delivery
 time by `org.apache.felix.configadmin.plugin.interpolation`, so one published image serves
@@ -142,6 +142,7 @@ every environment. Every placeholder has a default — the image starts standalo
 | `ANTHROPIC_API_KEY` | empty | never put this in a config file; it is interpolated from the environment |
 | `INFERENCE_MODEL` | `claude-sonnet-4-6` | see the note in [Model inference](#model-inference) before raising this |
 | `INFERENCE_MAX_RUNS` / `INFERENCE_TIMEOUT` | `1` / `900` | run cap per hour, and per-run timeout in seconds |
+| `INFERENCE_MAX_CONTINUATIONS` / `INFERENCE_BATCH_POLL` | `2` / `20` | how often an unfinished turn is resumed, and the batch status poll interval in seconds; see [The batch path](#the-batch-path) |
 
 ### List-valued variables
 
@@ -439,18 +440,26 @@ Three things that surprise people:
   `Cannot instantiate abstract EClass: ContentBlock`. It is simply the model this chain has
   actually been proven on end to end. Raise the default after a successful run, not before.
 - **The provider's host is allow-listed in the image, as a literal** (`api.anthropic.com`). So
-  repointing `ANTHROPIC_BASE_URL` or `ANTHROPIC_BATCH_URL` is not enough on its own — that host
+  repointing `ANTHROPIC_BATCH_URL` is not enough on its own — that host
   has to be added to `allowedHosts` too, which means rebuilding the config bundle. See
   [The batch path](#the-batch-path).
 
 ### The batch path
 
-A run goes through the **batch** API: `event.atlas.model.inference.chat.batch` is configured, and
-`BatchChatCompletionAdapter` (`configuration-policy=require`, higher ranking) is what selects it. A
-synchronous request hits the provider's ~10-iteration tool budget and returns `pause_turn` with no
-receipt; a batch runs about twice as far and resumes a paused turn.
+A run goes through the **batch** API, and since 2026-10-12 there is no other path: the synchronous
+adapter was removed, because a synchronous request hits the provider's ~10-iteration tool budget and
+returns `pause_turn` with no receipt — it could only ever half-finish the task. A batch runs about
+twice as far. `BatchChatCompletionAdapter` is `configuration-policy=require`, so the
+`event.atlas.model.inference.chat.batch` block is what publishes the completion at all; without it
+every closed sample set is reported as having no completion, and nothing is spent.
 
-It needs two things the synchronous path does not, and **both fail after the batch has been
+**An unfinished turn is resumed rather than lost**, up to `INFERENCE_MAX_CONTINUATIONS` times.
+Unfinished is wider than paused: a turn cut at the `max.tokens` cap is in the same state — the
+assistant content is complete up to the cut and the next turn carries on from it — so both are
+continued. Each continuation is a whole new batch with its own queueing, which is why
+`INFERENCE_TIMEOUT` (900s here) is usually what stops a long run first, not the continuation count.
+
+It needs two things a synchronous request did not, and **both fail after the batch has been
 accepted**, so a missing one costs a billed run (issue #68):
 
 - `org.eclipse.fennec.codec.jsonschema` must be deployed — it renders the request's output schema.

@@ -22,8 +22,7 @@ import org.eclipse.fennec.event.atlas.model.inference.InferenceOutcome.Status;
  * Reads an outcome out of an agent's prose, for the paths where there is no structured answer to
  * read instead.
  * <p>
- * This is the fallback, not the contract. It exists for three cases: the synchronous adapter,
- * which cannot finish an agentic run anyway and is not worth a schema; a turn that exhausted its
+ * This is the fallback, not the contract. It exists for two cases: a turn that exhausted its
  * continuations, which has text but never reached its structured answer; and a provider that
  * returns something the schema cannot be recovered from. Everywhere else the agent answers in
  * {@code InferenceResult} and this is not consulted.

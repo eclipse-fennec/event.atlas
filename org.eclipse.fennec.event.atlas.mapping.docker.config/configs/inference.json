@@ -39,15 +39,21 @@
    * what the server's task-scoped servlet actually serves; a name that drifts out of the server's
    * provider stops being callable rather than silently widening the surface.
    *
+   * `base.url` on the batch service is the batches *collection*: it POSTs to it and then GETs
+   * `<base.url>/{batchId}` and `<base.url>/{batchId}/results`, so pointing it at /v1/messages
+   * fails on the first status poll rather than on submission.
+   *
    * An unset ANTHROPIC_API_KEY does NOT stop the chat service activating - the metatype's
    * `required` is documentation, not enforcement. The first run then fails at the provider and
    * lands as an UNAVAILABLE receipt. Which is why `namespace`, not the key, is the switch that
    * governs spend.
    *
-   * Both a sync and a batch chat service are configured. BatchChatCompletionAdapter has
-   * configuration-policy=require and service.ranking=100, so `event.atlas.model.inference.chat.batch`
-   * below is what selects the batch path - which is the one to want: it raises the provider's
-   * server-side iteration ceiling from ~10 to ~21, and a paused turn is resumed rather than lost.
+   * The chat service is configured as a BATCH service, which is the only shape of request that
+   * can finish this task and since 2026-10-12 the only adapter this workspace ships: it raises the
+   * provider's server-side iteration ceiling from ~10 to ~21, and an unfinished turn - stopped at
+   * that ceiling or at `max.tokens` - is resumed rather than lost. BatchChatCompletionAdapter is
+   * configuration-policy=require, so `event.atlas.model.inference.chat.batch` below is what
+   * publishes the ChatCompletion at all.
    *
    * INFERENCE_MAX_RUNS is a GLOBAL budget, not per channel. Unknown payloads are windowed per
    * channel - the key is (source, namespaceUri, format), source being the MQTT topic or
@@ -98,37 +104,6 @@
     "server.name": "metamodel",
     "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=]]"
   },
-  "ClaudeChatCompletionService": {
-    "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
-    "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
-    "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-sonnet-4-6]]",
-    "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
-    "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=/opt/eventatlas/runtime/inference]",
-    "mcpServers.target": "(server.name=metamodel)",
-    "mcp.authorization.token": "$[env:METAMODEL_MCP_TOKEN;default=$[prop:METAMODEL_MCP_TOKEN;default=]]",
-    "mcp.tools.enabled": [
-      "list_metamodel",
-      "describe_eclass",
-      "export_package",
-      "list_annotation_sources",
-      "find_classes_by_annotation",
-      "find_features_by_annotation",
-      "describe_aspects",
-      "create_dataset",
-      "create_epackage",
-      "add_eclass",
-      "add_eattribute",
-      "add_ereference",
-      "add_eannotation",
-      "add_eenum",
-      "add_eenum_literal",
-      "modify_feature",
-      "create_from_json",
-      "register_package",
-      "list_registry",
-      "post_to_model_atlas"
-    ]
-  },
   "ClaudeBatchMessageService": {
     "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
     "base.url": "$[env:ANTHROPIC_BATCH_URL;default=$[prop:ANTHROPIC_BATCH_URL;default=https://api.anthropic.com/v1/messages/batches]]",
@@ -164,7 +139,7 @@
    * The batch path needs it: submitting a batch is a Resource save and is ungated, but every status
    * poll and the result fetch are Resource loads and are blocked, so the batch runs and costs money
    * and can never be read back (issue #68). A literal, as in mapping.inference.config - repointing
-   * ANTHROPIC_BASE_URL or ANTHROPIC_BATCH_URL means adding that host here too. Never "*". */
+   * ANTHROPIC_BATCH_URL means adding that host here too. Never "*". */
   "org.eclipse.fennec.emf.osgi.urihandler.http": {
     "allowedHosts": ["api.anthropic.com"]
   },

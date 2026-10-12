@@ -207,7 +207,7 @@
 
   /* --- model inference: a draft model for payloads this runtime has no model for ---------
    *
-   * All of this is optional. Without these four configurations - or without the bundles they
+   * All of this is optional. Without these configurations - or without the bundles they
    * configure - unknown payloads are dropped exactly as they were before, and the sample
    * collector below simply reports what it would have handed over.
    *
@@ -233,14 +233,25 @@
     "server.url": "$[env:METAMODEL_MCP_URL;default=$[prop:METAMODEL_MCP_URL;default=http://localhost:8099/mcp/inference]]"
   },
 
-  /* The Claude client. Note `mcpServers.target`: the reference is 1..n and unfiltered by
+  /* The Claude client, as a BATCH service - which is the only shape of request that can finish
+   * this task, and since the synchronous adapter was removed the only one this workspace has.
+   * The Messages API runs server-side tools in a sampling loop with a default limit of 10
+   * iterations per request and then returns `stop_reason: pause_turn` with no final answer;
+   * measured 2026-08-28 on this exact prompt, 11 iterations then pause_turn, while the same
+   * request as a batch ran 21 iterations to end_turn and published its draft.
+   *
+   * Note `base.url`: the batch service treats it as the batches *collection* - it POSTs to it and
+   * then GETs `<base.url>/{batchId}` and `<base.url>/{batchId}/results`. Pointing it at
+   * /v1/messages fails on the first status poll rather than on submission.
+   *
+   * Note `mcpServers.target`: the reference is 1..n and unfiltered by
    * default, so without this it would bind ANY MCPEndpoint in the framework - including a
    * co-hosted one - and the agent would be handed the wrong tool surface. Which tool surface
    * that is, is decided entirely by the endpoint's URL - see the note on scoping below.
    *
    * `api.key` is read from the environment; the key itself never lives in configuration.
-   * `download.file.folder` is required even though only the batch service reads it: the shared
-   * OCD marks it mandatory, so the component does not activate without it.
+   * `download.file.folder` is where the batch's results file lands; the shared OCD marks it
+   * mandatory, so the component does not activate without it.
    *
    * The values are read as $[env:NAME;default=$[prop:NAME;default=...]] - an exported
    * environment variable first, then a system property (which is what secrets.bndrun sets
@@ -264,15 +275,15 @@
    * names. Leaving it out leaves every tool on the server disabled - the agent gets a tool
    * surface of nothing - so it has to be listed here even when the endpoint is already scoped.
    *
-   * It mirrors the 21 tools `inference_tool_provider` serves on /mcp/inference, which is the
+   * It mirrors the 20 tools `inference_tool_provider` serves on /mcp/inference, which is the
    * task-scoped servlet: discovery, authoring, validation, register and publish. What manages
    * datasets beyond authoring, deletes, replays a recipe or unregisters a package is not served
    * there at all, and nothing on it can promote a draft to a released stage - that stays a human
    * decision. Scoping at both ends means a name that drifts out of the server's provider stops
    * being callable rather than silently widening the surface. */
-  "ClaudeChatCompletionService": {
+  "ClaudeBatchMessageService": {
     "api.key": "$[env:ANTHROPIC_API_KEY;default=$[prop:ANTHROPIC_API_KEY;default=]]",
-    "base.url": "$[env:ANTHROPIC_BASE_URL;default=$[prop:ANTHROPIC_BASE_URL;default=https://api.anthropic.com/v1/messages]]",
+    "base.url": "$[env:ANTHROPIC_BATCH_URL;default=$[prop:ANTHROPIC_BATCH_URL;default=https://api.anthropic.com/v1/messages/batches]]",
     "model": "$[env:INFERENCE_MODEL;default=$[prop:INFERENCE_MODEL;default=claude-opus-5]]",
     "max.tokens": "$[env:INFERENCE_MAX_TOKENS;default=$[prop:INFERENCE_MAX_TOKENS;default=16000]]",
     "download.file.folder": "$[env:INFERENCE_DOWNLOAD_FOLDER;default=$[prop:INFERENCE_DOWNLOAD_FOLDER;default=/tmp/eventatlas-inference]]",
@@ -296,11 +307,42 @@
       "add_eenum_literal",
       "modify_feature",
       "create_from_json",
-      "export_dataset",
       "register_package",
       "list_registry",
       "post_to_model_atlas"
     ]
+  },
+
+  /* emf.osgi's REST URI handler blocks ALL outbound http(s) *resolution* unless the host is
+   * allow-listed - an SSRF guard, since an attacker-supplied proxy reference in a model would
+   * otherwise make the runtime fetch arbitrary URLs.
+   *
+   * The batch path needs it, and asymmetrically: submitting a batch is a Resource *save* and is
+   * not gated, but every status poll and the result fetch are Resource *loads* and are. So the
+   * batch is accepted, starts running, costs money - and the first poll then fails with
+   * "host 'api.anthropic.com' is not in the configured allow-list" (issue #68).
+   *
+   * Only the provider host is listed, and deliberately as a literal rather than $[env:...]:
+   * repointing ANTHROPIC_BATCH_URL means adding that host here too. Never "*" - that disables the
+   * guard entirely and the handler logs a warning saying so. */
+  "org.eclipse.fennec.emf.osgi.urihandler.http": {
+    "allowedHosts": ["api.anthropic.com"]
+  },
+
+  /* Poll cadence for the batch above, and how many times an unfinished turn may be resumed.
+   * BatchChatCompletionAdapter is configuration-required, so the presence of THIS block is what
+   * publishes the ChatCompletion at all.
+   *
+   * Batch raises the provider's server-side iteration ceiling but does not remove it: three
+   * measured runs went 21, 15 and 22 iterations, the last coming back `stop_reason: pause_turn`.
+   * A turn can also stop at the `max.tokens` cap above. Either way the result is unfinished
+   * rather than failed - isSuccessful() is false and it carries no error - and is resumed by
+   * submitting a fresh batch carrying the conversation so far. maxContinuations is deliberately
+   * low: each continuation is a whole new batch with its own queueing, so `timeoutSeconds` below
+   * is usually what stops a run first. 0 restores the submit-once behaviour. */
+  "event.atlas.model.inference.chat.batch": {
+    "pollSeconds": "$[env:INFERENCE_BATCH_POLL;default=$[prop:INFERENCE_BATCH_POLL;default=20]]",
+    "maxContinuations": "$[env:INFERENCE_MAX_CONTINUATIONS;default=$[prop:INFERENCE_MAX_CONTINUATIONS;default=2]]"
   },
 
   /* The namespace the agent may publish under - the one thing it cannot work out for itself.
@@ -321,7 +363,12 @@
     "namespace": "$[env:INFERENCE_NAMESPACE;default=$[prop:INFERENCE_NAMESPACE;default=]]",
     "maxRunsPerInterval": "$[env:INFERENCE_MAX_RUNS;default=$[prop:INFERENCE_MAX_RUNS;default=3]]",
     "intervalSeconds": 3600,
-    "timeoutSeconds": 600
+    /* A batch is minutes, not seconds: the measured run took about twenty including queueing,
+     * and a continuation is a whole new batch with its own queue. This used to be 600, which was
+     * ample while the completion was a single synchronous request and would now cancel a run
+     * that was going to succeed - the batch then keeps running at the provider, and keeps
+     * costing, with only its id in the log. */
+    "timeoutSeconds": "$[env:INFERENCE_TIMEOUT;default=$[prop:INFERENCE_TIMEOUT;default=1800]]"
   },
 
   /* Left at its defaults except for the wait: a dev broker publishes often, and half an hour
