@@ -191,8 +191,6 @@ org.eclipse.fennec.m2x:org.eclipse.fennec.m2x.library.workspace:0.1.1-SNAPSHOT
 org.eclipse.fennec.persistence.jpa:org.eclipse.fennec.persistence.jpa.library.workspace:0.1.0-SNAPSHOT
 org.eclipse.fennec.models:org.eclipse.fennec.common.models.library:0.0.1-SNAPSHOT
 
-org.geckoprojects.weather:org.gecko.weather.model:1.1.0-SNAPSHOT
-
 # Dropwizard metrics - the sensinact gateway core's metrics support. cnf/ext/sensinact.maven
 # also pins it, but the Eclipse SensiNact repos do not serve third-party artifacts, so it has
 # to be declared here to be fetchable on a clean CI runner.
