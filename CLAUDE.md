@@ -27,7 +27,7 @@ Gradle graph automatically):
 | `…event.atlas.southbound.common` | the shared southbound ingress: `PayloadIngest` deserializes a payload (XMI or JSON), pushes it and reports an `IngestResult` (`APPLIED`, `NO_MAPPING`, `MODEL_UNKNOWN`, `PARSE_ERROR`, `FORMAT_UNSUPPORTED`, …), plus the optional `UnknownModelHandler` hook it offers unhandled payloads to |
 | `…event.atlas.southbound.sampling` | `PayloadSampleCollector` — the `UnknownModelHandler` implementation that buffers unhandled payloads per channel and hands a closed `PayloadSampleSet` to a `PayloadSampleSetHandler` |
 | `…event.atlas.model.inference` | `ModelInferenceService` — the `PayloadSampleSetHandler` that turns a closed sample set into a model draft: fingerprint dedup, run rate limit, one prompt, one agentic completion, then a receipt. Carries **no EMF dependency**, which is what makes "never registers an inferred package locally" structural, and talks to an AI stack only through its own `ChatCompletion` port |
-| `…event.atlas.model.inference.chat` | `ChatCompletionAdapter` — the only bundle here that depends on an AI stack: binds the `ChatCompletion` port to a Fennec AI `ChatCompletionService` and reads the agent's answer out of the response's content blocks. Not deploying it is one way a runtime opts out of inference; since 2026-09-04 configuration is the other |
+| `…event.atlas.model.inference.chat` | `BatchChatCompletionAdapter` — the only bundle here that depends on an AI stack: binds the `ChatCompletion` port to a Fennec AI `BatchChatCompletionService`, runs the completion as a batch and resumes an unfinished turn until the agent reaches its structured answer. Not deploying it is one way a runtime opts out of inference; since 2026-09-04 configuration is the other. The synchronous `ChatCompletionAdapter` was deleted on 2026-10-12 (#75): a synchronous request stops at the provider's ~10-iteration budget, so it could only ever half-finish the task |
 | `…event.atlas.mqtt.southbound.adapter` | `MqttPayloadListener` — binds a SensiNact MQTT handler's topics and feeds each payload through `PayloadIngest` |
 | `…event.atlas.rest.southbound.adapter` | `PayloadIngestResource` — `POST <whiteboard base>/ingest/{channel}`; the HTTP status mirrors the `IngestResult` outcome |
 
@@ -61,8 +61,8 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-10-05: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus **256 plain-JUnit tests** across ten projects. The
+Baseline as of 2026-10-12: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
+(the known admin-service read gap) — plus **251 plain-JUnit tests** across ten projects. The
 mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
 `DynamicMappingPackageTest`); the deployment project 44 (`DeploymentPlannerTest`,
@@ -291,8 +291,8 @@ exactly as before. The chain, one issue per link (#27 → #30):
 
 ```
 PayloadIngest ──UnknownModelHandler──▶ PayloadSampleCollector ──PayloadSampleSetHandler──▶
-    ModelInferenceService ──ChatCompletion──▶ ChatCompletionAdapter ──▶ ChatCompletionService
-                                                                          + remote MCPEndpoint
+    ModelInferenceService ──ChatCompletion──▶ BatchChatCompletionAdapter ──▶ BatchChatCompletionService
+                                                                               + remote MCPEndpoint
 ```
 
 **Two config switches turn it off, and they gate different costs.** Both default to off, so
@@ -398,31 +398,50 @@ it walks its directory once at activation and never again.
   `RemoteMCPEndpoint` into `org.eclipse.fennec.mcp.endpoint`, whose `Import-Package` is
   `java.lang` and nothing else. Both bndruns dropped all three (91 bundles in `inference.bndrun`,
   down from 94) and `central.mvn` no longer declares them.
-- **A run goes through the *batch* API, and that path needs two things the synchronous one does
-  not.** `BatchChatCompletionAdapter` is `configuration-policy=require` with `service.ranking=100`,
-  so an `event.atlas.model.inference.chat.batch` configuration is what selects it. Both extras fail
-  *after* the batch has been accepted, so a missing one burns a billed run, a rate-limiter token and
-  a fingerprint claim (issue #68): `org.eclipse.fennec.codec.jsonschema` renders the request's
-  output schema and is listed **by identity** in `inference.bndrun` and
-  `eventatlas.runtime_docker.bndrun` (nothing imports it as a package); and the provider host must
+- **A run goes through the *batch* API, and there is no other path.** Since 2026-10-12 (#75) the
+  synchronous `ChatCompletionAdapter` is gone, so `BatchChatCompletionAdapter` is the only
+  `ChatCompletion` in the workspace; it is `configuration-policy=require`, so an
+  `event.atlas.model.inference.chat.batch` configuration is what *publishes* it, and a runtime
+  without one reports every closed sample set as having no completion rather than spending on one
+  that cannot finish. All three config bundles now carry that block, and `local.config` moved onto
+  the batch path with it.
+  The batch path needs two things a synchronous request did not, and both fail *after* the batch
+  has been accepted, so a missing one burns a billed run, a rate-limiter token and a fingerprint
+  claim (issue #68): `org.eclipse.fennec.codec.jsonschema` renders the request's
+  output schema and is listed **by identity** in all three bndruns (nothing imports it as a
+  package); and the provider host must
   be in `org.eclipse.fennec.emf.osgi.urihandler.http`'s `allowedHosts` — submitting a batch is an
   EMF Resource *save* and is ungated, while every status poll and the result fetch are *loads* and
-  are blocked as SSRF. Both config bundles carry `["api.anthropic.com"]` as a literal, so
-  repointing `ANTHROPIC_BASE_URL` / `ANTHROPIC_BATCH_URL` needs the bundle rebuilt.
+  are blocked as SSRF. All three config bundles carry `["api.anthropic.com"]` as a literal, so
+  repointing `ANTHROPIC_BATCH_URL` needs the bundle rebuilt.
   `BatchInferenceWiringTest` (in `…mapping.docker.config`) pins both against the shipped configs
-  and the *resolved* `-runbundles`, skipping a config bundle with no `ClaudeBatchMessageService` —
-  which is why `local.config` / `launch.bndrun`, on the synchronous path, need neither.
+  and the *resolved* `-runbundles`; its skip for a config bundle with no `ClaudeBatchMessageService`
+  no longer fires for any of them. **`timeoutSeconds` on `event.atlas.model.inference` is the
+  other thing the batch path changes**: a run is minutes, not seconds — `local.config`'s 600 would
+  now cancel a run that was going to succeed, and it is 1800 there and 900 in the two others.
+- **An unfinished turn is resumed, and "unfinished" is wider than "paused".** fennec-ai #14
+  (taken up here on 2026-10-12, #75) added `isContinuable`, which also covers a turn cut at the
+  `max.tokens` cap — the same state as a `pause_turn`, assistant content complete up to the cut,
+  and resumable the same way; asking `isPaused` discarded those runs as failures. It also added the
+  four-argument `continueMessageBatch(next, previous, result, customId)`, and **the `previous` is
+  not optional for a caller that rebuilds the batch each round**: a continuation opens with the
+  result of the tool use that ended the previous turn and the provider requires that tool use to be
+  in the *same* request, so from the second continuation on — reachable at the default
+  `maxContinuations` of 2 — a prompt-only batch is rejected for an unexpected `tool_use_id`, after
+  billing. The messages accumulate from `previous`; model, tools and in particular the MCP
+  authorization token come from `next`, because a credential has to be minted rather than replayed
+  from a batch that may be hours old.
 - **Credentials come from the environment**, never from a config file: `api.key` is
   `$[env:ANTHROPIC_API_KEY]`, interpolated at configuration delivery by
   `org.apache.felix.configadmin.plugin.interpolation` (already in the runtime, enabled through
   `felix.cm.config.plugins`). **An unset variable does not stop anything from starting**: the
-  metatype's `required` is documentation, not enforcement, so `ClaudeChatCompletionService`
+  metatype's `required` is documentation, not enforcement, so `ClaudeBatchMessageService`
   activates and the first inference run fails at the provider. It surfaces as
   `IllegalStateException: Response object is not of expected type ClaudeResponse` — the client
-  reports a non-2xx by failing to deserialize the body — which `ChatCompletionAdapter` rewrites
-  to name `api.key` and `base.url`, and which lands as an `UNAVAILABLE` receipt that is not
-  retried for `retryAfterUnavailableSeconds`. `download.file.folder` is required by the shared
-  OCD even though only the batch service reads it — without it the component does not activate.
+  reports a non-2xx by failing to deserialize the body — which `BatchChatCompletionAdapter`
+  rewrites to name `api.key` and `base.url`, and which lands as an `UNAVAILABLE` receipt that is
+  not retried for `retryAfterUnavailableSeconds`. `download.file.folder` is where the batch's
+  results file lands — without it the component does not activate.
   `max.tokens` must be raised well past the component's own 1024 default, which would truncate a
   turn that authors a package.
 - **Local credentials go in `…mapping.runtime/secrets.bndrun`, which is gitignored.** It sets

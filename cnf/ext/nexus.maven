@@ -2,3 +2,9 @@ org.eclipse.fennec.ai:org.eclipse.fennec.ai.apis.meta.model:1.0.0-SNAPSHOT
 org.eclipse.fennec.ai:org.eclipse.fennec.ai.chat.completion.api:1.0.0-SNAPSHOT
 org.eclipse.fennec.ai:org.eclipse.fennec.ai.chat.completion.claude.model:1.0.0-SNAPSHOT
 org.eclipse.fennec.ai:org.eclipse.fennec.ai.chat.completion.impl.claude:1.0.0-SNAPSHOT
+
+# The DWD weather domain model used by the OSGi tests (…mapping.tests buildpath and
+# test.bndrun). Published only to the DIM nexus - Central Snapshots purged the artifact and
+# the republished 1.1.0-SNAPSHOT (build 17, 2026-10-16) did not go back there, so an entry in
+# central.mvn resolves out of a developer's ~/.m2 only and leaves the CI compile without it.
+org.geckoprojects.weather:org.gecko.weather.model:1.1.0-SNAPSHOT

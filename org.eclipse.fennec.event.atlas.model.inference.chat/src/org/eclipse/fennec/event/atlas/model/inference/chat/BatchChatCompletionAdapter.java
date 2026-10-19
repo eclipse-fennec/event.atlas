@@ -50,27 +50,44 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 /**
- * Runs the inference completion through the <em>batch</em> API instead of a synchronous request,
- * and blocks until the batch has a result.
+ * Runs the inference completion through the <em>batch</em> API, and blocks until the batch has a
+ * result. It is the only {@link ChatCompletion} this workspace ships, because it is the only
+ * shape of request that can finish the task.
  * <p>
- * <b>Why this exists.</b> A synchronous request cannot finish this task. The Messages API runs
- * server-side tools in a sampling loop with a documented <em>default limit of 10 iterations per
- * request</em>; when it is reached the response comes back with
- * {@code stop_reason: pause_turn}, carrying whatever the agent had said so far and no final
- * answer - so model inference reports an answer with no receipt. Measured on 2026-08-28 against
- * this exact prompt: 11 iterations then {@code pause_turn}, identically with and without
- * streaming, while the same request submitted as a batch ran 21 iterations to
- * {@code stop_reason: end_turn} and published its draft. Authoring a package takes more than ten
- * iterations, so the batch path is the one that completes. See
+ * <b>Why a batch and not a synchronous request.</b> The Messages API runs server-side tools in a
+ * sampling loop with a documented <em>default limit of 10 iterations per request</em>; when it is
+ * reached the response comes back with {@code stop_reason: pause_turn}, carrying whatever the
+ * agent had said so far and no final answer - so model inference reports an answer with no
+ * receipt. Measured on 2026-08-28 against this exact prompt: 11 iterations then
+ * {@code pause_turn}, identically with and without streaming, while the same request submitted as
+ * a batch ran 21 iterations to {@code stop_reason: end_turn} and published its draft. Authoring a
+ * package takes more than ten iterations, so a synchronous adapter was a path that could only
+ * ever half-finish, and this workspace no longer carries one. See
  * {@code docs/model-inference-test-log.md}.
  * <p>
  * <b>Batch raises the ceiling; it does not remove it.</b> Three measured batch runs went 21, 15
  * and 22 iterations, the last of which came back {@code pause_turn} - so the batch budget is
- * roughly double the synchronous one and a long run can still exhaust it. A paused result is
- * neither a success nor a failure: {@code isSuccessful()} is false and it carries no error, so
- * before continuation was wired in it was reported as "failed: null" and the work thrown away.
- * This adapter now resumes such a turn by submitting a fresh batch carrying the assistant
- * content so far, up to {@code maxContinuations} times, and joins what each turn said.
+ * roughly double the synchronous one and a long run can still exhaust it. A turn can also stop
+ * short of its own accord, at the {@code max.tokens} cap on the chat service. Either way the
+ * result is <em>unfinished</em> rather than failed - {@code isSuccessful()} is false and it
+ * carries no error, so before continuation was wired in it was reported as "failed: null" and the
+ * work thrown away. Which budget the provider hit says nothing about whether the work can go on,
+ * which is why the question asked here is
+ * {@link BatchChatCompletionService#isContinuable(BatchResult, String) isContinuable} and not
+ * {@code isPaused}: both stops leave the assistant content complete up to the cut, and the next
+ * turn carries on from it. This adapter resumes such a turn by submitting a fresh batch carrying
+ * the conversation so far, up to {@code maxContinuations} times, and joins what each turn said.
+ * <p>
+ * <b>The conversation accumulates; everything else is rebuilt.</b> A continuation opens with the
+ * result of the tool use that ended the previous turn, and the provider requires that tool use to
+ * be in the <em>same</em> request - so from the second continuation on, a batch built only from
+ * the prompt is rejected for an unexpected {@code tool_use_id}, after it has been accepted,
+ * queued and billed. The four-argument
+ * {@link BatchChatCompletionService#continueMessageBatch(MessageBatch, MessageBatch, BatchResult, String)
+ * continueMessageBatch} is the split that makes both halves right: the messages come from the
+ * batch that produced the unfinished result, while model, tools, MCP servers and in particular
+ * their authorization token come from a batch built fresh from current configuration - a
+ * credential has to be minted, not replayed from a batch that may be hours old.
  * <p>
  * Two costs it is honest about:
  * <ul>
@@ -87,17 +104,16 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
  * and is not done here.</li>
  * </ul>
  * <p>
- * <b>Which adapter wins.</b> {@link ChatCompletionAdapter} and this one both publish
- * {@link ChatCompletion}, and model inference binds that reference {@code GREEDY}, so the
- * higher {@code service.ranking} is used. This component ranks above the synchronous adapter and
- * is {@link ConfigurationPolicy#REQUIRE}, so the sync path stays in charge until a
- * {@code event.atlas.model.inference.chat.batch} configuration exists - deploying this bundle
- * changes nothing on its own.
+ * <b>What switches it on.</b> This component is {@link ConfigurationPolicy#REQUIRE}, so an
+ * {@code event.atlas.model.inference.chat.batch} configuration is what publishes the
+ * {@link ChatCompletion} - deploying this bundle changes nothing on its own, and a runtime
+ * without that configuration reports every closed sample set as having no completion rather than
+ * spending on one that cannot finish.
  * @author Ilenia Salvadori
  * @since 28.08.2026
  */
 @Component(name = BatchChatCompletionAdapter.PID, configurationPid = BatchChatCompletionAdapter.PID, //
-		configurationPolicy = ConfigurationPolicy.REQUIRE, property = "service.ranking:Integer=100")
+		configurationPolicy = ConfigurationPolicy.REQUIRE)
 @Designate(ocd = BatchChatCompletionAdapter.Config.class)
 public class BatchChatCompletionAdapter implements ChatCompletion {
 
@@ -116,7 +132,7 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 		long pollSeconds() default 20;
 
 		/**
-		 * How many times a paused turn may be resumed before the run is given up on.
+		 * How many times an unfinished turn may be resumed before the run is given up on.
 		 * <p>
 		 * Deliberately low. Each continuation is a whole new batch with its own queueing, so the
 		 * ceiling that bites first is usually {@code timeoutSeconds} on the inference
@@ -142,7 +158,7 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 		poll = Duration.ofSeconds(Math.max(1, config.pollSeconds()));
 		maxContinuations = Math.max(0, config.maxContinuations());
 		logger.info(() -> String.format(
-				"Model inference will use the batch API, polling every %ss and resuming a paused turn up to %s "
+				"Model inference will use the batch API, polling every %ss and resuming an unfinished turn up to %s "
 						+ "time(s). Note that a batch keeps running (and costs) if this runtime stops while waiting.",
 				poll.toSeconds(), maxContinuations));
 	}
@@ -156,45 +172,52 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 		Instant started = Instant.now();
 		StringJoiner answer = new StringJoiner("\n");
 		String customId = newCustomId();
-		String batchId = submit(createBatch(customId, systemMessage, userMessage), customId);
+		// Held across the loop on purpose: it is what the next continuation takes its messages
+		// from. Dropping it is how a second continuation ends up referencing a tool use that the
+		// request no longer carries (issue #75).
+		MessageBatch batch = createBatch(customId, systemMessage, userMessage);
+		String batchId = submit(batch, customId);
 
 		for (int continuation = 0;; continuation++) {
 			Turn turn = awaitTurn(batchId, customId, started);
 			if (turn.text() != null && !turn.text().isBlank()) {
 				answer.add(turn.text());
 			}
-			if (!turn.paused()) {
+			if (!turn.unfinished()) {
 				return outcomeOf(turn, answer.toString());
 			}
 			if (continuation == maxContinuations) {
 				throw new IllegalStateException(String.format(
-						"Completion batch '%s' is still paused after %s continuation(s): the agent has not "
+						"Completion batch '%s' is still unfinished after %s continuation(s): the agent has not "
 								+ "finished, and what it did say carries no conclusion. Raise maxContinuations on "
 								+ "the %s configuration, or shorten the task.",
 						batchId, maxContinuations, PID));
 			}
-			// The result carries the assistant turn but not the request that produced it, so the
-			// continuation is built from the same prompt - ours is a pure function of the sample
-			// set, so rebuilding it yields the identical turn. Everything else (model, tools, MCP
-			// servers and their authorization) comes from the current configuration on purpose: a
-			// token has to be minted fresh, not replayed from a batch that may be hours old.
-			String pausedCustomId = customId;
-			String pausedBatchId = batchId;
+			// The messages have to accumulate, because this turn opens with the result of the tool
+			// use that ended the last one and the provider requires that tool use to be in the same
+			// request - so they come from the batch that produced the unfinished result. Everything
+			// else (model, tools, MCP servers and their authorization) comes from a batch built
+			// fresh from the current configuration on purpose: a token has to be minted, not
+			// replayed from a batch that may be hours old. The prompt is rebuilt rather than kept
+			// because ours is a pure function of the sample set, so it yields the identical turn.
+			String previousCustomId = customId;
+			String previousBatchId = batchId;
+			MessageBatch previous = batch;
 			customId = newCustomId();
-			MessageBatch next = createBatch(customId, systemMessage, userMessage);
-			batchService.continueMessageBatch(next, turn.result(), pausedCustomId);
-			batchId = submit(next, customId);
+			batch = createBatch(customId, systemMessage, userMessage);
+			batchService.continueMessageBatch(batch, previous, turn.result(), previousCustomId);
+			batchId = submit(batch, customId);
 			String resumedBatchId = batchId;
 			int attempt = continuation + 1;
 			logger.log(Level.INFO, () -> String.format(
-					"Completion batch '%s' paused at the provider's iteration budget; resumed as batch '%s' "
-							+ "(continuation %s of %s)",
-					pausedBatchId, resumedBatchId, attempt, maxContinuations));
+					"Completion batch '%s' stopped before finishing - the provider's iteration budget or the "
+							+ "max.tokens cap; resumed as batch '%s' (continuation %s of %s)",
+					previousBatchId, resumedBatchId, attempt, maxContinuations));
 		}
 	}
 
 	/** One completed batch: what the agent said, and whether it had finished saying it. */
-	private record Turn(BatchResult result, boolean paused, String text) {
+	private record Turn(BatchResult result, boolean unfinished, String text) {
 	}
 
 	private static String newCustomId() {
@@ -275,9 +298,9 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 		} catch (IOException e) {
 			throw new IllegalStateException("The completion batch could not be submitted: " + describe(e), e);
 		} catch (RuntimeException e) {
-			// As in the synchronous adapter: the client reports a non-2xx by failing to
-			// deserialize the body, so a rejected key or a wrong endpoint arrives here wearing
-			// a message about types. Name the suspects rather than leave an operator guessing.
+			// The client reports a non-2xx by failing to deserialize the body, so a rejected key
+			// or a wrong endpoint arrives here wearing a message about types. Name the suspects
+			// rather than leave an operator guessing.
 			throw new IllegalStateException(String.format(
 					"The completion batch was rejected and the answer could not be read (%s). An HTTP error from "
 							+ "the provider looks exactly like this - check that api.key is set in the environment "
@@ -315,10 +338,10 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 	 * An interruption is propagated as an interrupt and reported as unavailable - model
 	 * inference cancels the call on its own timeout, and that is the path it takes.
 	 * <p>
-	 * A paused turn is checked for <em>before</em> success, because it is neither: a result
-	 * stopped at the provider's iteration budget reports {@code isSuccessful() == false} and
-	 * carries no error, so treating it as a failure would report it as
-	 * "failed: null" and throw away work that can be resumed.
+	 * An unfinished turn is checked for <em>before</em> success, because it is neither success nor
+	 * failure: a result stopped at the provider's iteration budget, or at the {@code max.tokens}
+	 * cap, reports {@code isSuccessful() == false} and carries no error, so treating it as a
+	 * failure would report it as "failed: null" and throw away work that can be resumed.
 	 */
 	private Turn awaitTurn(String batchId, String customId, Instant started) {
 		try {
@@ -331,7 +354,7 @@ public class BatchChatCompletionAdapter implements ChatCompletion {
 						status, providerError(batchId)));
 			}
 			BatchResult result = batchService.getBatchResult(batchId);
-			if (batchService.isPaused(result, customId)) {
+			if (batchService.isContinuable(result, customId)) {
 				return new Turn(result, true, result.getResultText());
 			}
 			if (!result.isSuccessful()) {
