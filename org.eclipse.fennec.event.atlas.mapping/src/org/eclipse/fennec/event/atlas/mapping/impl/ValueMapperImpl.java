@@ -137,7 +137,7 @@ public class ValueMapperImpl implements ValueMapper {
 
 				// Admin timestamp takes precedence, fallback to provider timestamp
 				Instant adminTimestamp = determineTimestamp(adminSource, mapping.getAdmin(), providerTimestamp);
-				mapAdminService(adminSource, mapping.getAdmin(), provider, adminTimestamp);
+				mapAdminService(adminSource, mapping.getAdmin(), provider, adminTimestamp, providerId);
 			}
 
 			logger.fine(String.format("Successfully mapped instance %s to provider %s", sourceInstance.eClass().getName(), providerModel));
@@ -201,6 +201,26 @@ public class ValueMapperImpl implements ValueMapper {
 			}
 		}
 
+		AdminMapping adminMapping = mapping.getAdmin();
+		if (adminMapping != null && !adminMapping.getResources().isEmpty()) {
+			try {
+				EObject adminSource = getServiceSource(sourceInstance, adminMapping);
+				for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+					String resourcePath = adminMapping.getMid() + "." + resourceMapping.getMid();
+					try {
+						Optional<Object> value = extractValue(adminSource, resourceMapping);
+						if (value.isPresent()) {
+							values.put(resourcePath, value.get());
+						}
+					} catch (Exception e) {
+						logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
+					}
+				}
+			} catch (ValueMappingException e) {
+				logger.warning(String.format("Failed to get service source for %s: %s", adminMapping.getMid(), e.getMessage()));
+			}
+		}
+
 		return values;
 	}
 
@@ -244,6 +264,18 @@ public class ValueMapperImpl implements ValueMapper {
 
 			for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
 				validateResourceMapping(serviceSource, resourceMapping, serviceMapping.getMid(), result);
+			}
+		}
+
+		AdminMapping adminMapping = mapping.getAdmin();
+		if (adminMapping != null && !adminMapping.getResources().isEmpty()) {
+			try {
+				EObject adminSource = getServiceSource(sourceInstance, adminMapping);
+				for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+					validateResourceMapping(adminSource, resourceMapping, adminMapping.getMid(), result);
+				}
+			} catch (ValueMappingException e) {
+				result.addError("Failed to get service source for " + adminMapping.getMid() + ": " + e.getMessage());
 			}
 		}
 
@@ -484,7 +516,7 @@ public class ValueMapperImpl implements ValueMapper {
 	 * Maps admin service values.
 	 */
 	private void mapAdminService(EObject sourceInstance, AdminMapping adminMapping, 
-			SensinactProvider provider, Instant timestamp) throws ValueMappingException {
+			SensinactProvider provider, Instant timestamp, String providerId) throws ValueMappingException {
 
 		SensinactService adminService = provider.getServices().get("admin");
 		if (adminService == null) {
@@ -492,6 +524,20 @@ public class ValueMapperImpl implements ValueMapper {
 		}
 		mapFriendlyName(sourceInstance, adminMapping, timestamp, adminService);
 		mapLocation(sourceInstance, adminMapping, timestamp, adminService);
+		mapAdminResources(sourceInstance, adminMapping, adminService, timestamp, providerId);
+	}
+
+	/**
+	 * Maps the admin mapping's own {@code resources} onto the admin service. The admin service's
+	 * resources are the fixed set sensiNact defines ({@code description}, {@code icon}, ...);
+	 * the mapping cannot add new ones, it only feeds the existing ones, so a resource mapping
+	 * whose mid is unknown there fails the way an unknown service resource does.
+	 */
+	private void mapAdminResources(EObject sourceInstance, AdminMapping adminMapping,
+			SensinactService adminService, Instant timestamp, String providerId) throws ValueMappingException {
+		for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+			mapSingleResource(sourceInstance, resourceMapping, adminService, timestamp, providerId);
+		}
 	}
 
 	/**

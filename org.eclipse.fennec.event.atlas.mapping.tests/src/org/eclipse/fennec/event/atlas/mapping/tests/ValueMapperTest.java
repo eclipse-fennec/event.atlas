@@ -29,12 +29,16 @@ import java.util.Map;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
+import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.emf.osgi.annotation.require.RequireEMF;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapper;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapperFactory;
+import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.sensinact.core.command.AbstractSensinactCommand;
 import org.eclipse.sensinact.core.command.GatewayThread;
 import org.eclipse.sensinact.core.model.SensinactModelManager;
@@ -53,7 +57,6 @@ import org.gecko.weather.model.weather.WeatherReports;
 import org.gecko.weather.model.weather.WeatherStation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -355,7 +358,6 @@ public class ValueMapperTest {
     }
 
     @Test
-    @Disabled("This is currently not working because the admin service is treated differently in sensinact")
     @DisplayName("Provider mapping: should map admin service")
     void providerMapping_admin() throws Exception {
         // Load weather mapping
@@ -363,6 +365,9 @@ public class ValueMapperTest {
         Resource mappingResource = resourceSet.createResource(URI.createURI(mappingUrl.toString()));
         mappingResource.load(null);
         ProviderMapping weatherMapping = (ProviderMapping) mappingResource.getContents().get(0);
+        // the report's timestamp predates the provider's creation and sensiNact drops older admin
+        // updates; without its own timestamp the admin update carries the provider timestamp
+        weatherMapping.getAdmin().setTimestamp(null);
 
         // Create test data
         WeatherReports weatherReports = createWeatherReportsTestData();
@@ -417,6 +422,67 @@ public class ValueMapperTest {
     }
 
     
+    @Test
+    @DisplayName("Provider mapping: a resource under <admin> feeds the admin service's description")
+    void providerMapping_adminResources_mapDescription() throws Exception {
+        URL mappingUrl = getClass().getResource(WEATHER_MAPPING_URI_NO_RESOURCES);
+        Resource mappingResource = resourceSet.createResource(URI.createURI(mappingUrl.toString()));
+        mappingResource.load(null);
+        ProviderMapping weatherMapping = (ProviderMapping) mappingResource.getContents().get(0);
+
+        // description <- the same path the friendly name uses: reports[0].station.name
+        AdminMapping admin = weatherMapping.getAdmin();
+        // sensiNact keeps the newer value and stamps the admin resources with the provider's
+        // creation instant; the report's own timestamp predates it, so let the admin update
+        // carry the provider timestamp instead
+        admin.setTimestamp(null);
+        ResourceMapping description = MappingFactory.eINSTANCE.createResourceMapping();
+        description.setName("description");
+        description.setMid("description");
+        for (EStructuralFeature feature : admin.getFriendlyNameFeature()) {
+            description.getValueFeature().add(feature);
+        }
+        admin.getResources().add(description);
+
+        WeatherReports weatherReports = createWeatherReportsTestData();
+        mappingRegistry.registerModelMapping(weatherMapping);
+
+        Promise<Boolean> result = gatewayThread.execute(new AbstractSensinactCommand<Boolean>() {
+            @Override
+            protected Promise<Boolean> call(SensinactDigitalTwin twin, SensinactModelManager modelManager, PromiseFactory pf) {
+                try {
+                    ValueMapper mapper = ValueMapperFactory.createValueMapper(twin, weatherMapping);
+                    Map<String, Object> values = mapper.mapResourceValues(weatherReports);
+                    assertEquals("GERA", values.get("admin.description"), "mapResourceValues lists the admin resource");
+                    mapper.mapInstance(weatherReports);
+                    return pf.resolved(true);
+                } catch (Exception e) {
+                    return pf.failed(e);
+                }
+            }
+        });
+        assertTrue(result.getValue(), "mapping with an admin resource should succeed");
+
+        result = gatewayThread.execute(new AbstractSensinactCommand<Boolean>() {
+            @Override
+            protected Promise<Boolean> call(SensinactDigitalTwin twin, SensinactModelManager modelManager, PromiseFactory pf) {
+                try {
+                    SensinactProvider provider = twin.getProvider(WEATHER_MODEL, "10567");
+                    assertNotNull(provider, "Provider should exist");
+                    SensinactService adminService = provider.getServices().get("admin");
+                    SensinactResource descriptionResource = adminService.getResources().get("description");
+                    assertNotNull(descriptionResource, "description resource should exist on the admin service");
+                    TimedValue<?> timedValue = descriptionResource.getValue().getValue();
+                    assertEquals("GERA", timedValue.getValue(), "description should carry reports[0].station.name");
+                    return pf.resolved(true);
+                } catch (Exception e) {
+                    return pf.failed(e);
+                }
+            }
+        });
+        assertTrue(result.getValue(), "admin.description should read back");
+    }
+
     @Test
     @DisplayName("Collection mapping: should map forecast3H service from reports[1]")
     void collectionMapping_forecast3H_usesReportAtIndex1() throws Exception {

@@ -61,8 +61,8 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-10-12: `./gradlew clean build` is green — **72 OSGi tests, 1 `@Disabled`**
-(the known admin-service read gap) — plus **251 plain-JUnit tests** across ten projects. The
+Baseline as of 2026-10-20: `./gradlew clean build` is green — **73 OSGi tests, 0 `@Disabled`**
+— plus **251 plain-JUnit tests** across ten projects. The
 mapping project contributes 40 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
 `DynamicMappingPackageTest`); the deployment project 44 (`DeploymentPlannerTest`,
