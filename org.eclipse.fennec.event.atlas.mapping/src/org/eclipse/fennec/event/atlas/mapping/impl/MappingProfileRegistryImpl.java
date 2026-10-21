@@ -28,6 +28,7 @@ import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryConstants;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryEntry;
 import org.eclipse.fennec.emf.osgi.eobject.registry.EObjectRegistryListener;
 import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
+import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
 import org.eclipse.fennec.event.atlas.model.mapping.ProfileAdmin;
 import org.eclipse.fennec.event.atlas.model.mapping.ProfileProvider;
@@ -216,6 +217,38 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
                 result.addError("Admin service requires friendly name but it is not configured");
             }
         }
+        validateAdminResources(mapping.getAdmin(), profileAdmin, result);
+    }
+
+    /**
+     * The profile's admin resources. {@code friendlyName} and {@code location} are satisfied by
+     * the admin mapping's dedicated features; any other one ({@code description}) needs an
+     * explicit resource mapping under {@code <admin>}, which is checked like a service resource.
+     */
+    private void validateAdminResources(AdminMapping admin, ProfileAdmin profileAdmin, ValidationResultImpl result) {
+        Map<String, ResourceMapping> mappingResources = new ConcurrentHashMap<>();
+        for (ResourceMapping resource : admin.getResources()) {
+            mappingResources.put(resource.getMid(), resource);
+        }
+        for (ProfileResource profileResource : profileAdmin.getResources()) {
+            String id = profileResource.getResourceId();
+            boolean dedicated = switch (id) {
+                case "friendlyName" -> admin.getFriendlyName() != null || !admin.getFriendlyNameFeature().isEmpty();
+                case "location" -> admin.getLatitude() != null || !admin.getLatitudeRef().isEmpty();
+                default -> false;
+            };
+            if (dedicated) {
+                continue;
+            }
+            ResourceMapping mappingResource = mappingResources.get(id);
+            if (mappingResource == null) {
+                if (profileResource.isRequired()) {
+                    result.addError("Required resource '" + id + "' is missing from service 'admin'");
+                }
+                continue;
+            }
+            validateResourceAgainstProfile(mappingResource, profileResource, result);
+        }
     }
 
     private void validateServices(ProviderMapping mapping, ProfileProvider profileProvider, ValidationResultImpl result) {
@@ -269,26 +302,31 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
                 continue;
             }
             
-            // Validate resource type compatibility
-            if (profileResource.getExpectedType() != null) {
-                if (!profileResource.getExpectedType().equals(mappingResource.getEAttributeType())) {
-                    result.addWarning("Resource '" + profileResource.getResourceId() + 
-                                    "' has type '" + mappingResource.getEAttributeType().getName() + 
-                                    "' but profile expects '" + profileResource.getExpectedType().getName() + "'");
-                }
+            validateResourceAgainstProfile(mappingResource, profileResource, result);
+        }
+    }
+
+    private void validateResourceAgainstProfile(ResourceMapping mappingResource, ProfileResource profileResource,
+            ValidationResultImpl result) {
+        // Validate resource type compatibility
+        if (profileResource.getExpectedType() != null) {
+            if (!profileResource.getExpectedType().equals(mappingResource.getEAttributeType())) {
+                result.addWarning("Resource '" + profileResource.getResourceId() + 
+                                "' has type '" + mappingResource.getEAttributeType().getName() + 
+                                "' but profile expects '" + profileResource.getExpectedType().getName() + "'");
             }
-            
-            // Validate unit compatibility. The unit may come from the mapping's `unit` field or
-            // from a `sensinact.mapping` annotation copied off the source attribute - reading
-            // only the field reported every annotation-supplied unit as a mismatch, while the
-            // twin published it correctly.
-            if (profileResource.getExpectedUnit() != null) {
-                String unit = MappingAnnotations.effectiveUnit(mappingResource);
-                if (!profileResource.getExpectedUnit().equals(unit)) {
-                    result.addWarning("Resource '" + profileResource.getResourceId() + 
-                                    "' has unit '" + unit + 
-                                    "' but profile expects '" + profileResource.getExpectedUnit() + "'");
-                }
+        }
+        
+        // Validate unit compatibility. The unit may come from the mapping's `unit` field or
+        // from a `sensinact.mapping` annotation copied off the source attribute - reading
+        // only the field reported every annotation-supplied unit as a mismatch, while the
+        // twin published it correctly.
+        if (profileResource.getExpectedUnit() != null) {
+            String unit = MappingAnnotations.effectiveUnit(mappingResource);
+            if (!profileResource.getExpectedUnit().equals(unit)) {
+                result.addWarning("Resource '" + profileResource.getResourceId() + 
+                                "' has unit '" + unit + 
+                                "' but profile expects '" + profileResource.getExpectedUnit() + "'");
             }
         }
     }

@@ -452,7 +452,7 @@ typed as `AdminMapping`, `xsi:type` is optional.
   <longitudeRef xsi:type="ecore:EReference" href="w.ecore#//Station/location"/>
   <longitudeRef xsi:type="ecore:EAttribute" href="w.ecore#//GeoPosition/longitude"/>
 
-  <!-- any other admin resource, by its sensiNact name: description, icon, ... -->
+  <!-- the Thing description, the one admin resource meant to be fed this way -->
   <resources name="description" mid="description">
     <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
     <valueFeature xsi:type="ecore:EReference" href="m.ecore#//UplinkMessage/deviceInfo"/>
@@ -465,19 +465,23 @@ Location can also be given as static `latitude` / `longitude` / `elevation` attr
 instead of `*Ref` feature paths.
 
 `resources` under `admin` work like service resources (`valueFeature`, change rules, ...) with
-one difference: the admin service's resources are the fixed set sensiNact defines, so a mapping
-feeds an existing one by its `mid` and cannot add new ones. `description` is what the
-SensorThings northbound shows as the Thing's description; without it a Thing reads
-"No description".
+one difference: the admin service's resources are the fixed set sensiNact defines
+(`friendlyName`, `description`, `location`, `model`, `modelPackageUri`), so a mapping feeds an
+existing one by its `mid` and cannot add new ones. `description` is the one to use here: it is
+what the SensorThings northbound shows as the Thing's description (without it a Thing reads
+"No description"), while `friendlyName` and `location` have the dedicated features above and
+`model`/`modelPackageUri` are the provider's identity. A mapping naming any other `mid` is
+refused at registration with a message naming it; one that bypasses the registry has that
+resource skipped with a warning.
 
-> **Timestamps matter on the admin service.** sensiNact keeps the newer value, and the admin
+> **Timestamps on the admin service.** sensiNact keeps the newer value, and the admin
 > resources are stamped with the provider's creation instant (the provider timestamp of the
-> first mapped payload). An admin update whose timestamp is older than that is dropped
-> silently and `friendlyName` keeps the provider id. A `FEATURE` timestamp on `<admin>` that
-> points at the payload's own time therefore never lands on the first payload. Leave the admin
-> timestamp out, so the update carries the provider timestamp, unless the payload time is
-> guaranteed to be at or after the provider's. This is what `ValueMapperTest#providerMapping_admin`
-> used to fail on before it was re-enabled.
+> first mapped payload). An admin update older than that would be dropped silently, with
+> `friendlyName` keeping the provider id, which is how a `FEATURE` timestamp on `<admin>` that
+> points at the payload's own time used to lose the first payload. The mapper therefore never
+> dates an admin update earlier than the provider timestamp of the same payload: the admin
+> values describe the provider, not a measurement. `ValueMapperTest#providerMapping_admin`
+> covers exactly that case.
 
 ## Mapping profiles
 

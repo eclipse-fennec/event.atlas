@@ -40,6 +40,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
 import org.eclipse.fennec.event.atlas.model.mapping.ProfileProvider;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy;
 import org.gecko.weather.model.weather.WeatherPackage;
 import org.junit.jupiter.api.AfterEach;
@@ -198,6 +199,21 @@ public class MappingRegistryListenerTest {
 		attachedListener = mappingListener;
 		writer.getRegistry().addListener(mappingListener);
 		assertEquals(List.of(mapping), mappingRegistry.getProviderMapping(providerClass));
+	}
+
+	@Test
+	@DisplayName("A mapping naming an admin resource the admin service does not have is refused")
+	void unknownAdminResourceIsRefused() throws IOException {
+		ProviderMapping mapping = loadWeatherMapping();
+		ResourceMapping icon = MappingFactory.eINSTANCE.createResourceMapping();
+		icon.setMid("icon");
+		mapping.getAdmin().getResources().add(icon);
+		EClass providerClass = weatherPackage.getMOSMIXSWeatherReport();
+		attach("sensinact-mappings", mappingListener);
+
+		writer.put(SOURCE, mapping.getMid(), mapping, Map.of());
+		assertTrue(mappingRegistry.getProviderMapping(providerClass).isEmpty(),
+				"a mapping with an unknown admin resource must not reach the mapping registry");
 	}
 
 	@Test

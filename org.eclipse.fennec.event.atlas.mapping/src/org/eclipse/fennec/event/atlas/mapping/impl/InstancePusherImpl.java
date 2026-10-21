@@ -84,7 +84,12 @@ public class InstancePusherImpl implements InstancePusher {
 						ValueMapperFactory.createValueMapper(twin, mapping, changeRuleFilter).mapInstance(instance);
 						applied++;
 					} catch (Throwable e) {
-						logger.warning(String.format("Failed pushing instance of '%s' via mapping '%s': %s", instance.eClass().getName(), mapping.getMid(), e.getMessage()));
+						// the cause names the resource or feature, the outer message only says that it failed
+						StringBuilder why = new StringBuilder(String.valueOf(e.getMessage()));
+						for (Throwable c = e.getCause(); c != null && c != c.getCause(); c = c.getCause()) {
+							why.append(" <- ").append(c.getMessage());
+						}
+						logger.warning(String.format("Failed pushing instance of '%s' via mapping '%s': %s", instance.eClass().getName(), mapping.getMid(), why));
 					}
 				}
 				return pf.resolved(applied);

@@ -365,9 +365,6 @@ public class ValueMapperTest {
         Resource mappingResource = resourceSet.createResource(URI.createURI(mappingUrl.toString()));
         mappingResource.load(null);
         ProviderMapping weatherMapping = (ProviderMapping) mappingResource.getContents().get(0);
-        // the report's timestamp predates the provider's creation and sensiNact drops older admin
-        // updates; without its own timestamp the admin update carries the provider timestamp
-        weatherMapping.getAdmin().setTimestamp(null);
 
         // Create test data
         WeatherReports weatherReports = createWeatherReportsTestData();
@@ -432,17 +429,7 @@ public class ValueMapperTest {
 
         // description <- the same path the friendly name uses: reports[0].station.name
         AdminMapping admin = weatherMapping.getAdmin();
-        // sensiNact keeps the newer value and stamps the admin resources with the provider's
-        // creation instant; the report's own timestamp predates it, so let the admin update
-        // carry the provider timestamp instead
-        admin.setTimestamp(null);
-        ResourceMapping description = MappingFactory.eINSTANCE.createResourceMapping();
-        description.setName("description");
-        description.setMid("description");
-        for (EStructuralFeature feature : admin.getFriendlyNameFeature()) {
-            description.getValueFeature().add(feature);
-        }
-        admin.getResources().add(description);
+        admin.getResources().add(adminResource("description", admin));
 
         WeatherReports weatherReports = createWeatherReportsTestData();
         mappingRegistry.registerModelMapping(weatherMapping);
@@ -481,6 +468,48 @@ public class ValueMapperTest {
             }
         });
         assertTrue(result.getValue(), "admin.description should read back");
+    }
+
+    @Test
+    @DisplayName("Provider mapping: an admin resource the admin service does not have is skipped, the rest lands")
+    void providerMapping_adminResources_unknownMidIsSkipped() throws Exception {
+        URL mappingUrl = getClass().getResource(WEATHER_MAPPING_URI_NO_RESOURCES);
+        Resource mappingResource = resourceSet.createResource(URI.createURI(mappingUrl.toString()));
+        mappingResource.load(null);
+        ProviderMapping weatherMapping = (ProviderMapping) mappingResource.getContents().get(0);
+        AdminMapping admin = weatherMapping.getAdmin();
+        admin.getResources().add(adminResource("icon", admin));          // sensiNact has no such admin resource
+        admin.getResources().add(adminResource("description", admin));
+
+        WeatherReports weatherReports = createWeatherReportsTestData();
+        mappingRegistry.registerModelMapping(weatherMapping);
+
+        Promise<Boolean> result = gatewayThread.execute(new AbstractSensinactCommand<Boolean>() {
+            @Override
+            protected Promise<Boolean> call(SensinactDigitalTwin twin, SensinactModelManager modelManager, PromiseFactory pf) {
+                try {
+                    ValueMapperFactory.createValueMapper(twin, weatherMapping).mapInstance(weatherReports);
+                    SensinactService adminService = twin.getProvider(WEATHER_MODEL, "10567").getServices().get("admin");
+                    assertEquals("GERA", adminService.getResources().get("description").getValue().getValue().getValue(),
+                            "the known admin resource is still mapped");
+                    return pf.resolved(true);
+                } catch (Exception e) {
+                    return pf.failed(e);
+                }
+            }
+        });
+        assertTrue(result.getValue(), "an unknown admin resource must not fail the payload");
+    }
+
+    /** An admin resource mapping that reads the same feature path as the admin's friendly name. */
+    private static ResourceMapping adminResource(String mid, AdminMapping admin) {
+        ResourceMapping resource = MappingFactory.eINSTANCE.createResourceMapping();
+        resource.setName(mid);
+        resource.setMid(mid);
+        for (EStructuralFeature feature : admin.getFriendlyNameFeature()) {
+            resource.getValueFeature().add(feature);
+        }
+        return resource;
     }
 
     @Test

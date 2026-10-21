@@ -23,6 +23,8 @@ import org.eclipse.emf.ecore.EcoreFactory;
 import org.eclipse.emf.ecore.InternalEObject;
 import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry.ValidationResult;
 import org.eclipse.fennec.event.atlas.mapping.SensinactMapperConstants;
+import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ProfileAdmin;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
 import org.eclipse.fennec.event.atlas.model.mapping.ProfileProvider;
@@ -126,6 +128,44 @@ public class MappingProfileValidationTest {
 	 * Validates a mapping holding <code>resource</code> in service {@code weather} against a
 	 * profile that expects <code>expectedUnit</code> for it.
 	 */
+	@Test
+	@DisplayName("A profile's admin description is satisfied by an admin resource mapping, not by the friendly name")
+	void adminDescription_needsAnAdminResource() {
+		MappingFactory f = MappingFactory.eINSTANCE;
+		ProfileResource friendlyName = f.createProfileResource();
+		friendlyName.setResourceId("friendlyName");
+		friendlyName.setRequired(true);
+		ProfileResource description = f.createProfileResource();
+		description.setResourceId("description");
+		description.setRequired(true);
+		ProfileAdmin profileAdmin = f.createProfileAdmin();
+		profileAdmin.setServiceId("admin");
+		profileAdmin.setRequiresFriendlyName(true);
+		profileAdmin.getResources().add(friendlyName);
+		profileAdmin.getResources().add(description);
+		ProfileProvider provider = f.createProfileProvider();
+		provider.setProviderId("p");
+		provider.setAdmin(profileAdmin);
+		MappingProfile profile = f.createMappingProfile();
+		profile.setProfileId("admin-profile");
+		profile.setProvider(provider);
+
+		AdminMapping admin = f.createAdminMapping();
+		admin.setMid("admin");
+		admin.setFriendlyName("static name");
+		ProviderMapping mapping = mapping();
+		mapping.setAdmin(admin);
+		mapping.setProfile(profile);
+
+		ValidationResult withoutDescription = new MappingProfileRegistryImpl().validateMapping(mapping);
+		assertEquals(1, withoutDescription.getErrors().size(), () -> withoutDescription.getErrors().toString());
+		assertTrue(withoutDescription.getErrors().get(0).contains("'description'"),
+				() -> "the error should name the missing admin resource: " + withoutDescription.getErrors());
+
+		admin.getResources().add(resource("description", null));
+		assertTrue(new MappingProfileRegistryImpl().validateMapping(mapping).isValid());
+	}
+
 	private static ValidationResult validateAgainstProfileExpecting(String expectedUnit, ResourceMapping resource) {
 		MappingFactory f = MappingFactory.eINSTANCE;
 
