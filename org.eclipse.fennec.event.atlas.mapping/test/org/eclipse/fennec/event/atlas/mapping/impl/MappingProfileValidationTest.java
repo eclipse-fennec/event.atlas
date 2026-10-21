@@ -166,6 +166,40 @@ public class MappingProfileValidationTest {
 		assertTrue(new MappingProfileRegistryImpl().validateMapping(mapping).isValid());
 	}
 
+	@Test
+	@DisplayName("A profile's admin location is satisfied by both coordinates, not by latitude alone")
+	void adminLocation_needsBothCoordinates() {
+		MappingFactory f = MappingFactory.eINSTANCE;
+		ProfileResource location = f.createProfileResource();
+		location.setResourceId("location");
+		location.setRequired(true);
+		ProfileAdmin profileAdmin = f.createProfileAdmin();
+		profileAdmin.setServiceId("admin");
+		profileAdmin.getResources().add(location);
+		ProfileProvider provider = f.createProfileProvider();
+		provider.setProviderId("p");
+		provider.setAdmin(profileAdmin);
+		MappingProfile profile = f.createMappingProfile();
+		profile.setProfileId("location-profile");
+		profile.setProvider(provider);
+
+		AdminMapping admin = f.createAdminMapping();
+		admin.setMid("admin");
+		admin.setLatitude(51.95);
+		ProviderMapping mapping = mapping();
+		mapping.setAdmin(admin);
+		mapping.setProfile(profile);
+
+		// a half-configured location is not a location: the twin needs both coordinates
+		ValidationResult latitudeOnly = new MappingProfileRegistryImpl().validateMapping(mapping);
+		assertEquals(1, latitudeOnly.getErrors().size(), () -> latitudeOnly.getErrors().toString());
+		assertTrue(latitudeOnly.getErrors().get(0).contains("'location'"),
+				() -> "the error should name the missing admin resource: " + latitudeOnly.getErrors());
+
+		admin.setLongitude(8.53);
+		assertTrue(new MappingProfileRegistryImpl().validateMapping(mapping).isValid());
+	}
+
 	private static ValidationResult validateAgainstProfileExpecting(String expectedUnit, ResourceMapping resource) {
 		MappingFactory f = MappingFactory.eINSTANCE;
 

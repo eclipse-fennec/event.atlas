@@ -72,7 +72,6 @@ public class ValueMapperImpl implements ValueMapper {
 	private static final Logger logger = Logger.getLogger(ValueMapperImpl.class.getName());
 
 	/** The sensiNact admin service: its resources are fixed, a mapping can only feed them. */
-
 	private static final String ADMIN_SERVICE = "admin";
 
 	private final SensinactDigitalTwin twin;

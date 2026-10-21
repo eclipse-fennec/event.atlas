@@ -234,7 +234,8 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
             String id = profileResource.getResourceId();
             boolean dedicated = switch (id) {
                 case "friendlyName" -> admin.getFriendlyName() != null || !admin.getFriendlyNameFeature().isEmpty();
-                case "location" -> admin.getLatitude() != null || !admin.getLatitudeRef().isEmpty();
+                case "location" -> (admin.getLatitude() != null || !admin.getLatitudeRef().isEmpty())
+                        && (admin.getLongitude() != null || !admin.getLongitudeRef().isEmpty());
                 default -> false;
             };
             if (dedicated) {

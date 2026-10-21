@@ -270,7 +270,7 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			if (!quiet) {
 				logger.severe(String.format("ProviderMapping '%s' (%s) maps admin resource(s) %s the admin service "
 						+ "does not have (it has %s) - skipping", entry.key(), mapping.getMid(), unknownAdminResources,
-						ProviderPackage.Literals.ADMIN.getEAllStructuralFeatures().stream().map(f -> f.getName()).toList()));
+						adminResourceNames()));
 			}
 			return Optional.empty();
 		}
@@ -303,8 +303,20 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 		if (mapping.getAdmin() == null) {
 			return List.of();
 		}
+		List<String> known = adminResourceNames();
 		return mapping.getAdmin().getResources().stream().map(r -> r.getMid())
-				.filter(mid -> mid == null || ProviderPackage.Literals.ADMIN.getEStructuralFeature(mid) == null).toList();
+				.filter(mid -> mid == null || !known.contains(mid)).toList();
+	}
+
+	/**
+	 * The resources sensiNact's admin service has: the attributes of {@code Admin}. Not every
+	 * structural feature - {@code metadata} is inherited from {@code Service} as a reference and
+	 * {@code ModelNexus.getResourcesForService} filters it out, so matching on features would let
+	 * {@code mid="metadata"} past this check and leave it to be skipped at push time, which is
+	 * what the check exists to prevent - and the refusal would offer it as an alternative.
+	 */
+	static List<String> adminResourceNames() {
+		return ProviderPackage.Literals.ADMIN.getEAllAttributes().stream().map(a -> a.getName()).toList();
 	}
 
 	/**
