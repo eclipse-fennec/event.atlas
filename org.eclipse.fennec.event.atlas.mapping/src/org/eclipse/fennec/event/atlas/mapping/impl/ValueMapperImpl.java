@@ -71,6 +71,9 @@ public class ValueMapperImpl implements ValueMapper {
 
 	private static final Logger logger = Logger.getLogger(ValueMapperImpl.class.getName());
 
+	/** The sensiNact admin service: its resources are fixed, a mapping can only feed them. */
+	private static final String ADMIN_SERVICE = "admin";
+
 	private final SensinactDigitalTwin twin;
 	private final ProviderMapping mapping;
 	private final String providerModel;
@@ -137,7 +140,14 @@ public class ValueMapperImpl implements ValueMapper {
 
 				// Admin timestamp takes precedence, fallback to provider timestamp
 				Instant adminTimestamp = determineTimestamp(adminSource, mapping.getAdmin(), providerTimestamp);
-				mapAdminService(adminSource, mapping.getAdmin(), provider, adminTimestamp);
+				// sensiNact stamps the admin resources with the provider's creation instant and keeps
+				// the newer value, so an admin update dated from a payload older than the provider it
+				// just created would be dropped. The admin values describe the provider, not the
+				// measurement, so they take the provider timestamp of this payload when older.
+				if (adminTimestamp.isBefore(providerTimestamp)) {
+					adminTimestamp = providerTimestamp;
+				}
+				mapAdminService(adminSource, mapping.getAdmin(), provider, adminTimestamp, providerId);
 			}
 
 			logger.fine(String.format("Successfully mapped instance %s to provider %s", sourceInstance.eClass().getName(), providerModel));
@@ -201,6 +211,26 @@ public class ValueMapperImpl implements ValueMapper {
 			}
 		}
 
+		AdminMapping adminMapping = mapping.getAdmin();
+		if (adminMapping != null && !adminMapping.getResources().isEmpty()) {
+			try {
+				EObject adminSource = getServiceSource(sourceInstance, adminMapping);
+				for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+					String resourcePath = ADMIN_SERVICE + "." + resourceMapping.getMid();
+					try {
+						Optional<Object> value = extractValue(adminSource, resourceMapping);
+						if (value.isPresent()) {
+							values.put(resourcePath, value.get());
+						}
+					} catch (Exception e) {
+						logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
+					}
+				}
+			} catch (ValueMappingException e) {
+				logger.warning(String.format("Failed to get service source for %s: %s", ADMIN_SERVICE, e.getMessage()));
+			}
+		}
+
 		return values;
 	}
 
@@ -244,6 +274,18 @@ public class ValueMapperImpl implements ValueMapper {
 
 			for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
 				validateResourceMapping(serviceSource, resourceMapping, serviceMapping.getMid(), result);
+			}
+		}
+
+		AdminMapping adminMapping = mapping.getAdmin();
+		if (adminMapping != null && !adminMapping.getResources().isEmpty()) {
+			try {
+				EObject adminSource = getServiceSource(sourceInstance, adminMapping);
+				for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+					validateResourceMapping(adminSource, resourceMapping, ADMIN_SERVICE, result);
+				}
+			} catch (ValueMappingException e) {
+				result.addError("Failed to get service source for " + ADMIN_SERVICE + ": " + e.getMessage());
 			}
 		}
 
@@ -484,14 +526,35 @@ public class ValueMapperImpl implements ValueMapper {
 	 * Maps admin service values.
 	 */
 	private void mapAdminService(EObject sourceInstance, AdminMapping adminMapping, 
-			SensinactProvider provider, Instant timestamp) throws ValueMappingException {
+			SensinactProvider provider, Instant timestamp, String providerId) throws ValueMappingException {
 
-		SensinactService adminService = provider.getServices().get("admin");
+		SensinactService adminService = provider.getServices().get(ADMIN_SERVICE);
 		if (adminService == null) {
 			throw new ValueMappingException("Admin service not found");
 		}
 		mapFriendlyName(sourceInstance, adminMapping, timestamp, adminService);
 		mapLocation(sourceInstance, adminMapping, timestamp, adminService);
+		mapAdminResources(sourceInstance, adminMapping, adminService, timestamp, providerId);
+	}
+
+	/**
+	 * Maps the admin mapping's own {@code resources} onto the admin service. The admin service's
+	 * resources are the fixed set sensiNact defines, and {@code description} is the one meant to
+	 * be fed this way ({@code friendlyName} and {@code location} have their own mapping features).
+	 * A mid the admin service does not have is skipped with a warning rather than failing the
+	 * payload: the registry refuses such a mapping at registration, this covers mappings that
+	 * bypass it.
+	 */
+	private void mapAdminResources(EObject sourceInstance, AdminMapping adminMapping,
+			SensinactService adminService, Instant timestamp, String providerId) throws ValueMappingException {
+		for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+			if (adminService.getResources().get(resourceMapping.getMid()) == null) {
+				logger.warning(String.format("Mapping '%s': the admin service has no resource '%s' (it has %s) - skipped",
+						mapping.getMid(), resourceMapping.getMid(), adminService.getResources().keySet()));
+				continue;
+			}
+			mapSingleResource(sourceInstance, resourceMapping, adminService, timestamp, providerId);
+		}
 	}
 
 	/**

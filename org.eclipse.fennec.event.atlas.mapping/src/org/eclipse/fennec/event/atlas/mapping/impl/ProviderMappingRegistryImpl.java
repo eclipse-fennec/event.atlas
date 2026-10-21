@@ -50,6 +50,7 @@ import org.eclipse.sensinact.core.command.GatewayThread;
 import org.eclipse.sensinact.core.emf.command.AbstractSensinactEMFCommand;
 import org.eclipse.sensinact.core.emf.model.SensinactEMFModelManager;
 import org.eclipse.sensinact.core.emf.twin.SensinactEMFDigitalTwin;
+import org.eclipse.sensinact.model.core.provider.ProviderPackage;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
@@ -262,6 +263,17 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			}
 			return Optional.empty();
 		}
+		// The admin service's resources are fixed by sensiNact; a mapping can feed them, not add
+		// to them. Refused here, where the name reaches the log, instead of failing every payload.
+		List<String> unknownAdminResources = unknownAdminResources(mapping);
+		if (!unknownAdminResources.isEmpty()) {
+			if (!quiet) {
+				logger.severe(String.format("ProviderMapping '%s' (%s) maps admin resource(s) %s the admin service "
+						+ "does not have (it has %s) - skipping", entry.key(), mapping.getMid(), unknownAdminResources,
+						adminResourceNames()));
+			}
+			return Optional.empty();
+		}
 		// From here every failure is recoverable: the mapping is well-formed and only the model
 		// or the profile it points at is missing, both of which may still arrive. Reported once,
 		// on the first park - a retry runs per EPackage bind and must not repeat itself.
@@ -284,6 +296,27 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			undefer(entry);
 		}
 		return Optional.of(mapping);
+	}
+
+	/** The mids under {@code <admin>} that are not a resource of sensiNact's admin service. */
+	static List<String> unknownAdminResources(ProviderMapping mapping) {
+		if (mapping.getAdmin() == null) {
+			return List.of();
+		}
+		List<String> known = adminResourceNames();
+		return mapping.getAdmin().getResources().stream().map(r -> r.getMid())
+				.filter(mid -> mid == null || !known.contains(mid)).toList();
+	}
+
+	/**
+	 * The resources sensiNact's admin service has: the attributes of {@code Admin}. Not every
+	 * structural feature - {@code metadata} is inherited from {@code Service} as a reference and
+	 * {@code ModelNexus.getResourcesForService} filters it out, so matching on features would let
+	 * {@code mid="metadata"} past this check and leave it to be skipped at push time, which is
+	 * what the check exists to prevent - and the refusal would offer it as an alternative.
+	 */
+	static List<String> adminResourceNames() {
+		return ProviderPackage.Literals.ADMIN.getEAllAttributes().stream().map(a -> a.getName()).toList();
 	}
 
 	/**
