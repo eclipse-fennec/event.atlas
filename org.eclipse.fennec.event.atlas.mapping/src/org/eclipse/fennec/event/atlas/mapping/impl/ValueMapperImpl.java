@@ -125,29 +125,41 @@ public class ValueMapperImpl implements ValueMapper {
 
 
 			for (ServiceMapping serviceMapping : mapping.getServices()) {
-				// Determine the source object for this service (may be from a collection)
-				EObject serviceSource = getServiceSource(sourceInstance, serviceMapping);
+				// Determine the source object for this service (may be from a collection).
+				// A service whose filter matches nothing is not carried by this payload - a
+				// device that splits its readings over several uplinks sends a different
+				// subset each time, and the services it did not send keep their last values.
+				Optional<EObject> serviceSource = getServiceSource(sourceInstance, serviceMapping);
+				if (serviceSource.isEmpty()) {
+					logger.fine(String.format("Instance carries no source for service %s - skipped",
+							serviceMapping.getMid()));
+					continue;
+				}
 
 				// Service timestamp takes precedence, fallback to provider timestamp
-				Instant serviceTimestamp = determineTimestamp(serviceSource, serviceMapping, providerTimestamp);
-				mapServiceResources(serviceSource, serviceMapping, provider, serviceTimestamp, providerId);
+				Instant serviceTimestamp = determineTimestamp(serviceSource.get(), serviceMapping, providerTimestamp);
+				mapServiceResources(serviceSource.get(), serviceMapping, provider, serviceTimestamp, providerId);
 			}
 
 			// Map admin service if configured
 			if (mapping.getAdmin() != null) {
 				// Determine the source object for admin service (may be from a collection)
-				EObject adminSource = getServiceSource(sourceInstance, mapping.getAdmin());
-
-				// Admin timestamp takes precedence, fallback to provider timestamp
-				Instant adminTimestamp = determineTimestamp(adminSource, mapping.getAdmin(), providerTimestamp);
-				// sensiNact stamps the admin resources with the provider's creation instant and keeps
-				// the newer value, so an admin update dated from a payload older than the provider it
-				// just created would be dropped. The admin values describe the provider, not the
-				// measurement, so they take the provider timestamp of this payload when older.
-				if (adminTimestamp.isBefore(providerTimestamp)) {
-					adminTimestamp = providerTimestamp;
+				Optional<EObject> adminSource = getServiceSource(sourceInstance, mapping.getAdmin());
+				if (adminSource.isEmpty()) {
+					logger.fine("Instance carries no source for the admin service - skipped");
+				} else {
+					// Admin timestamp takes precedence, fallback to provider timestamp
+					Instant adminTimestamp = determineTimestamp(adminSource.get(), mapping.getAdmin(),
+							providerTimestamp);
+					// sensiNact stamps the admin resources with the provider's creation instant and keeps
+					// the newer value, so an admin update dated from a payload older than the provider it
+					// just created would be dropped. The admin values describe the provider, not the
+					// measurement, so they take the provider timestamp of this payload when older.
+					if (adminTimestamp.isBefore(providerTimestamp)) {
+						adminTimestamp = providerTimestamp;
+					}
+					mapAdminService(adminSource.get(), mapping.getAdmin(), provider, adminTimestamp, providerId);
 				}
-				mapAdminService(adminSource, mapping.getAdmin(), provider, adminTimestamp, providerId);
 			}
 
 			logger.fine(String.format("Successfully mapped instance %s to provider %s", sourceInstance.eClass().getName(), providerModel));
@@ -166,30 +178,28 @@ public class ValueMapperImpl implements ValueMapper {
 		for (ServiceMapping serviceMapping : mapping.getServices()) {
 			try {
 				// Determine the source object for this service (may be from a collection)
-				EObject serviceSource = getServiceSource(sourceInstance, serviceMapping);
+				Optional<EObject> source = getServiceSource(sourceInstance, serviceMapping);
+				if (source.isEmpty()) {
+					continue;
+				}
+				EObject serviceSource = source.get();
 
-				// Add auto-generated resources from ReferenceMapping if configured
+				// Add auto-generated resources from ReferenceMapping if configured. The
+				// service source already is the referenced element - getServiceSource
+				// resolved it through the very same ReferenceMapping.
 				if (serviceMapping.getReferencedResource() != null) {
-					try {
-						ReferenceMapping refMapping = serviceMapping.getReferencedResource();
-						EObject referencedObject = getReferencedSource(sourceInstance, refMapping,
-								"service: " + serviceMapping.getMid());
+					ReferenceMapping refMapping = serviceMapping.getReferencedResource();
 
-						List<EStructuralFeature> attributesToMap = getFilteredAttributes(referencedObject.eClass(), refMapping);
-
-						for (EStructuralFeature attribute : attributesToMap) {
-							String resourcePath = serviceMapping.getMid() + "." + attribute.getName();
-							try {
-								Object value = referencedObject.eGet(attribute);
-								if (value != null) {
-									values.put(resourcePath, value);
-								}
-							} catch (Exception e) {
-								logger.warning(String.format("Failed to extract auto-generated value for resource path %s: %s", resourcePath, e.getMessage()));
+					for (EStructuralFeature attribute : getFilteredAttributes(serviceSource.eClass(), refMapping)) {
+						String resourcePath = serviceMapping.getMid() + "." + attribute.getName();
+						try {
+							Object value = serviceSource.eGet(attribute);
+							if (value != null) {
+								values.put(resourcePath, value);
 							}
+						} catch (Exception e) {
+							logger.warning(String.format("Failed to extract auto-generated value for resource path %s: %s", resourcePath, e.getMessage()));
 						}
-					} catch (ValueMappingException e) {
-						logger.warning(String.format("Failed to get referenced source for %s: %s", serviceMapping.getMid(), e.getMessage()));
 					}
 				}
 
@@ -214,16 +224,18 @@ public class ValueMapperImpl implements ValueMapper {
 		AdminMapping adminMapping = mapping.getAdmin();
 		if (adminMapping != null && !adminMapping.getResources().isEmpty()) {
 			try {
-				EObject adminSource = getServiceSource(sourceInstance, adminMapping);
-				for (ResourceMapping resourceMapping : adminMapping.getResources()) {
-					String resourcePath = ADMIN_SERVICE + "." + resourceMapping.getMid();
-					try {
-						Optional<Object> value = extractValue(adminSource, resourceMapping);
-						if (value.isPresent()) {
-							values.put(resourcePath, value.get());
+				EObject adminSource = getServiceSource(sourceInstance, adminMapping).orElse(null);
+				if (adminSource != null) {
+					for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+						String resourcePath = ADMIN_SERVICE + "." + resourceMapping.getMid();
+						try {
+							Optional<Object> value = extractValue(adminSource, resourceMapping);
+							if (value.isPresent()) {
+								values.put(resourcePath, value.get());
+							}
+						} catch (Exception e) {
+							logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
 						}
-					} catch (Exception e) {
-						logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
 					}
 				}
 			} catch (ValueMappingException e) {
@@ -258,31 +270,30 @@ public class ValueMapperImpl implements ValueMapper {
 				validateReferenceMapping(sourceInstance, serviceMapping.getReferencedResource(),
 						"service: " + serviceMapping.getMid(), result);
 			}
-//			// Validate legacy collection configuration if present
-//			else if (serviceMapping.getCollectionFeature() != null) {
-//				validateCollectionFeature(sourceInstance, serviceMapping, result);
-//			}
 
-			// Get the service source for validation (may be from a collection)
-			EObject serviceSource;
+			// Get the service source for validation (may be from a collection). An empty
+			// optional is a service this instance does not carry, which mapInstance skips -
+			// so there is nothing to validate rather than something to report.
 			try {
-				serviceSource = getServiceSource(sourceInstance, serviceMapping);
+				Optional<EObject> serviceSource = getServiceSource(sourceInstance, serviceMapping);
+				if (!serviceSource.isEmpty()) {
+					for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
+						validateResourceMapping(serviceSource.get(), resourceMapping, serviceMapping.getMid(), result);
+					}
+				}
 			} catch (ValueMappingException e) {
 				result.addError("Failed to get service source for " + serviceMapping.getMid() + ": " + e.getMessage());
-				continue; // Skip validating resources if we can't get the source
-			}
-
-			for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
-				validateResourceMapping(serviceSource, resourceMapping, serviceMapping.getMid(), result);
 			}
 		}
 
 		AdminMapping adminMapping = mapping.getAdmin();
 		if (adminMapping != null && !adminMapping.getResources().isEmpty()) {
 			try {
-				EObject adminSource = getServiceSource(sourceInstance, adminMapping);
-				for (ResourceMapping resourceMapping : adminMapping.getResources()) {
-					validateResourceMapping(adminSource, resourceMapping, ADMIN_SERVICE, result);
+				EObject adminSource = getServiceSource(sourceInstance, adminMapping).orElse(null);
+				if (adminSource != null) {
+					for (ResourceMapping resourceMapping : adminMapping.getResources()) {
+						validateResourceMapping(adminSource, resourceMapping, ADMIN_SERVICE, result);
+					}
 				}
 			} catch (ValueMappingException e) {
 				result.addError("Failed to get service source for " + ADMIN_SERVICE + ": " + e.getMessage());
@@ -307,28 +318,13 @@ public class ValueMapperImpl implements ValueMapper {
 			return;
 		}
 
-		// Try to navigate the feature path
+		// Try to navigate the feature path. Element selection - by filter or by index -
+		// happens during navigation, so an empty result means the instance does not carry
+		// this element: the service is skipped, which is not a validation finding.
 		try {
-			Object targetValue = navigateFeaturePath(sourceInstance, featurePath, context);
+			Optional<Object> targetValue = navigateFeaturePath(sourceInstance, featurePath, context, referenceMapping);
 
-			// If target is a collection, validate index bounds
-			if (targetValue instanceof List<?>) {
-				List<?> collection = (List<?>) targetValue;
-				int index = referenceMapping.getCollectionIndex();
-
-				if (collection.isEmpty()) {
-					result.addWarning(String.format("Referenced collection is empty (%s)", context));
-				} else if (index < 0 || index >= collection.size()) {
-					result.addError(String.format("Collection index %d out of bounds for collection of size %d (%s)",
-						index, collection.size(), context));
-				} else {
-					Object element = collection.get(index);
-					if (!(element instanceof EObject)) {
-						result.addError(String.format("Collection element at index %d is not an EObject (%s)",
-							index, context));
-					}
-				}
-			} else if (!(targetValue instanceof EObject)) {
+			if (targetValue.isPresent() && !(targetValue.get() instanceof EObject)) {
 				result.addError(String.format("ReferenceMapping target is not an EObject (%s)", context));
 			}
 
@@ -336,53 +332,6 @@ public class ValueMapperImpl implements ValueMapper {
 			result.addError(String.format("Failed to navigate ReferenceMapping (%s): %s", context, e.getMessage()));
 		}
 	}
-
-	/**
-	 * Validates that a collection feature is properly configured and accessible.
-	 * This is the legacy validation approach for backward compatibility.
-	 */
-//	private void validateCollectionFeature(EObject sourceInstance, ServiceMapping serviceMapping,
-//			ValidationResultImpl result) {
-//		EStructuralFeature collectionFeature = serviceMapping.getCollectionFeature();
-//
-//		// Check that the feature exists on the source instance
-//		if (!sourceInstance.eClass().getEAllStructuralFeatures().contains(collectionFeature)) {
-//			result.addError(String.format("Collection feature '%s' not found on instance type %s (service: %s)",
-//				collectionFeature.getName(), sourceInstance.eClass().getName(), serviceMapping.getMid()));
-//			return;
-//		}
-//
-//		// Try to access the collection
-//		try {
-//			Object collectionValue = sourceInstance.eGet(collectionFeature);
-//
-//			if (!(collectionValue instanceof List<?>)) {
-//				result.addError(String.format("Collection feature '%s' is not a list (service: %s)",
-//					collectionFeature.getName(), serviceMapping.getMid()));
-//				return;
-//			}
-//
-//			List<?> collection = (List<?>) collectionValue;
-//			int index = serviceMapping.getCollectionIndex();
-//
-//			if (collection.isEmpty()) {
-//				result.addWarning(String.format("Collection feature '%s' is empty (service: %s)",
-//					collectionFeature.getName(), serviceMapping.getMid()));
-//			} else if (index < 0 || index >= collection.size()) {
-//				result.addError(String.format("Collection index %d out of bounds for collection '%s' of size %d (service: %s)",
-//					index, collectionFeature.getName(), collection.size(), serviceMapping.getMid()));
-//			} else {
-//				Object element = collection.get(index);
-//				if (!(element instanceof EObject)) {
-//					result.addError(String.format("Collection element at index %d is not an EObject (service: %s)",
-//						index, serviceMapping.getMid()));
-//				}
-//			}
-//		} catch (Exception e) {
-//			result.addError(String.format("Failed to access collection feature '%s' (service: %s): %s",
-//				collectionFeature.getName(), serviceMapping.getMid(), e.getMessage()));
-//		}
-//	}
 
 	/**
 	 * Extracts a value from an EObject instance using a ResourceMapping configuration.
@@ -436,10 +385,6 @@ public class ValueMapperImpl implements ValueMapper {
 		}
 	}
 
-
-	
-
-	
 	/**
 	 * Returns the list of attributes to map based on ReferenceMapping filter configuration.
 	 *
@@ -482,10 +427,6 @@ public class ValueMapperImpl implements ValueMapper {
 
 		return result;
 	}
-
-
-
-	
 
 	/**
 	 * Maps a single resource value.
@@ -884,10 +825,11 @@ public class ValueMapperImpl implements ValueMapper {
 	 *
 	 * @param rootSource The root source object
 	 * @param serviceMapping The service mapping configuration
-	 * @return The source EObject to use for this service
+	 * @return The source EObject to use for this service, or an empty optional when the
+	 *         service selects a collection element this instance does not carry
 	 * @throws ValueMappingException If collection extraction fails
 	 */
-	private EObject getServiceSource(EObject rootSource, ServiceMapping serviceMapping)
+	private Optional<EObject> getServiceSource(EObject rootSource, ServiceMapping serviceMapping)
 			throws ValueMappingException {
 
 		// New approach: Check if referencedResource is configured
@@ -897,64 +839,8 @@ public class ValueMapperImpl implements ValueMapper {
 		}
 
 		// No collection configuration: use root source directly
-		return rootSource;
+		return Optional.of(rootSource);
 	}
-
-//	/**
-//	 * Legacy implementation for backward compatibility with collectionFeature approach.
-//	 */
-//	private EObject getServiceSourceLegacy(EObject rootSource, ServiceMapping serviceMapping)
-//			throws ValueMappingException {
-//
-//		// Collection-based mapping: extract the specific element for this service
-//		EStructuralFeature collectionFeature = serviceMapping.getCollectionFeature();
-//		Object collectionValue = rootSource.eGet(collectionFeature);
-//
-//		// Ensure the feature is actually a collection
-//		if (!(collectionValue instanceof List<?>)) {
-//			throw new ValueMappingException(
-//				String.format("Collection feature '%s' is not a list (service: %s)",
-//					collectionFeature.getName(), serviceMapping.getMid()));
-//		}
-//
-//		List<?> collection = (List<?>) collectionValue;
-//
-//		// Validate collection is not empty
-//		if (collection.isEmpty()) {
-//			throw new ValueMappingException(
-//				String.format("Collection feature '%s' is empty (service: %s)",
-//					collectionFeature.getName(), serviceMapping.getMid()));
-//		}
-//
-//		// Get the index (default is 0)
-//		int index = serviceMapping.getCollectionIndex();
-//
-//		// Check if collectionFilter is set (takes precedence over index)
-//		if (serviceMapping.getCollectionFilter() != null &&
-//			!serviceMapping.getCollectionFilter().trim().isEmpty()) {
-//			// Future extension: evaluate filter expression
-//			logger.warning(String.format("collectionFilter not yet implemented for service %s, using collectionIndex", //				serviceMapping.getMid()));
-//		}
-//
-//		// Validate index bounds
-//		if (index < 0 || index >= collection.size()) {
-//			throw new ValueMappingException(
-//				String.format("Collection index %d out of bounds for collection '%s' of size %d (service: %s)",
-//					index, collectionFeature.getName(), collection.size(), serviceMapping.getMid()));
-//		}
-//
-//		// Extract the element
-//		Object element = collection.get(index);
-//		if (!(element instanceof EObject)) {
-//			throw new ValueMappingException(
-//				String.format("Collection element at index %d is not an EObject (service: %s)",
-//					index, serviceMapping.getMid()));
-//		}
-//
-//		logger.fine(String.format("Service '%s' mapping from collection '%s' at index %s", //			serviceMapping.getMid(), collectionFeature.getName(), index));
-//
-//		return (EObject) element;
-//	}
 
 	/**
 	 * Navigates a ReferenceMapping to extract the target EObject.
@@ -963,10 +849,11 @@ public class ValueMapperImpl implements ValueMapper {
 	 * @param source The source EObject to start navigation from
 	 * @param referenceMapping The ReferenceMapping configuration
 	 * @param context Context string for error messages (e.g., "service: weather")
-	 * @return The target EObject
+	 * @return The target EObject, or an empty optional when the mapping's
+	 *         {@code collectionFilter} matches nothing in this instance
 	 * @throws ValueMappingException If navigation fails
 	 */
-	private EObject getReferencedSource(EObject source, ReferenceMapping referenceMapping,
+	private Optional<EObject> getReferencedSource(EObject source, ReferenceMapping referenceMapping,
 			String context) throws ValueMappingException {
 
 		List<EStructuralFeature> featurePath = referenceMapping.getFeaturePath();
@@ -975,56 +862,75 @@ public class ValueMapperImpl implements ValueMapper {
 				String.format("ReferenceMapping has no feature path (%s)", context));
 		}
 
-		// Navigate to the target (might be a collection or single object)
-		Object targetValue = navigateFeaturePath(source, featurePath, context);
-
-		// If it's a collection, apply collection index/filter
-		if (targetValue instanceof List<?>) {
-			List<?> collection = (List<?>) targetValue;
-
-			if (collection.isEmpty()) {
-				throw new ValueMappingException(
-					String.format("Referenced collection is empty (%s)", context));
-			}
-
-			// Check if collectionFilter is set (takes precedence over index)
-			if (referenceMapping.getCollectionFilter() != null &&
-				!referenceMapping.getCollectionFilter().trim().isEmpty()) {
-				// Future extension: evaluate filter expression
-				logger.warning(String.format("collectionFilter not yet implemented (%s), using collectionIndex", context));
-			}
-
-			int index = referenceMapping.getCollectionIndex();
-			if (index < 0 || index >= collection.size()) {
-				throw new ValueMappingException(
-					String.format("Collection index %d out of bounds for collection of size %d (%s)",
-						index, collection.size(), context));
-			}
-
-			targetValue = collection.get(index);
-			logger.fine(String.format("ReferenceMapping: extracted element at index %s (%s)", index, context));
+		// Navigate to the target, picking an element wherever the path crosses a collection
+		Optional<Object> targetValue = navigateFeaturePath(source, featurePath, context, referenceMapping);
+		if (targetValue.isEmpty()) {
+			return Optional.empty();
 		}
 
-		if (!(targetValue instanceof EObject)) {
+		if (!(targetValue.get() instanceof EObject)) {
 			throw new ValueMappingException(
 				String.format("Referenced target is not an EObject (%s)", context));
 		}
 
-		return (EObject) targetValue;
+		return Optional.of((EObject) targetValue.get());
+	}
+
+	/**
+	 * Picks the element a {@link FeatureMapping} selects out of a collection: by its
+	 * {@code collectionFilter} when one is set, otherwise by its {@code collectionIndex}.
+	 *
+	 * @return the selected element, or an empty optional when a filter matches nothing - the
+	 *         payload does not carry this element, which is a skip, not a failure
+	 * @throws ValueMappingException if there is no filter and the index does not address an
+	 *         element, which is a mapping that does not fit the payload at all
+	 */
+	private Optional<Object> selectElement(List<?> collection, FeatureMapping selector, String context)
+			throws ValueMappingException {
+
+		Optional<CollectionFilter> filter = CollectionFilter.of(selector, context);
+		if (filter.isPresent()) {
+			Optional<Object> selected = filter.get().select(collection);
+			if (selected.isEmpty()) {
+				logger.fine(String.format("No element matches filter %s (%s)", filter.get(), context));
+			}
+			return selected;
+		}
+
+		if (collection.isEmpty()) {
+			throw new ValueMappingException(
+				String.format("Referenced collection is empty (%s)", context));
+		}
+
+		int index = selector == null ? 0 : selector.getCollectionIndex();
+		if (index < 0 || index >= collection.size()) {
+			throw new ValueMappingException(
+				String.format("Collection index %d out of bounds for collection of size %d (%s)",
+					index, collection.size(), context));
+		}
+
+		logger.fine(String.format("Extracted element at index %s (%s)", index, context));
+		return Optional.of(collection.get(index));
 	}
 
 	/**
 	 * Navigates a feature path from a source object to retrieve the target value.
-	 * Does not handle collection indexing - that's done by the caller.
+	 * <p>
+	 * Wherever the path crosses a collection - at its end or in the middle - the
+	 * {@code selector}'s filter or index picks the element to carry on from. A path may
+	 * therefore continue past a collection, which is what addresses the value of an EMap
+	 * entry: {@code lines} selects the entry, {@code value} navigates into it.
 	 *
 	 * @param source The source EObject
 	 * @param featurePath The path of features to traverse
 	 * @param context Context string for error messages
-	 * @return The value at the end of the path
+	 * @param selector The mapping whose collection filter/index picks collection elements
+	 * @return The value at the end of the path, or an empty optional when a collection filter
+	 *         along the path matches nothing
 	 * @throws ValueMappingException If navigation fails
 	 */
-	private Object navigateFeaturePath(EObject source, List<EStructuralFeature> featurePath, String context)
-			throws ValueMappingException {
+	private Optional<Object> navigateFeaturePath(EObject source, List<EStructuralFeature> featurePath, String context,
+			FeatureMapping selector) throws ValueMappingException {
 
 		Object currentValue = source;
 		try {
@@ -1045,15 +951,16 @@ public class ValueMapperImpl implements ValueMapper {
 							feature.getName(), context));
 				}
 
-				// For intermediate steps, if we encounter a list, we should not be here
-				// (ReferenceMapping should only have collections as the final step)
-				if (i < featurePath.size() - 1 && currentValue instanceof List<?>) {
-					throw new ValueMappingException(
-						String.format("Unexpected collection at intermediate step '%s' (%s)",
-							feature.getName(), context));
+				if (currentValue instanceof List<?> collection) {
+					Optional<Object> element = selectElement(collection, selector,
+							String.format("%s, feature '%s'", context, feature.getName()));
+					if (element.isEmpty()) {
+						return Optional.empty();
+					}
+					currentValue = element.get();
 				}
 			}
-			return currentValue;
+			return Optional.of(currentValue);
 		} catch (ValueMappingException e) {
 			throw e;
 		} catch (Exception e) {
@@ -1083,18 +990,28 @@ public class ValueMapperImpl implements ValueMapper {
 		}
 
 		int collectionIndex = featureMapping.getCollectionIndex(); // Default is 0
+		Optional<CollectionFilter> filter = CollectionFilter.of(featureMapping, "feature path " + featurePath);
 
 		Object currentValue = source;
 		try {
 			for (EStructuralFeature feature : featurePath) {
-				if (currentValue instanceof EObject) {
-					currentValue = ((EObject) currentValue).eGet(feature);
+				if (currentValue instanceof EObject eo) {
+					currentValue = eo.eGet(feature);
 
-					// Handle multi-value features: use configured collection index
+					// Handle multi-value features: by filter when one is set, else by index
 					if (currentValue instanceof EList<?>) {
 						List<?> list = (List<?>) currentValue;
 						if (list.isEmpty()) {
 							return Optional.empty();
+						}
+
+						if (filter.isPresent()) {
+							Optional<Object> selected = filter.get().select(list);
+							if (selected.isEmpty()) {
+								return Optional.empty();
+							}
+							currentValue = selected.get();
+							continue;
 						}
 
 						// Use the collectionIndex from FeatureMapping (default 0)
@@ -1134,8 +1051,8 @@ public class ValueMapperImpl implements ValueMapper {
 		Object currentValue = source;
 		try {
 			for (EStructuralFeature feature : featurePath) {
-				if (currentValue instanceof EObject) {
-					currentValue = ((EObject) currentValue).eGet(feature);
+				if (currentValue instanceof EObject eo) {
+					currentValue = eo.eGet(feature);
 
 					// Handle multi-value features: take first element (backward compatible behavior)
 					if (currentValue instanceof EList<?>) {
@@ -1163,25 +1080,23 @@ public class ValueMapperImpl implements ValueMapper {
 	 */
 	private GeoJsonObject lookupLocation(AdminMapping adminMapping) {
 		requireNonNull(adminMapping);
-		final Object latitude, longitude, altitude;
-		latitude = adminMapping.getLatitude();
+		Double latitude = adminMapping.getLatitude();
 		if (isNull(latitude)) {
 			// No latitude: no location
 			return null;
 		}
 
-		longitude = adminMapping.getLongitude();
+		Double longitude = adminMapping.getLongitude();
 		if (isNull(longitude)) {
 			// No longitude: no location
 			return null;
 		}
 
 		// Altitude is optional
-		altitude = adminMapping.getElevation();
+		Double altitude = adminMapping.getElevation();
 
 		Coordinates coordinates = new Coordinates(toDouble(longitude), toDouble(latitude), toDouble(altitude));
-		final Point point = new Point(coordinates, Collections.emptyList(), Collections.emptyMap());
-		return point;
+		return new Point(coordinates, Collections.emptyList(), Collections.emptyMap());
 	}
 
 	/**
@@ -1197,8 +1112,8 @@ public class ValueMapperImpl implements ValueMapper {
 			return Double.NaN;
 		}
 
-		if (value instanceof Number) {
-			return ((Number) value).doubleValue();
+		if (value instanceof Number number) {
+			return number.doubleValue();
 		}
 
 		if (value instanceof CharSequence) {

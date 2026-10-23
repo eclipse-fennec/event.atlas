@@ -1,0 +1,75 @@
+{
+  "deduplicationId": "7049b4f7-1ea5-49c9-aeec-2dad465a31bb",
+  "time": "2026-10-22T20:57:40.247+00:00",
+  "deviceInfo": {
+    "tenantId": "52f14cd4-c6f1-4fbd-8f87-4025e1d49242",
+    "tenantName": "Jena",
+    "applicationId": "6c05c20d-a152-43be-bd50-0af072e909d4",
+    "applicationName": "Passantenzählung",
+    "deviceProfileId": "ef645c43-546c-4594-a0e5-9e0852faf29b",
+    "deviceProfileName": "iotec iotraffic Camera",
+    "deviceName": "iotraffic Camera Test",
+    "devEui": "37a151dd238fb2e7",
+    "deviceClassEnabled": "CLASS_C",
+    "tags": {}
+  },
+  "devAddr": "01536d18",
+  "adr": true,
+  "dr": 5,
+  "fCnt": 3708,
+  "fPort": 16,
+  "confirmed": false,
+  "data": "BVEFYJAUAAACAAABAAAA",
+  "object": {
+    "from_time_text": "21:36",
+    "to_time": 1376,
+    "payload_version": 5,
+    "total_objects": 23,
+    "from_time": 1296,
+    "to_time_text": "22:56",
+    "lines": {
+      "line_9": {
+        "bicycle": 0,
+        "truck": 0,
+        "car": 2,
+        "bus": 1,
+        "train": 0,
+        "motorbike": 0,
+        "person": 20,
+        "line_number": 9,
+        "total": 23
+      }
+    },
+    "message_type": "counter_data",
+    "line_count": 1
+  },
+  "rxInfo": [
+    {
+      "gatewayId": "7076ff0056080c2c",
+      "uplinkId": 28901,
+      "nsTime": "2026-10-22T20:57:40.291411885+00:00",
+      "timeSinceGpsEpoch": "1476737878.247s",
+      "rssi": -91,
+      "snr": 8.2,
+      "channel": 1,
+      "location": {
+        "latitude": 50.92881393432617,
+        "longitude": 11.584820747375488,
+        "altitude": 282
+      },
+      "context": "3zCg+w==",
+      "crcStatus": "CRC_OK"
+    }
+  ],
+  "txInfo": {
+    "frequency": 867300000,
+    "modulation": {
+      "lora": {
+        "bandwidth": 125000,
+        "spreadingFactor": 7,
+        "codeRate": "CR_4_5"
+      }
+    }
+  },
+  "regionConfigId": "eu868"
+}

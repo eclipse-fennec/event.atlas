@@ -54,6 +54,45 @@ Registered discriminator values (path `deduplicationId`, `fallbackStrategy`
 | `waterpark-water-temperature` | `waterpark_domain#//WaterTemperature` |
 | `waterpark-water-quality` | `waterpark_domain#//WaterQuality` |
 
+## When one discriminator cannot serve every family: `codec.rootType`
+
+The three constraints above have a consequence the registry cannot fix: a family whose payloads
+carry **no stable value anywhere** cannot be typed by a discriminator at all. A ChirpStack
+uplink is the case — its `deduplicationId` is a fresh UUID per message, and the fields that do
+identify the device (`deviceInfo.deviceProfileName`) are not in the m5airq model, so no single
+path serves both families.
+
+Since 2026-10-23 a channel can say what it receives instead (pid
+`event.atlas.southbound.ingest`):
+
+```json
+"event.atlas.southbound.ingest": {
+  "codec.typeMapId": "jena-sensors",
+  "codec.rootType": [
+    "iotraffic/#=https://eclipse.org/fennec/lorawan/iotraffic#//CounterUplink",
+    "rest/counter=https://eclipse.org/fennec/lorawan/iotraffic#//CounterUplink"
+  ]
+}
+```
+
+- Entries are `<source pattern>=<nsURI>#//EClass`. The pattern is matched whole against the
+  ingest source — `rest/<channel>` for the REST adapter, the MQTT topic for the MQTT one —
+  with `*` and `#` standing for any text, so a topic filter can be pasted in as written. The
+  first matching entry wins.
+- The class is resolved against the **resource set's package registry**, i.e. the runtime's own
+  models, and handed to the codec as an EClass instance. A class this runtime does not have is
+  reported once and the payload is read as it would have been without the entry — never a
+  failed ingest.
+- It is a **fallback**, not an override: the codec still resolves the discriminator first, so a
+  family that annotates one keeps picking its own message type per payload. The iotraffic camera
+  relies on exactly that, sending counter data and AI module status through one topic and
+  telling them apart by `object.message_type` (see
+  [the iotraffic example](iotraffic-counter-example.md)).
+
+This is what lets device families that do not share a discriminator coexist in one runtime, so
+the "every JSON device family in one runtime must share the same mapId and the same
+discriminator path" above holds only for the channels that rely on discrimination.
+
 ## config.json changes (local.config)
 
 ```json

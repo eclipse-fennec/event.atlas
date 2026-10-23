@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="iotraffic-status">
+  <timestamp>
+    <featurePath xsi:type="ecore:EAttribute" href="https://eclipse.org/fennec/lorawan/iotraffic#//IotrafficUplink/time"/>
+  </timestamp>
+  <name>
+    <featurePath xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//IotrafficUplink/deviceInfo"/>
+    <featurePath xsi:type="ecore:EAttribute" href="https://eclipse.org/fennec/lorawan/iotraffic#//DeviceInfo/devEui"/>
+  </name>
+  <providerClasses href="https://eclipse.org/fennec/lorawan/iotraffic#//StatusUplink"/>
+  <!-- The same provider as the counting mapping: one camera is one thing in the twin, and a
+       UNIFIED profile is what lets two mappings contribute services to it. -->
+  <profile href="iotraffic-camera-profile.xmi#iotraffic-camera"/>
+  <services mid="status">
+    <name name="AI module"/>
+    <!-- Every attribute of the health report becomes a resource, units and descriptions
+         included - they are annotated on the model. -->
+    <referencedResource xsi:type="mapping:ReferenceMapping">
+      <featurePath xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//StatusUplink/object"/>
+      <filter href="https://eclipse.org/fennec/lorawan/iotraffic#//AiModuleStatus/message_type"/>
+      <filter href="https://eclipse.org/fennec/lorawan/iotraffic#//AiModuleStatus/payload_version"/>
+      <filter href="https://eclipse.org/fennec/lorawan/iotraffic#//AiModuleStatus/raw_hex"/>
+    </referencedResource>
+  </services>
+  <admin mid="admin">
+    <name name="Admin"/>
+    <friendlyNameFeature xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//IotrafficUplink/deviceInfo"/>
+    <friendlyNameFeature xsi:type="ecore:EAttribute" href="https://eclipse.org/fennec/lorawan/iotraffic#//DeviceInfo/deviceName"/>
+    <latitudeRef xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//IotrafficUplink/rxInfo"/>
+    <latitudeRef xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//RxInfo/location"/>
+    <latitudeRef xsi:type="ecore:EAttribute" href="https://eclipse.org/fennec/lorawan/iotraffic#//Location/latitude"/>
+    <longitudeRef xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//IotrafficUplink/rxInfo"/>
+    <longitudeRef xsi:type="ecore:EReference" href="https://eclipse.org/fennec/lorawan/iotraffic#//RxInfo/location"/>
+    <longitudeRef xsi:type="ecore:EAttribute" href="https://eclipse.org/fennec/lorawan/iotraffic#//Location/longitude"/>
+    <providerPackage href="https://eclipse.org/fennec/lorawan/iotraffic#/"/>
+  </admin>
+</mapping:ProviderMapping>
