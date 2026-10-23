@@ -737,7 +737,7 @@ EPackages a runtime maps must be registered in that runtime.
 - **Runtime/OSGi dependencies come from Maven Central via bnd**, listed in `cnf/ext/central.mvn`
   — *not* Gradle. Gradle `dependencies` are test-only. Broader dependency sets are switched on
   through `-library:` in `fennec.bnd` (`fennec`, `fennecTest`, `fennecJacoco`, `fennecEMF`,
-  `fennecM2X`, `fennecJPA`, `fennecEMFModels`, `fennecCodec`); a project opts into a setup with
+  `fennecM2X`, `fennecCodec`); a project opts into a setup with
   e.g. `-library: enableEMF` / `enableOSGi-Test` in its own `bnd.bnd`. No project opts into
   `fennecM2X` — it is in the list purely because `fennecM2X.maven` is the only index naming
   `org.antlr:antlr4-runtime`; see the third `-runbundles` trap below.
