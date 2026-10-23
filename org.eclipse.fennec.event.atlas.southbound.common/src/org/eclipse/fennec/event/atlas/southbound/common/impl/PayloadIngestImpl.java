@@ -17,22 +17,29 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.eclipse.emf.common.util.URI;
+import org.eclipse.emf.ecore.EClass;
+import org.eclipse.emf.ecore.EClassifier;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.xmi.PackageNotFoundException;
@@ -89,6 +96,26 @@ public class PayloadIngestImpl implements PayloadIngest {
 		 * name.
 		 */
 		boolean codec_useNamesFromExtendedMetadata() default true;
+
+		/**
+		 * The root type a channel's payloads are read as, as
+		 * {@code <source pattern>=<nsURI>#//EClass} entries - for example
+		 * {@code iotraffic/#=https://eclipse.org/fennec/lorawan/iotraffic#//CounterUplink}.
+		 * The pattern is matched against the ingest source ({@code rest/<channel>}, or the
+		 * MQTT topic a listener passes), where {@code *} and {@code #} stand for any text;
+		 * the first entry that matches wins.
+		 * <p>
+		 * This is what lets device families that do not share one discriminator coexist in a
+		 * runtime. The codec resolves a JSON payload's root type from <em>one</em>
+		 * discriminator path for the whole registry, and a family whose payloads carry no
+		 * such value anywhere - a ChirpStack uplink, whose {@code deduplicationId} is a fresh
+		 * UUID per message - can never be typed by it. A channel that knows what it receives
+		 * says so here instead: the hint is a fallback, so a family that <em>does</em>
+		 * annotate a discriminator still picks its own message type (the counter and status
+		 * uplinks of one camera, say), and only an unresolvable payload falls back to the
+		 * named class.
+		 */
+		String[] codec_rootType() default {};
 	}
 
 	/** Codec load option selecting the type-mapping registry; see {@code CodecOptions}. */
@@ -96,6 +123,9 @@ public class PayloadIngestImpl implements PayloadIngest {
 
 	/** Codec load option honouring ExtendedMetaData names; see {@code ConfigProperty}. */
 	private static final String OPTION_USE_EMD_NAMES = "codec.useNamesFromExtendedMetadata";
+
+	/** Codec load option naming the root EClass; see {@code CodecResource.CODEC_ROOT_TYPE}. */
+	private static final String OPTION_ROOT_TYPE = "CODEC_ROOT_TYPE";
 
 	private static final Logger logger = Logger.getLogger(PayloadIngestImpl.class.getName());
 
@@ -112,6 +142,12 @@ public class PayloadIngestImpl implements PayloadIngest {
 
 	/** Empty unless a mapId is configured; passed to every JSON load. */
 	private volatile Map<String, Object> loadOptions = Collections.emptyMap();
+
+	/** Root types per channel, in configuration order; empty unless any is configured. */
+	private volatile List<RootTypeHint> rootTypes = List.of();
+
+	/** Root types already reported as missing, so the warning is one per entry, not per payload. */
+	private final Set<String> unresolvedRootTypes = ConcurrentHashMap.newKeySet();
 
 	/** Distinguishes the throw-away resource URIs; only needs to be unique per runtime. */
 	private final AtomicLong sequence = new AtomicLong();
@@ -160,9 +196,116 @@ public class PayloadIngestImpl implements PayloadIngest {
 			options.put(OPTION_USE_EMD_NAMES, Boolean.TRUE);
 		}
 		loadOptions = options.isEmpty() ? Collections.emptyMap() : Map.copyOf(options);
-		logger.info(String.format("Payload typing: map '%s', ExtendedMetaData names %s",
+		rootTypes = RootTypeHint.parse(config.codec_rootType());
+		unresolvedRootTypes.clear();
+		logger.info(String.format("Payload typing: map '%s', ExtendedMetaData names %s, %s channel root type(s)",
 				mapId == null || mapId.isBlank() ? "<none>" : mapId,
-				config.codec_useNamesFromExtendedMetadata() ? "on" : "off"));
+				config.codec_useNamesFromExtendedMetadata() ? "on" : "off", rootTypes.size()));
+	}
+
+	/**
+	 * A configured {@code <source pattern>=<root type>} entry.
+	 * <p>
+	 * The pattern is matched whole against the ingest source, with {@code *} and {@code #}
+	 * standing for any text - so an MQTT topic filter can be pasted in as it is written in
+	 * the listener's configuration.
+	 */
+	private record RootTypeHint(Pattern source, String rootType) {
+
+		private static List<RootTypeHint> parse(String[] entries) {
+			if (entries == null || entries.length == 0) {
+				return List.of();
+			}
+			List<RootTypeHint> hints = new ArrayList<>(entries.length);
+			for (String entry : entries) {
+				if (entry == null || entry.isBlank()) {
+					continue;
+				}
+				int equals = entry.indexOf('=');
+				if (equals < 1 || equals == entry.length() - 1) {
+					logger.warning(String.format(
+							"Ignoring root type '%s': expected <source pattern>=<nsURI>#//EClass", entry));
+					continue;
+				}
+				hints.add(new RootTypeHint(toPattern(entry.substring(0, equals).trim()),
+						entry.substring(equals + 1).trim()));
+			}
+			return List.copyOf(hints);
+		}
+
+		private static Pattern toPattern(String sourcePattern) {
+			StringBuilder regex = new StringBuilder();
+			StringBuilder literal = new StringBuilder();
+			for (char c : sourcePattern.toCharArray()) {
+				if (c == '*' || c == '#') {
+					if (literal.length() > 0) {
+						regex.append(Pattern.quote(literal.toString()));
+						literal.setLength(0);
+					}
+					regex.append(".*");
+				} else {
+					literal.append(c);
+				}
+			}
+			if (literal.length() > 0) {
+				regex.append(Pattern.quote(literal.toString()));
+			}
+			return Pattern.compile(regex.toString());
+		}
+	}
+
+	/**
+	 * @return the load options for a payload from <code>source</code>: the shared ones, plus
+	 * the root type of the first channel pattern that matches
+	 */
+	private Map<String, Object> loadOptions(ResourceSet resourceSet, String source) {
+		List<RootTypeHint> hints = rootTypes;
+		if (hints.isEmpty()) {
+			return loadOptions;
+		}
+		for (RootTypeHint hint : hints) {
+			if (!hint.source().matcher(source).matches()) {
+				continue;
+			}
+			EClass rootType = resolveRootType(resourceSet, hint.rootType());
+			if (rootType == null) {
+				return loadOptions;
+			}
+			Map<String, Object> options = new LinkedHashMap<>(loadOptions);
+			options.put(OPTION_ROOT_TYPE, rootType);
+			return options;
+		}
+		return loadOptions;
+	}
+
+	/**
+	 * Resolves a configured <code>nsURI#//EClass</code> against the runtime's own packages.
+	 * <p>
+	 * The EClass is handed over as an instance rather than as the string the codec would also
+	 * take, because the codec resolves a string through the metadata index, which keys a class
+	 * by {@code EcoreUtil.getURI} - and for a model loaded from a document, that is the
+	 * document's URI, not its nsURI. The resource set's package registry is where a runtime's
+	 * models actually are, however they got there.
+	 *
+	 * @return the EClass, or <code>null</code> if this runtime does not have it - then the
+	 * payload is read without a hint, which is what it did before one was configured
+	 */
+	private EClass resolveRootType(ResourceSet resourceSet, String rootType) {
+		int hash = rootType.indexOf('#');
+		EPackage ePackage = hash < 1 ? null
+				: resourceSet.getPackageRegistry().getEPackage(rootType.substring(0, hash));
+		EClassifier classifier = ePackage == null ? null
+				: ePackage.getEClassifier(rootType.substring(hash + 1).replaceFirst("^//", ""));
+		if (classifier instanceof EClass eClass) {
+			return eClass;
+		}
+		if (unresolvedRootTypes.add(rootType)) {
+			logger.warning(String.format(
+					"Root type '%s' is not available in this runtime - payloads of that channel are "
+							+ "read without it. Is the model deployed or in the atlas?",
+					rootType));
+		}
+		return null;
 	}
 
 	@Deactivate
@@ -184,7 +327,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 
 		Resource resource;
 		try {
-			resource = deserialize(payload, format);
+			resource = deserialize(payload, format, origin);
 		} catch (PackageNotFoundException e) {
 			// The model is neither deployed nor resolvable through the Model Atlas. Not an
 			// error on our side - the payload simply cannot be understood yet.
@@ -381,13 +524,13 @@ public class PayloadIngestImpl implements PayloadIngest {
 	 * {@link Resource#load(java.io.InputStream, java.util.Map)} directly - it only carries
 	 * the file extension that selects the resource factory (XMI, or the codec's for JSON).
 	 */
-	private Resource deserialize(byte[] payload, String format) throws Exception {
+	private Resource deserialize(byte[] payload, String format, String source) throws Exception {
 		ResourceSet resourceSet = resourceSetFactory.createResourceSet();
 		requireResourceFactory(resourceSet, format);
 		Resource resource = resourceSet
 				.createResource(URI.createURI("eventatlas-ingest/" + sequence.incrementAndGet() + "." + format));
 		try {
-			resource.load(new ByteArrayInputStream(payload), loadOptions);
+			resource.load(new ByteArrayInputStream(payload), loadOptions(resourceSet, source));
 		} catch (Exception e) {
 			PackageNotFoundException notFound = findPackageNotFound(e);
 			throw notFound == null ? e : notFound;

@@ -61,11 +61,12 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-10-21: `./gradlew clean build` is green — **75 OSGi tests, 0 `@Disabled`**
-— plus **255 plain-JUnit tests** across ten projects. The
-mapping project contributes 44 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+Baseline as of 2026-10-23: `./gradlew clean build` is green — **80 OSGi tests, 0 `@Disabled`**
+— plus **270 plain-JUnit tests** across ten projects. The
+mapping project contributes 55 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
-`DynamicMappingPackageTest`, `AdminResourceGateTest`); the deployment project 44 (`DeploymentPlannerTest`,
+`DynamicMappingPackageTest`, `AdminResourceGateTest`, `CollectionFilterTest`,
+`FilteredServiceSourceTest`); the deployment project 44 (`DeploymentPlannerTest`,
 `DeploymentConfiguratorImplTest`, `ExampleDeploymentTest`, `ShippedConfigOverlapTest`,
 `DynamicDeploymentPackageTest`).
 
@@ -158,6 +159,21 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   channel a *resolve-time* guarantee rather than a runtime surprise. `JsonPayloadIngestTest`
   (OSGi, with `data/dragino-example.json`) is the regression guard; `PayloadIngestImpl` now
   also reports a missing factory as `FORMAT_UNSUPPORTED` (HTTP 501) instead of parsing on.
+- **A JSON channel can declare the type it receives: `codec.rootType` on
+  `event.atlas.southbound.ingest`** (since 2026-10-23), entries
+  `<source pattern>=<nsURI>#//EClass` matched against the ingest source (`rest/<channel>`, or
+  the MQTT topic), `*` and `#` wildcards, first match wins. It exists because the codec
+  resolves a JSON root type from **one** discriminator path per runtime
+  (`TypeDiscriminatorRegistry`, `getAnyDiscriminatorPath`), which a family whose payloads carry
+  no stable value anywhere cannot answer — a ChirpStack uplink's `deduplicationId` is a fresh
+  UUID, and `jena-sensors` discriminates on exactly that. The hint is a **fallback**: the
+  discriminator still runs first, so one topic can carry several message types of the same
+  family and each is read as its own class. `PayloadIngestImpl` resolves the class against the
+  **resource set's package registry** and hands the codec an `EClass` instance, not the string:
+  the codec resolves a string through the metadata index, which keys a class by
+  `EcoreUtil.getURI` — the *document* URI for a model loaded from an `.ecore`, not its nsURI, so
+  a dynamically delivered model would never be found. An unresolvable entry is warned about once
+  and ignored. See `docs/json-southbound-typing.md`.
 - **History is two bundles now: a storage backend plus an engine.** Since the gateway's history
   rework (PR #758, merged 2026-09-07) `…southbound.history.timescale-provider` only *stores and
   queries*; `…southbound.history.history-core` is the engine that subscribes a backend to the
@@ -635,6 +651,28 @@ Core concepts, all expressed as XMI instances of that metamodel:
   live value at the last accepted one (see below). The intended enforcement point, and why a
   transparent interceptor on SensiNact's fan-out typed-event bus cannot work, is in
   `docs/WP-SN-2-persistence-rules-plan.md`.
+- **`collectionFilter` is implemented since 2026-10-23, and a filter that matches nothing is a
+  skip.** The expression is `<dotted feature path>=<literal>`, evaluated on the collection
+  *element* and compared as text (`key=line_5`, `value.line_number=5`); it beats
+  `collectionIndex` wherever both are set, a malformed one is logged and leaves the index in
+  charge (`CollectionFilter`). Two consequences are the point of the feature, both in
+  `ValueMapperImpl`:
+  a feature path may now **continue past a collection** — the selected element is navigated on,
+  which is how `lines/value` reaches into an EMF map entry — and `getServiceSource` returns an
+  empty optional when a filter matches nothing, which **skips that service** instead of failing
+  the instance. An out-of-bounds `collectionIndex` stays an error, because that is a mapping
+  that does not fit the payload at all; a filter matching nothing is a payload that does not
+  carry this element. Without that asymmetry a device that splits one reading over several
+  messages — four of nine counting lines per LoRaWAN uplink — would have every message rejected
+  by the services whose line it did not carry. Guards: `CollectionFilterTest`,
+  `FilteredServiceSourceTest`, `IotrafficMappingTest`.
+- **A JSON object with per-item member names is an EMF map, and the engine reads one.** The
+  codec deserializes it into a containment reference to a `java.util.Map$Entry` EClass
+  (`EMapHelper`), whose entries are plain `EObject`s with a `key` and a `value` feature —
+  `DynamicEObjectImpl.BasicEMapEntry` when the package was loaded from an `.ecore`, which is
+  what a Model Atlas delivers. Nothing in the engine knows about maps: the filter navigates
+  `key`/`value` like any other feature. `model/iotraffic.ecore` in the tests project is the
+  worked case, documented in `docs/iotraffic-counter-example.md`.
 
 ## Runtime layering
 
@@ -722,8 +760,8 @@ optional-import trick intact when adding SensiNact dependencies.
 
 **Where the models live** — `…mapping/model/` holds only the metamodel plus `examples/` and
 `profiles/` (example mappings, battery/temperature/weather-station profiles). The *domain*
-models being mapped (Dragino, EM310UDL, EcoWitt, DWD weather, LoRaWAN uplink) live in
-`…mapping.tests/model/`, with matching payloads in `…mapping.tests/data/`. Whatever domain
+models being mapped (Dragino, EM310UDL, EcoWitt, DWD weather, LoRaWAN uplink, iotraffic) live
+in `…mapping.tests/model/`, with matching payloads in `…mapping.tests/data/`. Whatever domain
 EPackages a runtime maps must be registered in that runtime.
 
 ## Workspace & OSGi conventions
