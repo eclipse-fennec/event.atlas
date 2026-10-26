@@ -25,7 +25,8 @@
 	fennecJacoco,\
 	fennecEMF,\
 	fennecM2X,\
-	fennecJPA,\
+	fennecPersistence,\
+	fennecPersistenceTest,\
 	fennecEMFModels,\
 	fennecCodec
 
