@@ -1,0 +1,108 @@
+{
+  "deduplicationId": "f3f603de-49a5-472b-900a-1ac3c2b07265",
+  "time": "2026-10-22T20:57:20.645+00:00",
+  "deviceInfo": {
+    "tenantId": "52f14cd4-c6f1-4fbd-8f87-4025e1d49242",
+    "tenantName": "Jena",
+    "applicationId": "6c05c20d-a152-43be-bd50-0af072e909d4",
+    "applicationName": "Passantenzählung",
+    "deviceProfileId": "ef645c43-546c-4594-a0e5-9e0852faf29b",
+    "deviceProfileName": "iotec iotraffic Camera",
+    "deviceName": "iotraffic Camera Test",
+    "devEui": "37a151dd238fb2e7",
+    "deviceClassEnabled": "CLASS_C",
+    "tags": {}
+  },
+  "devAddr": "01536d18",
+  "adr": true,
+  "dr": 5,
+  "fCnt": 3706,
+  "fPort": 16,
+  "confirmed": false,
+  "data": "BVEFYBAFACAAAAABAAAAIAIAEAAAAAAAAAAwDAAAAAAAAAAAAEAHACAAAAAAAAAA",
+  "object": {
+    "line_count": 4,
+    "lines": {
+      "line_1": {
+        "truck": 0,
+        "motorbike": 0,
+        "bus": 1,
+        "car": 0,
+        "total": 8,
+        "train": 0,
+        "line_number": 1,
+        "person": 5,
+        "bicycle": 2
+      },
+      "line_3": {
+        "total": 12,
+        "car": 0,
+        "bus": 0,
+        "line_number": 3,
+        "motorbike": 0,
+        "person": 12,
+        "bicycle": 0,
+        "train": 0,
+        "truck": 0
+      },
+      "line_4": {
+        "train": 0,
+        "line_number": 4,
+        "person": 7,
+        "truck": 0,
+        "motorbike": 0,
+        "bus": 0,
+        "car": 0,
+        "total": 9,
+        "bicycle": 2
+      },
+      "line_2": {
+        "total": 3,
+        "person": 2,
+        "bus": 0,
+        "car": 0,
+        "truck": 0,
+        "line_number": 2,
+        "bicycle": 1,
+        "motorbike": 0,
+        "train": 0
+      }
+    },
+    "from_time": 1296,
+    "to_time": 1376,
+    "message_type": "counter_data",
+    "payload_version": 5,
+    "from_time_text": "21:36",
+    "total_objects": 32,
+    "to_time_text": "22:56"
+  },
+  "rxInfo": [
+    {
+      "gatewayId": "7076ff0056080c2c",
+      "uplinkId": 27109,
+      "nsTime": "2026-10-22T20:57:20.698348436+00:00",
+      "timeSinceGpsEpoch": "1476737858.645s",
+      "rssi": -91,
+      "snr": 5.2,
+      "channel": 2,
+      "location": {
+        "latitude": 50.928810119628906,
+        "longitude": 11.584823608398438,
+        "altitude": 282
+      },
+      "context": "3gWEGw==",
+      "crcStatus": "CRC_OK"
+    }
+  ],
+  "txInfo": {
+    "frequency": 867500000,
+    "modulation": {
+      "lora": {
+        "bandwidth": 125000,
+        "spreadingFactor": 7,
+        "codeRate": "CR_4_5"
+      }
+    }
+  },
+  "regionConfigId": "eu868"
+}

@@ -28,6 +28,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -406,6 +407,105 @@ public class PayloadIngestImplTest {
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
 		assertEquals(Outcome.APPLIED, result.outcome());
+	}
+
+	@Test
+	@DisplayName("A channel's root type is handed to the codec as the type to read")
+	// The codec resolves a JSON payload's type from one discriminator path per runtime, which a
+	// family whose payloads carry no stable discriminator anywhere - a ChirpStack uplink, whose
+	// deduplicationId is a fresh UUID - can never answer. The channel says what it receives.
+	void rootType_isPassedForTheMatchingChannel() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("iotraffic/#=" + KNOWN_NS_URI + "#//Sensor"));
+
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "iotraffic/jena/uplink");
+
+		assertEquals(sensorEClass(), options.get(0).get("CODEC_ROOT_TYPE"),
+				"the class itself is handed over, not the string the metadata index would have to resolve");
+	}
+
+	@Test
+	@DisplayName("A payload from a channel no pattern matches is read without a root type")
+	void rootType_isNotPassedForOtherChannels() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("iotraffic/#=" + KNOWN_NS_URI + "#//Sensor"));
+
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "waterpark/sensors/pool");
+
+		assertNull(options.get(0).get("CODEC_ROOT_TYPE"), "another channel keeps the runtime's own typing");
+	}
+
+	@Test
+	@DisplayName("The first matching pattern wins, and a malformed entry only costs itself")
+	void rootType_firstMatchWinsAndMalformedEntriesAreIgnored() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("no-equals-sign", "rest/counter=" + KNOWN_NS_URI + "#//Sensor",
+				"rest/*=" + KNOWN_NS_URI + "#//Other"));
+
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "rest/counter");
+
+		assertEquals(sensorEClass(), options.get(0).get("CODEC_ROOT_TYPE"));
+	}
+
+	@Test
+	@DisplayName("A root type this runtime does not have leaves the payload to the runtime's own typing")
+	void unknownRootType_isReportedAndSkipped() {
+		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("rest/*=http://example.org/southbound/nowhere/1.0#//Nope"));
+
+		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "rest/counter");
+
+		assertEquals(Outcome.APPLIED, result.outcome(), "a missing root type must not fail the ingest");
+		assertNull(options.get(0).get("CODEC_ROOT_TYPE"));
+	}
+
+	/**
+	 * Registers a JSON factory that records the load options instead of parsing, and returns
+	 * the list they land in.
+	 */
+	private List<Map<?, ?>> captureLoadOptions() {
+		List<Map<?, ?>> captured = new ArrayList<>();
+		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
+			ResourceSet resourceSet = createResourceSet();
+			resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put(PayloadIngest.FORMAT_JSON,
+					(Resource.Factory) uri -> new XMIResourceImpl(uri) {
+						@Override
+						public void doLoad(java.io.InputStream inputStream, java.util.Map<?, ?> options) {
+							captured.add(options);
+							getContents().add(EcoreUtil.create(sensorEClass()));
+						}
+					});
+			return resourceSet;
+		});
+		return captured;
+	}
+
+	private static PayloadIngestImpl.Config config(String... rootTypes) {
+		return new PayloadIngestImpl.Config() {
+			@Override
+			public Class<? extends java.lang.annotation.Annotation> annotationType() {
+				return PayloadIngestImpl.Config.class;
+			}
+
+			@Override
+			public String codec_typeMapId() {
+				return "";
+			}
+
+			@Override
+			public boolean codec_useNamesFromExtendedMetadata() {
+				return true;
+			}
+
+			@Override
+			public String[] codec_rootType() {
+				return rootTypes;
+			}
+		};
 	}
 
 	private static byte[] sensorXmi() {

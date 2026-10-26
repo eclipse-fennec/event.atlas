@@ -324,9 +324,42 @@ When a feature path crosses a multi-valued reference, pick the element with
 </name>
 ```
 
-> **`collectionFilter` is reserved but not yet implemented.** The attribute exists on the
-> metamodel for a future "select the element where …" expression; today the engine logs a
-> warning and falls back to `collectionIndex`.
+### Selecting by content: `collectionFilter`
+
+A position only works when the payload has one. A JSON object writes its members in whatever
+order the sender chose, and a device that splits one reading over several messages sends a
+different subset each time — then `collectionIndex="4"` addresses a different thing in every
+message, or nothing at all. `collectionFilter` picks the element by what it *is*:
+
+```xml
+<referencedResource xsi:type="mapping:ReferenceMapping" collectionFilter="key=line_5">
+  <featurePath xsi:type="ecore:EReference" href="c.ecore#//CounterUplink/object"/>
+  <featurePath xsi:type="ecore:EReference" href="c.ecore#//CounterData/lines"/>
+  <featurePath xsi:type="ecore:EReference" href="c.ecore#//LineEntry/value"/>
+</referencedResource>
+```
+
+- The expression is `<path>=<literal>`, the path a dot-separated chain of feature **names**
+  read from the collection element. An EMF map is a list of entries with a `key` and a `value`
+  feature, so a map is addressed as `key=line_5` or `value.line_number=5`.
+- Comparison is on the string form of the value: `5` matches an `EInt` 5, an enum matches its
+  literal name, and a literal may be quoted (`key="line 5"`).
+- It is available wherever `collectionIndex` is — on a service's `referencedResource` and on
+  any feature path (`name`, `timestamp`, `valueFeature`, …) — and **takes precedence** over it.
+  A malformed expression is logged and ignored, which leaves the index in charge.
+- **A path may continue past the collection.** The element the filter picks is navigated on,
+  so `lines` selects the entry and `value` steps into it — the three-step path above ends at
+  the line itself, and the service's resources read its attributes directly.
+
+**A filter that matches nothing is a skip, not a failure.** The service it selects for is left
+untouched for that instance and everything else in the mapping is still applied; the twin keeps
+whatever an earlier message put there. That is what makes one mapping able to read a reading
+split over several messages — declare a service per element you ever expect, and each message
+updates the ones it carries. An **index** out of bounds stays an error, because a mapping that
+asks for `[4]` of a three-element list does not fit the payload at all.
+
+> A worked example of both — a camera that reports up to four counting lines per LoRaWAN
+> uplink — is in [the iotraffic example](iotraffic-counter-example.md).
 
 ### Mapping services onto collection elements
 
@@ -744,7 +777,9 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
   A stale URI in an XMI fails to load with `PackageNotFoundException`.
 - **Tag `xsi:type` on `EStructuralFeature` refs** (`featurePath`, `valueFeature`,
   `unitFeature`, admin `*Ref`) — otherwise EMF cannot resolve attribute vs. reference.
-- **`collectionFilter` is not implemented yet** — use `collectionIndex`.
+- **A `collectionFilter` that matches nothing skips its service** — silently, by design; an
+  out-of-bounds `collectionIndex` is still an error. See
+  [Selecting by content](#selecting-by-content-collectionfilter).
 - **Admin resource reads are incomplete** — see the note under [Admin service](#admin-service).
 - **Metadata precedence** — an explicit `unit`/`extraMetadata` on the resource overrides the
   Ecore annotation; leave them off to let model annotations flow through.
@@ -757,9 +792,9 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 | `ServiceMapping` | `mid`, `name`, `timestamp`, `resources`, `referencedResource` |
 | `ResourceMapping` | `mid`, `name`, `unit`, `eType`, `valueFeature`, `unitFeature`, `timestamp`, `extraMetadata`, `defaultValueLiteral`, `changeRule`, `deletionRule` |
 | `AdminMapping` | `friendlyName`/`friendlyNameFeature`, `latitude`/`latitudeRef` (+ longitude, elevation), `providerPackage` |
-| `NameMapping` | `name`, `featurePath`, `collectionIndex` |
+| `NameMapping` | `name`, `featurePath`, `collectionIndex`, `collectionFilter` |
 | `TimestampMapping` | `strategy` (`NOW`/`FEATURE`/`FUNCTION`), `hint`, `timestamp`, `featurePath` |
-| `ReferenceMapping` | `featurePath`, `targetEClass`, `filter`, `exclude`, `referenceMappings`, `collectionIndex`, `bindings` |
+| `ReferenceMapping` | `featurePath`, `targetEClass`, `filter`, `exclude`, `referenceMappings`, `collectionIndex`, `collectionFilter`, `bindings` |
 | `ReferenceResourceBinding` | `attributes` (empty = all), `changeRule`, `deletionRule`, `unit` |
 | `FeatureMapping` (base) | `functionId`, `featurePath`, `collectionIndex`, `collectionFilter` |
 | `MappingProfile` | `profileId`, `name`, `version`, `providerStrategy`, `provider` |

@@ -61,11 +61,12 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-10-21: `./gradlew clean build` is green — **75 OSGi tests, 0 `@Disabled`**
-— plus **255 plain-JUnit tests** across ten projects. The
-mapping project contributes 44 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+Baseline as of 2026-10-23: `./gradlew clean build` is green — **80 OSGi tests, 0 `@Disabled`**
+— plus **270 plain-JUnit tests** across ten projects. The
+mapping project contributes 55 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
-`DynamicMappingPackageTest`, `AdminResourceGateTest`); the deployment project 44 (`DeploymentPlannerTest`,
+`DynamicMappingPackageTest`, `AdminResourceGateTest`, `CollectionFilterTest`,
+`FilteredServiceSourceTest`); the deployment project 44 (`DeploymentPlannerTest`,
 `DeploymentConfiguratorImplTest`, `ExampleDeploymentTest`, `ShippedConfigOverlapTest`,
 `DynamicDeploymentPackageTest`).
 
@@ -158,6 +159,21 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   channel a *resolve-time* guarantee rather than a runtime surprise. `JsonPayloadIngestTest`
   (OSGi, with `data/dragino-example.json`) is the regression guard; `PayloadIngestImpl` now
   also reports a missing factory as `FORMAT_UNSUPPORTED` (HTTP 501) instead of parsing on.
+- **A JSON channel can declare the type it receives: `codec.rootType` on
+  `event.atlas.southbound.ingest`** (since 2026-10-23), entries
+  `<source pattern>=<nsURI>#//EClass` matched against the ingest source (`rest/<channel>`, or
+  the MQTT topic), `*` and `#` wildcards, first match wins. It exists because the codec
+  resolves a JSON root type from **one** discriminator path per runtime
+  (`TypeDiscriminatorRegistry`, `getAnyDiscriminatorPath`), which a family whose payloads carry
+  no stable value anywhere cannot answer — a ChirpStack uplink's `deduplicationId` is a fresh
+  UUID, and `jena-sensors` discriminates on exactly that. The hint is a **fallback**: the
+  discriminator still runs first, so one topic can carry several message types of the same
+  family and each is read as its own class. `PayloadIngestImpl` resolves the class against the
+  **resource set's package registry** and hands the codec an `EClass` instance, not the string:
+  the codec resolves a string through the metadata index, which keys a class by
+  `EcoreUtil.getURI` — the *document* URI for a model loaded from an `.ecore`, not its nsURI, so
+  a dynamically delivered model would never be found. An unresolvable entry is warned about once
+  and ignored. See `docs/json-southbound-typing.md`.
 - **History is two bundles now: a storage backend plus an engine.** Since the gateway's history
   rework (PR #758, merged 2026-09-07) `…southbound.history.timescale-provider` only *stores and
   queries*; `…southbound.history.history-core` is the engine that subscribes a backend to the
@@ -635,6 +651,28 @@ Core concepts, all expressed as XMI instances of that metamodel:
   live value at the last accepted one (see below). The intended enforcement point, and why a
   transparent interceptor on SensiNact's fan-out typed-event bus cannot work, is in
   `docs/WP-SN-2-persistence-rules-plan.md`.
+- **`collectionFilter` is implemented since 2026-10-23, and a filter that matches nothing is a
+  skip.** The expression is `<dotted feature path>=<literal>`, evaluated on the collection
+  *element* and compared as text (`key=line_5`, `value.line_number=5`); it beats
+  `collectionIndex` wherever both are set, a malformed one is logged and leaves the index in
+  charge (`CollectionFilter`). Two consequences are the point of the feature, both in
+  `ValueMapperImpl`:
+  a feature path may now **continue past a collection** — the selected element is navigated on,
+  which is how `lines/value` reaches into an EMF map entry — and `getServiceSource` returns an
+  empty optional when a filter matches nothing, which **skips that service** instead of failing
+  the instance. An out-of-bounds `collectionIndex` stays an error, because that is a mapping
+  that does not fit the payload at all; a filter matching nothing is a payload that does not
+  carry this element. Without that asymmetry a device that splits one reading over several
+  messages — four of nine counting lines per LoRaWAN uplink — would have every message rejected
+  by the services whose line it did not carry. Guards: `CollectionFilterTest`,
+  `FilteredServiceSourceTest`, `IotrafficMappingTest`.
+- **A JSON object with per-item member names is an EMF map, and the engine reads one.** The
+  codec deserializes it into a containment reference to a `java.util.Map$Entry` EClass
+  (`EMapHelper`), whose entries are plain `EObject`s with a `key` and a `value` feature —
+  `DynamicEObjectImpl.BasicEMapEntry` when the package was loaded from an `.ecore`, which is
+  what a Model Atlas delivers. Nothing in the engine knows about maps: the filter navigates
+  `key`/`value` like any other feature. `model/iotraffic.ecore` in the tests project is the
+  worked case, documented in `docs/iotraffic-counter-example.md`.
 
 ## Runtime layering
 
@@ -722,8 +760,8 @@ optional-import trick intact when adding SensiNact dependencies.
 
 **Where the models live** — `…mapping/model/` holds only the metamodel plus `examples/` and
 `profiles/` (example mappings, battery/temperature/weather-station profiles). The *domain*
-models being mapped (Dragino, EM310UDL, EcoWitt, DWD weather, LoRaWAN uplink) live in
-`…mapping.tests/model/`, with matching payloads in `…mapping.tests/data/`. Whatever domain
+models being mapped (Dragino, EM310UDL, EcoWitt, DWD weather, LoRaWAN uplink, iotraffic) live
+in `…mapping.tests/model/`, with matching payloads in `…mapping.tests/data/`. Whatever domain
 EPackages a runtime maps must be registered in that runtime.
 
 ## Workspace & OSGi conventions
@@ -737,10 +775,15 @@ EPackages a runtime maps must be registered in that runtime.
 - **Runtime/OSGi dependencies come from Maven Central via bnd**, listed in `cnf/ext/central.mvn`
   — *not* Gradle. Gradle `dependencies` are test-only. Broader dependency sets are switched on
   through `-library:` in `fennec.bnd` (`fennec`, `fennecTest`, `fennecJacoco`, `fennecEMF`,
-  `fennecM2X`, `fennecCodec`); a project opts into a setup with
-  e.g. `-library: enableEMF` / `enableOSGi-Test` in its own `bnd.bnd`. No project opts into
-  `fennecM2X` — it is in the list purely because `fennecM2X.maven` is the only index naming
-  `org.antlr:antlr4-runtime`; see the third `-runbundles` trap below.
+  `fennecM2X`, `fennecEMFModels`, `fennecCodec`);
+  a project opts into a setup with e.g. `-library: enableEMF` / `enableOSGi-Test` in its own
+  `bnd.bnd`. No project opts into `fennecM2X` — it is in the list purely because
+  `fennecM2X.maven` is the only index naming `org.antlr:antlr4-runtime`; see the third
+  `-runbundles` trap below. **There is no persistence library entry any more** (`fennecJPA`,
+  renamed `fennecPersistence`/`fennecPersistenceTest` upstream on 2026-10-16): nothing here uses
+  JPA, it was only ever carrying spifly and asm, and those are pinned in `central.mvn` directly
+  since 2026-10-26. Prefer that shape — a `-library:` entry kept for two third-party bundles is
+  a whole upstream workspace's release cadence in the resolve path.
 - SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
   `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots). **The
   history rework needs a gateway snapshot from 2026-09-10 or later.** That deployment had been
@@ -812,6 +855,35 @@ EPackages a runtime maps must be registered in that runtime.
      carries antlr 4.13.2 — so antlr keeps coming from the library rather than being pinned
      here. That leaves it a single point of failure: if the same thing happens again, one
      `org.antlr:antlr4-runtime:4.13.2` line in `central.mvn` decouples it for good.
+
+     **It happened again on 2026-10-23, and the library is gone now.** It was `fennecJPA`, and
+     the project behind it was not abandoned - `eclipse-fennec/emf.persistence-jpa` is active and
+     **renamed** it to `org.eclipse.fennec.persistence:org.eclipse.fennec.persistence.workspace.library`
+     (`bnd.library=fennecPersistence`), with the test bundles split off into
+     `…persistence.test.workspace.library` (`fennecPersistenceTest`). So a stale coordinate, not a
+     dead project: the one `central.mvn` pinned **404s**, and a runner without a warm `cnf/cache`
+     got no expansion. Nine `-runbundles` entries were reachable through its index and nowhere
+     else - `org.apache.aries.spifly.dynamic.bundle` (the framework-extension variant is
+     blacklisted everywhere here), the four asm bundles it needs (`asm.commons`, `asm.tree`,
+     `asm.tree.analysis`, `asm.util`), and `junit-jupiter-params` + `org.osgi.test.{common,junit5}`
+     for the test bndrun. Without spifly nothing provides
+     `osgi.extender=osgi.serviceloader.{processor,registrar}`, which `slf4j.api` and
+     `slf4j.simple` require — and the resolver reports that three hops away as
+     `org.eclipse.sensinact.gateway.core.impl cannot be resolved`. Repointing the library fixed
+     that instance; **dropping it entirely is the fix that holds** — all nine coordinates are in
+     `central.mvn` at the versions the bndruns already name, and no workspace here needs the rest
+     of a persistence stack.
+     **The signature to recognise: two builds of the same commit disagree.** On PR #84's
+     `c9228fb` the `push` build failed and the `pull_request` build five minutes later was green,
+     because the latter restored a `cnf/cache` that still held the old expansion. That is this
+     class of break, not a flaky test.
+     **Reproducing one takes two removals, not one.** Deleting an expansion under
+     `cnf/cache/<v>/expanded/` proves nothing, because bnd rebuilds it from the copy in `~/.m2`
+     (the `.receipt` names `~/.m2`, not a URL). Move the artifact's directory under
+     `~/.m2/repository` aside as well and the resolve fails exactly as CI does.
+     **`assertj-core` has no bnd repo source any more** — it came from `fennecPersistenceTest`.
+     The Gradle test classpath is unaffected (the root `build.gradle` pins it); a bnd
+     `-testpath: assertj-core` in a project's `bnd.bnd` finds nothing, silently.
 
   For 1 and 2 the fix is the same: declare it in `central.mvn`, at the version the rest of that
   library family already uses. After changing a bndrun's `-runbundles`, cross-check every entry

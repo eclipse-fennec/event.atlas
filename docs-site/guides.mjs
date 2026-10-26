@@ -12,4 +12,5 @@ export const GUIDES = [
 ];
 
 export const EXAMPLES = [
+  { file: 'iotraffic-counter-example.md', slug: 'iotraffic-counter', title: 'Counting lines split over several uplinks' },
 ];

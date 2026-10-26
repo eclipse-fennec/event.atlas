@@ -1,0 +1,109 @@
+{
+  "deduplicationId": "73808a54-59d6-4a02-8748-ad626f48ab40",
+  "time": "2026-10-22T20:57:53.509+00:00",
+  "deviceInfo": {
+    "tenantId": "52f14cd4-c6f1-4fbd-8f87-4025e1d49242",
+    "tenantName": "Jena",
+    "applicationId": "6c05c20d-a152-43be-bd50-0af072e909d4",
+    "applicationName": "Passantenzählung",
+    "deviceProfileId": "ef645c43-546c-4594-a0e5-9e0852faf29b",
+    "deviceProfileName": "iotec iotraffic Camera",
+    "deviceName": "iotraffic Camera Test",
+    "devEui": "37a151dd238fb2e7",
+    "deviceClassEnabled": "CLASS_C",
+    "tags": {}
+  },
+  "devAddr": "01536d18",
+  "adr": true,
+  "dr": 5,
+  "fCnt": 3709,
+  "fPort": 20,
+  "confirmed": false,
+  "data": "BRwyDAICAgAwAGM3OAD//wAAvJTaaoggAAA=",
+  "object": {
+    "network_if_status": 0,
+    "timestamp_iso": "2026-10-22T22:57:00.000Z",
+    "message_type": "ai_module_status",
+    "disk_pct": 12,
+    "ethernet_active": false,
+    "cpu_temp_c": 55,
+    "gpu_temp_c": 56,
+    "error_code": 0,
+    "os_load_5_average": 2,
+    "cpu_pct": 28,
+    "os_load_15_average": 2,
+    "gpu_usage_pct": 99,
+    "wifi_active": false,
+    "ram_pct": 48,
+    "voltage_v": 65.535,
+    "timestamp": 1792709820,
+    "uptime_hours": 138.8,
+    "payload_version": 5,
+    "os_load_1_average": 2,
+    "uptime_days": 5.78,
+    "raw_hex": "051C320C02020200300063373800FFFF0000BC94DA6A88200000",
+    "vmem_pct": 50,
+    "voltage_mv": 65535,
+    "swap_pct": 0,
+    "uptime_minutes": 8328
+  },
+  "rxInfo": [
+    {
+      "gatewayId": "7076ff0056080bfe",
+      "uplinkId": 51375,
+      "nsTime": "2026-10-22T20:57:53.578616397+00:00",
+      "timeSinceGpsEpoch": "1476737891.509s",
+      "rssi": -115,
+      "snr": 0.2,
+      "channel": 5,
+      "location": {
+        "latitude": 50.928924560546875,
+        "longitude": 11.584619522094727,
+        "altitude": 285
+      },
+      "context": "YrSr0w==",
+      "crcStatus": "CRC_OK"
+    },
+    {
+      "gatewayId": "7076ff0056080c2c",
+      "uplinkId": 30437,
+      "nsTime": "2026-10-22T20:57:53.550548963+00:00",
+      "timeSinceGpsEpoch": "1476737891.509s",
+      "rssi": -92,
+      "snr": 9.2,
+      "channel": 5,
+      "location": {
+        "latitude": 50.92881393432617,
+        "longitude": 11.584820747375488,
+        "altitude": 282
+      },
+      "context": "3/r9Ew==",
+      "crcStatus": "CRC_OK"
+    },
+    {
+      "gatewayId": "fcc23dfffe2ea641",
+      "uplinkId": 59893,
+      "nsTime": "2026-10-22T20:57:53.535564537+00:00",
+      "rssi": -117,
+      "snr": -4.5,
+      "rfChain": 1,
+      "location": {
+        "latitude": 50.932005871988125,
+        "longitude": 11.591793894767763
+      },
+      "context": "D4qduw==",
+      "crcStatus": "CRC_OK"
+    }
+  ],
+  "txInfo": {
+    "frequency": 868100000,
+    "modulation": {
+      "lora": {
+        "bandwidth": 125000,
+        "spreadingFactor": 7,
+        "codeRate": "CR_4_5"
+      }
+    }
+  },
+  "regionConfigId": "eu868"
+}

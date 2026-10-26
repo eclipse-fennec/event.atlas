@@ -25,6 +25,7 @@
 	fennecJacoco,\
 	fennecEMF,\
 	fennecM2X,\
+	fennecEMFModels,\
 	fennecCodec
 
 base-version: 1.0.0
