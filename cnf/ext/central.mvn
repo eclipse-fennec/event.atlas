@@ -64,14 +64,6 @@ org.apache.aries.component-dsl:org.apache.aries.component-dsl.component-dsl:1.2.
 org.apache.aries.typedevent:org.apache.aries.typedevent.bus:1.0.1
 org.apache.aries.spifly:org.apache.aries.spifly.dynamic.framework.extension:1.3.7
 
-# Everything below down to the next blank line used to arrive only through the fennecJPA
-# library, and nothing here should depend on a library expansion for a bundle it deploys: when
-# that coordinate went stale (renamed upstream, see further down), a runner without a warm
-# cnf/cache got no expansion and the resolve failed several hops from the cause - no spifly
-# means no osgi.serviceloader.{processor,registrar} extender, which slf4j.api and slf4j.simple
-# require, reported as "org.eclipse.sensinact.gateway.core.impl cannot be resolved"; spifly in
-# turn needs asm. Versions match what the bndruns already name. The renamed library carries
-# spifly and asm again, but not the junit/osgi.test entries - those have no library source.
 org.apache.aries.spifly:org.apache.aries.spifly.dynamic.bundle:1.3.7
 org.ow2.asm:asm:9.9.1
 org.ow2.asm:asm-commons:9.9.1
@@ -207,11 +199,6 @@ org.eclipse.osgi-technology.rest:org.eclipse.osgitech.rest.bnd.library:1.2.3
 org.eclipse.fennec.codec:org.eclipse.fennec.codec.workspace.library:0.1.0-SNAPSHOT
 
 org.eclipse.fennec.m2x:org.eclipse.fennec.m2x.library.workspace:0.1.1-SNAPSHOT
-# Renamed on 2026-10-16: was org.eclipse.fennec.persistence.jpa:…jpa.library.workspace
-# (bnd.library=fennecJPA), which 404s now. The test half is a separate library since the split -
-# it is what carries assertj-core for a -testpath.
-org.eclipse.fennec.persistence:org.eclipse.fennec.persistence.workspace.library:0.1.0-SNAPSHOT
-org.eclipse.fennec.persistence:org.eclipse.fennec.persistence.test.workspace.library:0.1.0-SNAPSHOT
 org.eclipse.fennec.models:org.eclipse.fennec.common.models.library:0.0.1-SNAPSHOT
 
 # Dropwizard metrics - the sensinact gateway core's metrics support. cnf/ext/sensinact.maven

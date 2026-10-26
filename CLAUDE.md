@@ -775,13 +775,15 @@ EPackages a runtime maps must be registered in that runtime.
 - **Runtime/OSGi dependencies come from Maven Central via bnd**, listed in `cnf/ext/central.mvn`
   — *not* Gradle. Gradle `dependencies` are test-only. Broader dependency sets are switched on
   through `-library:` in `fennec.bnd` (`fennec`, `fennecTest`, `fennecJacoco`, `fennecEMF`,
-  `fennecM2X`, `fennecPersistence`, `fennecPersistenceTest`, `fennecEMFModels`, `fennecCodec`);
+  `fennecM2X`, `fennecEMFModels`, `fennecCodec`);
   a project opts into a setup with e.g. `-library: enableEMF` / `enableOSGi-Test` in its own
   `bnd.bnd`. No project opts into `fennecM2X` — it is in the list purely because
   `fennecM2X.maven` is the only index naming `org.antlr:antlr4-runtime`; see the third
-  `-runbundles` trap below. The two persistence entries are there for the same reason (spifly
-  and asm) and replace `fennecJPA`, renamed upstream on 2026-10-16; the bundles themselves are
-  pinned in `central.mvn` as well, so no deployed bundle depends on a library expansion.
+  `-runbundles` trap below. **There is no persistence library entry any more** (`fennecJPA`,
+  renamed `fennecPersistence`/`fennecPersistenceTest` upstream on 2026-10-16): nothing here uses
+  JPA, it was only ever carrying spifly and asm, and those are pinned in `central.mvn` directly
+  since 2026-10-26. Prefer that shape — a `-library:` entry kept for two third-party bundles is
+  a whole upstream workspace's release cadence in the resolve path.
 - SensiNact itself (`org.eclipse.sensinact.gateway.*`) comes in through the dedicated
   `cnf/ext/sensinact.bnd` repo (index `sensinact.maven`, Eclipse sensinact snapshots). **The
   history rework needs a gateway snapshot from 2026-09-10 or later.** That deployment had been
@@ -854,35 +856,34 @@ EPackages a runtime maps must be registered in that runtime.
      here. That leaves it a single point of failure: if the same thing happens again, one
      `org.antlr:antlr4-runtime:4.13.2` line in `central.mvn` decouples it for good.
 
-     **It happened again on 2026-10-23, and this time the whole closure is pinned.** The library
-     is `fennecJPA`, and it was not abandoned - `eclipse-fennec/emf.persistence-jpa` is active and
-     **renamed** it: `org.eclipse.fennec.persistence:org.eclipse.fennec.persistence.workspace.library`
-     (providing `bnd.library=fennecPersistence`) replaces
-     `org.eclipse.fennec.persistence.jpa:…jpa.library.workspace` (`fennecJPA`), with the test
-     bundles split off into `…persistence.test.workspace.library` (`fennecPersistenceTest`). So a
-     stale coordinate, not a dead project: the one `central.mvn` pinned **404s**, and a runner
-     without a warm `cnf/cache` got no expansion. `central.mvn` and the `-library:` list now name
-     the renamed pair. Nine `-runbundles` entries were reachable
-     through its `fennecPersistence.maven` and nowhere else; the load-bearing ones are `org.apache.aries.spifly.dynamic.bundle` (the
-     framework-extension variant is blacklisted everywhere here), the four asm bundles it needs
-     (`asm.commons`, `asm.tree`, `asm.tree.analysis`, `asm.util`), and `junit-jupiter-params` +
-     `org.osgi.test.{common,junit5}` for the test bndrun — and of those, the renamed library
-     still carries only spifly and asm, so the three test bundles now have no library source at
-     all. Without spifly nothing provides
+     **It happened again on 2026-10-23, and the library is gone now.** It was `fennecJPA`, and
+     the project behind it was not abandoned - `eclipse-fennec/emf.persistence-jpa` is active and
+     **renamed** it to `org.eclipse.fennec.persistence:org.eclipse.fennec.persistence.workspace.library`
+     (`bnd.library=fennecPersistence`), with the test bundles split off into
+     `…persistence.test.workspace.library` (`fennecPersistenceTest`). So a stale coordinate, not a
+     dead project: the one `central.mvn` pinned **404s**, and a runner without a warm `cnf/cache`
+     got no expansion. Nine `-runbundles` entries were reachable through its index and nowhere
+     else - `org.apache.aries.spifly.dynamic.bundle` (the framework-extension variant is
+     blacklisted everywhere here), the four asm bundles it needs (`asm.commons`, `asm.tree`,
+     `asm.tree.analysis`, `asm.util`), and `junit-jupiter-params` + `org.osgi.test.{common,junit5}`
+     for the test bndrun. Without spifly nothing provides
      `osgi.extender=osgi.serviceloader.{processor,registrar}`, which `slf4j.api` and
      `slf4j.simple` require — and the resolver reports that three hops away as
-     `org.eclipse.sensinact.gateway.core.impl cannot be resolved`. `central.mvn` now carries all
-     of them at the versions the bndruns already name — repointing the library fixed this
-     instance, the pins are what stop the next rename from breaking a deployed bundle again.
+     `org.eclipse.sensinact.gateway.core.impl cannot be resolved`. Repointing the library fixed
+     that instance; **dropping it entirely is the fix that holds** — all nine coordinates are in
+     `central.mvn` at the versions the bndruns already name, and no workspace here needs the rest
+     of a persistence stack.
      **The signature to recognise: two builds of the same commit disagree.** On PR #84's
      `c9228fb` the `push` build failed and the `pull_request` build five minutes later was green,
      because the latter restored a `cnf/cache` that still held the old expansion. That is this
      class of break, not a flaky test.
-     **Reproducing it locally takes two removals, not one.** Deleting
-     `cnf/cache/<v>/expanded/…persistence…` proves nothing, because bnd rebuilds the expansion
-     from the copy in `~/.m2` (the `.receipt` names `~/.m2`, not a URL). Move
-     `~/.m2/repository/org/eclipse/fennec/persistence/jpa` aside as well and the resolve fails
-     exactly as CI does.
+     **Reproducing one takes two removals, not one.** Deleting an expansion under
+     `cnf/cache/<v>/expanded/` proves nothing, because bnd rebuilds it from the copy in `~/.m2`
+     (the `.receipt` names `~/.m2`, not a URL). Move the artifact's directory under
+     `~/.m2/repository` aside as well and the resolve fails exactly as CI does.
+     **`assertj-core` has no bnd repo source any more** — it came from `fennecPersistenceTest`.
+     The Gradle test classpath is unaffected (the root `build.gradle` pins it); a bnd
+     `-testpath: assertj-core` in a project's `bnd.bnd` finds nothing, silently.
 
   For 1 and 2 the fix is the same: declare it in `central.mvn`, at the version the rest of that
   library family already uses. After changing a bndrun's `-runbundles`, cross-check every entry
