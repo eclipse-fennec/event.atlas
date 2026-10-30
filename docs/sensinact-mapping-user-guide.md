@@ -495,7 +495,9 @@ typed as `AdminMapping`, `xsi:type` is optional.
 ```
 
 Location can also be given as static `latitude` / `longitude` / `elevation` attributes
-instead of `*Ref` feature paths.
+instead of `*Ref` feature paths. The location is written only when the mapping yields one: a
+mapping without `latitude`/`latitudeRef`, or a payload that lacks the referenced values, leaves
+`admin/location` as it is, so an adapter that knows the device position can own it.
 
 `resources` under `admin` work like service resources (`valueFeature`, change rules, ...) with
 one difference: the admin service's resources are the fixed set sensiNact defines
