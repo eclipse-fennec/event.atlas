@@ -531,46 +531,38 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
-	 * @param sourceInstance
-	 * @param adminMapping
-	 * @param timestamp
-	 * @param adminService
-	 * @throws ValueMappingException
+	 * The admin location: the point read through {@code latitudeRef}/{@code longitudeRef}, else the
+	 * static {@code latitude}/{@code longitude} of the mapping. A mapping that defines neither, or
+	 * a payload without the referenced values, leaves the resource untouched - another source may
+	 * own the provider's location.
 	 */
 	private void mapLocation(EObject sourceInstance, AdminMapping adminMapping, Instant timestamp,
 			SensinactService adminService) throws ValueMappingException {
-		// Map friendlyName resource if configured
-		GeoJsonObject location = lookupLocation(adminMapping);
 		SensinactResource locationResource = adminService.getResources().get("location");
 		requireNonNull(locationResource, "No location resource available in admin service");
-		if (!adminMapping.getLatitudeRef().isEmpty() && 
-				!adminMapping.getLongitudeRef().isEmpty()) {
-			List<EStructuralFeature> latFeaturePath = adminMapping.getLatitudeRef();
-			List<EStructuralFeature> lonFeaturePath = adminMapping.getLongitudeRef();
-			Optional<Object> latValue = getRawValue(sourceInstance, latFeaturePath);
-			Optional<Object> lonValue = getRawValue(sourceInstance, lonFeaturePath);
-
+		GeoJsonObject location = lookupLocation(adminMapping);
+		if (!adminMapping.getLatitudeRef().isEmpty() && !adminMapping.getLongitudeRef().isEmpty()) {
+			Optional<Object> latValue = getRawValue(sourceInstance, adminMapping.getLatitudeRef());
+			Optional<Object> lonValue = getRawValue(sourceInstance, adminMapping.getLongitudeRef());
 			if (latValue.isPresent() && lonValue.isPresent()) {
 				try {
 					Coordinates coordinates = new Coordinates(toDouble(lonValue.get()), toDouble(latValue.get()));
-					final Point point = new Point(coordinates, Collections.emptyList(), Collections.emptyMap());
-					location = point;
-					logger.finest(String.format("Set admin.location = %s", point));
-					return;
+					location = new Point(coordinates, Collections.emptyList(), Collections.emptyMap());
 				} catch (Exception e) {
-					throw new ValueMappingException("Failed to set admin location resource", e);
+					throw new ValueMappingException("Failed to read the admin location from the instance", e);
 				}
 			} else {
 				logger.fine("No value extracted for admin.location");
 			}
 		}
-		if (locationResource != null) {
-			try {
-				locationResource.setValue(location, timestamp);
-				logger.finest(String.format("Set admin.location = %s", location));
-			} catch (Exception e) {
-				logger.warning(String.format("Failed to set admin location: %s", e.getMessage()));
-			}
+		if (location == null) {
+			return;
+		}
+		try {
+			locationResource.setValue(location, timestamp);
+			logger.finest(String.format("Set admin.location = %s", location));
+		} catch (Exception e) {
+			logger.warning(String.format("Failed to set admin location: %s", e.getMessage()));
 		}
 	}
 
