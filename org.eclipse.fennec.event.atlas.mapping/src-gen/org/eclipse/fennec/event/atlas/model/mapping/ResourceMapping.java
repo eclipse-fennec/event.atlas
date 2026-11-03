@@ -42,6 +42,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDescriptionMapping <em>Description Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule <em>Change Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule <em>Deletion Rule</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getValueMapping <em>Value Mapping</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getResourceMapping()
@@ -229,6 +230,42 @@ public interface ResourceMapping extends EObject, EAttribute {
 	 * @generated
 	 */
 	void setDeletionRule(DeletionRule value);
+
+	/**
+	 * Returns the value of the '<em><b>Value Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * Optional richer description of where this resource's value comes from.
+	 * 
+	 * 'valueFeature' states a plain feature path and nothing else. A valueMapping states the same
+	 * path (as its inherited 'featurePath') and adds the whole FeatureMapping chain on top: an OCL
+	 * 'expression' or a 'functionId' to produce the value, a 'converterId' to post-process whatever
+	 * produced it, 'collectionIndex'/'collectionFilter' to pick an element where the path crosses a
+	 * collection, and its own 'value' attribute for a constant pushed on every instance.
+	 * 
+	 * Both are supported: valueFeature is used when valueMapping is absent, so a mapping written
+	 * before this attribute existed behaves exactly as before. When both are set, valueMapping wins
+	 * and the ignored valueFeature is logged once - the same precedence collectionFilter has over
+	 * collectionIndex.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Value Mapping</em>' containment reference.
+	 * @see #setValueMapping(ValueMapping)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getResourceMapping_ValueMapping()
+	 * @model containment="true"
+	 * @generated
+	 */
+	ValueMapping getValueMapping();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getValueMapping <em>Value Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Value Mapping</em>' containment reference.
+	 * @see #getValueMapping()
+	 * @generated
+	 */
+	void setValueMapping(ValueMapping value);
 
 	/**
 	 * <!-- begin-user-doc -->

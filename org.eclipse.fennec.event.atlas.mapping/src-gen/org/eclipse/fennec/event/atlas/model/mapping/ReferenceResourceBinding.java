@@ -46,6 +46,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getChangeRule <em>Change Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getDeletionRule <em>Deletion Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getUnit <em>Unit</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getConverterId <em>Converter Id</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getReferenceResourceBinding()
@@ -160,5 +161,41 @@ public interface ReferenceResourceBinding extends EObject {
 	 * @generated
 	 */
 	void setUnit(String value);
+
+	/**
+	 * Returns the value of the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * Optional converter for the selected resources, applied as the 'converterId' of the
+	 * valueMapping that each generated resource receives.
+	 * 
+	 * A reference mapping generates one resource per attribute of the referenced type, so a
+	 * converter declared on the ReferenceMapping itself applies to all of them - rarely what is
+	 * wanted, since a Fahrenheit-to-Celsius converter would also be handed the humidity. Name the
+	 * attributes here to convert only those.
+	 * 
+	 * Resolved like every other binding setting: the nearest declaration wins, and a binding with an
+	 * empty 'attributes' list is the default for the whole reference. This is the slot the 'unit'
+	 * documentation above already refers to when it speaks of an attribute annotated 'F' exposed as
+	 * 'C' after conversion.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Converter Id</em>' attribute.
+	 * @see #setConverterId(String)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getReferenceResourceBinding_ConverterId()
+	 * @model
+	 * @generated
+	 */
+	String getConverterId();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getConverterId <em>Converter Id</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Converter Id</em>' attribute.
+	 * @see #getConverterId()
+	 * @generated
+	 */
+	void setConverterId(String value);
 
 } // ReferenceResourceBinding

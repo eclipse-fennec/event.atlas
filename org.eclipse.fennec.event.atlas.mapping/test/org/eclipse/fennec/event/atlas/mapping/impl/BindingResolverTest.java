@@ -155,6 +155,57 @@ public class BindingResolverTest {
 		return refMapping;
 	}
 
+	@Test
+	@DisplayName("A converter resolves like every other setting, nested mappings included")
+	void converterId_resolvesLikeTheOthers() {
+		ReferenceMapping parent = referenceMapping(converterBinding("f2c", windSpeed),
+				converterBinding("round"));
+		BindingResolver resolver = new BindingResolver(null, parent);
+
+		assertEquals("f2c", resolver.converterId(windSpeed));
+		assertEquals("round", resolver.converterId(temperature), "not named, so the default applies");
+
+		// A nested reference mapping that declares no bindings of its own: both answers have
+		// to come from the parent. Cheap, but it pins that converterId routes through the same
+		// resolve() as the other settings rather than being resolved on its own.
+		BindingResolver nested = new BindingResolver(resolver, referenceMapping());
+		assertEquals("f2c", nested.converterId(windSpeed),
+				"the nested level declares nothing, so the parent's bindings still apply");
+		assertEquals("round", nested.converterId(temperature),
+				"and its default is inherited too");
+	}
+
+	@Test
+	@DisplayName("A binding that sets only a converter does not reset the other settings")
+	void converterBinding_leavesTheOtherSettingsAlone() {
+		ChangeRule fallback = percentage("pct-50");
+
+		ReferenceMapping refMapping = referenceMapping(converterBinding("f2c", windSpeed),
+				binding(fallback, null, "m/s"));
+		BindingResolver resolver = new BindingResolver(null, refMapping);
+
+		assertEquals("f2c", resolver.converterId(windSpeed));
+		assertSame(fallback, resolver.changeRule(windSpeed), "inherited from the default binding");
+		assertEquals("m/s", resolver.unit(windSpeed));
+	}
+
+	@Test
+	@DisplayName("No binding names a converter, so nothing resolves one")
+	void noConverterBinding_resolvesNull() {
+		BindingResolver resolver = new BindingResolver(null, referenceMapping(binding(percentage("pct-5"), null, null)));
+
+		assertNull(resolver.converterId(windSpeed));
+	}
+
+	private static ReferenceResourceBinding converterBinding(String converterId, EAttribute... attributes) {
+		ReferenceResourceBinding binding = MappingFactory.eINSTANCE.createReferenceResourceBinding();
+		binding.setConverterId(converterId);
+		for (EAttribute attribute : attributes) {
+			binding.getAttributes().add(attribute);
+		}
+		return binding;
+	}
+
 	private static ReferenceResourceBinding binding(ChangeRule changeRule, DeletionRule deletionRule, String unit,
 			EAttribute... attributes) {
 		ReferenceResourceBinding binding = MappingFactory.eINSTANCE.createReferenceResourceBinding();

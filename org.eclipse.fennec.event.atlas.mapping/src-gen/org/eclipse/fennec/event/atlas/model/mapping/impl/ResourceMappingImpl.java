@@ -44,6 +44,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
 import org.eclipse.fennec.event.atlas.model.mapping.NameMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
 
 /**
  * <!-- begin-user-doc -->
@@ -62,6 +63,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getDescriptionMapping <em>Description Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getChangeRule <em>Change Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getDeletionRule <em>Deletion Rule</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getValueMapping <em>Value Mapping</em>}</li>
  * </ul>
  *
  * @generated
@@ -176,6 +178,16 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 * @ordered
 	 */
 	protected DeletionRule deletionRule;
+
+	/**
+	 * The cached value of the '{@link #getValueMapping() <em>Value Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getValueMapping()
+	 * @generated
+	 * @ordered
+	 */
+	protected ValueMapping valueMapping;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -457,6 +469,51 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 * @generated
 	 */
 	@Override
+	public ValueMapping getValueMapping() {
+		return valueMapping;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public NotificationChain basicSetValueMapping(ValueMapping newValueMapping, NotificationChain msgs) {
+		ValueMapping oldValueMapping = valueMapping;
+		valueMapping = newValueMapping;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING, oldValueMapping, newValueMapping);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setValueMapping(ValueMapping newValueMapping) {
+		if (newValueMapping != valueMapping) {
+			NotificationChain msgs = null;
+			if (valueMapping != null)
+				msgs = ((InternalEObject)valueMapping).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING, null, msgs);
+			if (newValueMapping != null)
+				msgs = ((InternalEObject)newValueMapping).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING, null, msgs);
+			msgs = basicSetValueMapping(newValueMapping, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING, newValueMapping, newValueMapping));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public void mapUnit(final EObject eobject, final Function<EObject, String> unitFunction) {
 		Objects.requireNonNull(unitFunction);
 		Objects.requireNonNull(eobject);
@@ -477,6 +534,8 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 				return basicSetChangeRule(null, msgs);
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
 				return basicSetDeletionRule(null, msgs);
+			case MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING:
+				return basicSetValueMapping(null, msgs);
 		}
 		return super.eInverseRemove(otherEnd, featureID, msgs);
 	}
@@ -510,6 +569,8 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 				return getChangeRule();
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
 				return getDeletionRule();
+			case MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING:
+				return getValueMapping();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -552,6 +613,9 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
 				setDeletionRule((DeletionRule)newValue);
 				return;
+			case MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING:
+				setValueMapping((ValueMapping)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -591,6 +655,9 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
 				setDeletionRule((DeletionRule)null);
 				return;
+			case MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING:
+				setValueMapping((ValueMapping)null);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -621,6 +688,8 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 				return changeRule != null;
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
 				return deletionRule != null;
+			case MappingPackage.RESOURCE_MAPPING__VALUE_MAPPING:
+				return valueMapping != null;
 		}
 		return super.eIsSet(featureID);
 	}

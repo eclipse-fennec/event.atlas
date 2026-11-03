@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:a9227d7920f93e8572463f1e350d2e2e5a22a8da1f5e98ebf78db0cf0e35fe8f", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:bb874fc30df5d406e61d3025167eaa85637eca384c26cd39d2dc9bd090d6f5a0", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -1024,13 +1024,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int RESOURCE_MAPPING__DELETION_RULE = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 8;
 
 	/**
+	 * The feature id for the '<em><b>Value Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int RESOURCE_MAPPING__VALUE_MAPPING = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 9;
+
+	/**
 	 * The number of structural features of the '<em>Resource Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int RESOURCE_MAPPING_FEATURE_COUNT = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 9;
+	int RESOURCE_MAPPING_FEATURE_COUNT = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 10;
 
 	/**
 	 * The operation id for the '<em>Get EAnnotation</em>' operation.
@@ -1342,13 +1351,31 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int FEATURE_MAPPING__COLLECTION_FILTER = 3;
 
 	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int FEATURE_MAPPING__CONVERTER_ID = 4;
+
+	/**
+	 * The feature id for the '<em><b>Expression</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int FEATURE_MAPPING__EXPRESSION = 5;
+
+	/**
 	 * The number of structural features of the '<em>Feature Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int FEATURE_MAPPING_FEATURE_COUNT = 4;
+	int FEATURE_MAPPING_FEATURE_COUNT = 6;
 
 	/**
 	 * The number of operations of the '<em>Feature Mapping</em>' class.
@@ -1404,6 +1431,24 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @ordered
 	 */
 	int TIMESTAMP_MAPPING__COLLECTION_FILTER = FEATURE_MAPPING__COLLECTION_FILTER;
+
+	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int TIMESTAMP_MAPPING__CONVERTER_ID = FEATURE_MAPPING__CONVERTER_ID;
+
+	/**
+	 * The feature id for the '<em><b>Expression</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int TIMESTAMP_MAPPING__EXPRESSION = FEATURE_MAPPING__EXPRESSION;
 
 	/**
 	 * The feature id for the '<em><b>Strategy</b></em>' attribute.
@@ -1497,6 +1542,24 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int NAME_MAPPING__COLLECTION_FILTER = FEATURE_MAPPING__COLLECTION_FILTER;
 
 	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int NAME_MAPPING__CONVERTER_ID = FEATURE_MAPPING__CONVERTER_ID;
+
+	/**
+	 * The feature id for the '<em><b>Expression</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int NAME_MAPPING__EXPRESSION = FEATURE_MAPPING__EXPRESSION;
+
+	/**
 	 * The feature id for the '<em><b>Name</b></em>' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -1568,6 +1631,24 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @ordered
 	 */
 	int VALUE_MAPPING__COLLECTION_FILTER = FEATURE_MAPPING__COLLECTION_FILTER;
+
+	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int VALUE_MAPPING__CONVERTER_ID = FEATURE_MAPPING__CONVERTER_ID;
+
+	/**
+	 * The feature id for the '<em><b>Expression</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int VALUE_MAPPING__EXPRESSION = FEATURE_MAPPING__EXPRESSION;
 
 	/**
 	 * The feature id for the '<em><b>Value</b></em>' attribute.
@@ -1687,6 +1768,24 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @ordered
 	 */
 	int REFERENCE_MAPPING__COLLECTION_FILTER = FEATURE_MAPPING__COLLECTION_FILTER;
+
+	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_MAPPING__CONVERTER_ID = FEATURE_MAPPING__CONVERTER_ID;
+
+	/**
+	 * The feature id for the '<em><b>Expression</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_MAPPING__EXPRESSION = FEATURE_MAPPING__EXPRESSION;
 
 	/**
 	 * The feature id for the '<em><b>Filter</b></em>' reference list.
@@ -2319,13 +2418,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int REFERENCE_RESOURCE_BINDING__UNIT = 3;
 
 	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int REFERENCE_RESOURCE_BINDING__CONVERTER_ID = 4;
+
+	/**
 	 * The number of structural features of the '<em>Reference Resource Binding</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int REFERENCE_RESOURCE_BINDING_FEATURE_COUNT = 4;
+	int REFERENCE_RESOURCE_BINDING_FEATURE_COUNT = 5;
 
 	/**
 	 * The number of operations of the '<em>Reference Resource Binding</em>' class.
@@ -2895,6 +3003,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getResourceMapping_DeletionRule();
 
 	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getValueMapping <em>Value Mapping</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Value Mapping</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getValueMapping()
+	 * @see #getResourceMapping()
+	 * @generated
+	 */
+	EReference getResourceMapping_ValueMapping();
+
+	/**
 	 * Returns the meta object for the '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#mapUnit(org.eclipse.emf.ecore.EObject, java.util.function.Function) <em>Map Unit</em>}' operation.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -3150,6 +3269,28 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 */
 	EAttribute getFeatureMapping_CollectionFilter();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping#getConverterId <em>Converter Id</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Converter Id</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping#getConverterId()
+	 * @see #getFeatureMapping()
+	 * @generated
+	 */
+	EAttribute getFeatureMapping_ConverterId();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping#getExpression <em>Expression</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Expression</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping#getExpression()
+	 * @see #getFeatureMapping()
+	 * @generated
+	 */
+	EAttribute getFeatureMapping_Expression();
 
 	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping <em>Timestamp Mapping</em>}'.
@@ -3635,6 +3776,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EAttribute getReferenceResourceBinding_Unit();
 
 	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getConverterId <em>Converter Id</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Converter Id</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding#getConverterId()
+	 * @see #getReferenceResourceBinding()
+	 * @generated
+	 */
+	EAttribute getReferenceResourceBinding_ConverterId();
+
+	/**
 	 * Returns the meta object for enum '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -4113,6 +4265,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference RESOURCE_MAPPING__DELETION_RULE = eINSTANCE.getResourceMapping_DeletionRule();
 
 		/**
+		 * The meta object literal for the '<em><b>Value Mapping</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference RESOURCE_MAPPING__VALUE_MAPPING = eINSTANCE.getResourceMapping_ValueMapping();
+
+		/**
 		 * The meta object literal for the '<em><b>Map Unit</b></em>' operation.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
@@ -4311,6 +4471,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EAttribute FEATURE_MAPPING__COLLECTION_FILTER = eINSTANCE.getFeatureMapping_CollectionFilter();
+
+		/**
+		 * The meta object literal for the '<em><b>Converter Id</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute FEATURE_MAPPING__CONVERTER_ID = eINSTANCE.getFeatureMapping_ConverterId();
+
+		/**
+		 * The meta object literal for the '<em><b>Expression</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute FEATURE_MAPPING__EXPRESSION = eINSTANCE.getFeatureMapping_Expression();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.TimestampMappingImpl <em>Timestamp Mapping</em>}' class.
@@ -4699,6 +4875,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EAttribute REFERENCE_RESOURCE_BINDING__UNIT = eINSTANCE.getReferenceResourceBinding_Unit();
+
+		/**
+		 * The meta object literal for the '<em><b>Converter Id</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute REFERENCE_RESOURCE_BINDING__CONVERTER_ID = eINSTANCE.getReferenceResourceBinding_ConverterId();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}' enum.

@@ -46,6 +46,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl#getChangeRule <em>Change Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl#getDeletionRule <em>Deletion Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl#getUnit <em>Unit</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ReferenceResourceBindingImpl#getConverterId <em>Converter Id</em>}</li>
  * </ul>
  *
  * @generated
@@ -100,6 +101,26 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 	 * @ordered
 	 */
 	protected String unit = UNIT_EDEFAULT;
+
+	/**
+	 * The default value of the '{@link #getConverterId() <em>Converter Id</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getConverterId()
+	 * @generated
+	 * @ordered
+	 */
+	protected static final String CONVERTER_ID_EDEFAULT = null;
+
+	/**
+	 * The cached value of the '{@link #getConverterId() <em>Converter Id</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getConverterId()
+	 * @generated
+	 * @ordered
+	 */
+	protected String converterId = CONVERTER_ID_EDEFAULT;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -252,6 +273,29 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 	 * @generated
 	 */
 	@Override
+	public String getConverterId() {
+		return converterId;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setConverterId(String newConverterId) {
+		String oldConverterId = converterId;
+		converterId = newConverterId;
+		if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.REFERENCE_RESOURCE_BINDING__CONVERTER_ID, oldConverterId, converterId));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs) {
 		switch (featureID) {
 			case MappingPackage.REFERENCE_RESOURCE_BINDING__CHANGE_RULE:
@@ -278,6 +322,8 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 				return getDeletionRule();
 			case MappingPackage.REFERENCE_RESOURCE_BINDING__UNIT:
 				return getUnit();
+			case MappingPackage.REFERENCE_RESOURCE_BINDING__CONVERTER_ID:
+				return getConverterId();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -304,6 +350,9 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 			case MappingPackage.REFERENCE_RESOURCE_BINDING__UNIT:
 				setUnit((String)newValue);
 				return;
+			case MappingPackage.REFERENCE_RESOURCE_BINDING__CONVERTER_ID:
+				setConverterId((String)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -328,6 +377,9 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 			case MappingPackage.REFERENCE_RESOURCE_BINDING__UNIT:
 				setUnit(UNIT_EDEFAULT);
 				return;
+			case MappingPackage.REFERENCE_RESOURCE_BINDING__CONVERTER_ID:
+				setConverterId(CONVERTER_ID_EDEFAULT);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -348,6 +400,8 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 				return deletionRule != null;
 			case MappingPackage.REFERENCE_RESOURCE_BINDING__UNIT:
 				return UNIT_EDEFAULT == null ? unit != null : !UNIT_EDEFAULT.equals(unit);
+			case MappingPackage.REFERENCE_RESOURCE_BINDING__CONVERTER_ID:
+				return CONVERTER_ID_EDEFAULT == null ? converterId != null : !CONVERTER_ID_EDEFAULT.equals(converterId);
 		}
 		return super.eIsSet(featureID);
 	}
@@ -364,6 +418,8 @@ public class ReferenceResourceBindingImpl extends MinimalEObjectImpl.Container i
 		StringBuilder result = new StringBuilder(super.toString());
 		result.append(" (unit: ");
 		result.append(unit);
+		result.append(", converterId: ");
+		result.append(converterId);
 		result.append(')');
 		return result.toString();
 	}

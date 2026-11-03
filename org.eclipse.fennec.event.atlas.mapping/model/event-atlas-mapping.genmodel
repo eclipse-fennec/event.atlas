@@ -80,6 +80,7 @@
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/descriptionMapping"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/changeRule"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/deletionRule"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/valueMapping"/>
       <genOperations ecoreOperation="event-atlas-mapping.ecore#//ResourceMapping/mapUnit"
           body="&lt;%java.util.Objects%>.requireNonNull(unitFunction);&#xA;Objects.requireNonNull(eobject);&#xA;setUnit(unitFunction.apply(eobject));">
         <genParameters ecoreParameter="event-atlas-mapping.ecore#//ResourceMapping/mapUnit/eobject"/>
@@ -119,6 +120,8 @@
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//FeatureMapping/featurePath"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/collectionIndex"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/collectionFilter"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/converterId"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//FeatureMapping/expression"/>
     </genClasses>
     <genClasses ecoreClass="event-atlas-mapping.ecore#//TimestampMapping">
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//TimestampMapping/strategy"/>
@@ -177,6 +180,7 @@
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceResourceBinding/changeRule"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceResourceBinding/deletionRule"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceResourceBinding/unit"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceResourceBinding/converterId"/>
     </genClasses>
   </genPackages>
 </genmodel:GenModel>

@@ -748,7 +748,30 @@ important thing to know, and the part that changed most recently:
   strategies, admin/location mapping.
 - `ProviderModelSensinactMapper` — builds the provider model in the twin from a `ProviderMapping`
   (via its inner `Factory`, needs the profile registry).
-- `converters/` — `TypeConverter` + `TypeConverterRegistry` for source→resource value coercion.
+- **`converters/` is the converter whiteboard** (since 2026-11-03, issue #91). `ValueConverter`
+  (`Object convert(Object)`, selected by the `event.atlas.converter.id` service property) is the
+  exported API; `converters/impl` holds `ValueConverterRegistryImpl` plus the two factory
+  components that ship — `event.atlas.converter.linear` (`factor`/`offset`) and
+  `event.atlas.converter.instant` (`pattern`), both `configuration-policy=require`, so a runtime
+  that configures none publishes none. `ValueMapperImpl` applies the converter a `FeatureMapping`
+  names *before* the value is read as the resource's `eType`, so a converter may change the type
+  — which is why a scaled value needs a floating-point `eType`: `convertValue` hands a `Double` to
+  `EcoreUtil.convertToString` for `EInt`, which throws, and the value is **dropped, not rounded**
+  (`ScaledResourceValueTest` pins it). An unknown id passes the value through and logs once; a
+  converter that throws or returns null drops it. The old dead `TypeConverter`/`TypeConverterRegistry`/
+  `DateToInstantConverter` trio was deleted. `InstantConverter` is a plain class, not a component:
+  a `TimestampMapping` uses it directly with the `hint` from the model, so a timestamp needs
+  nothing deployed; the component wraps the same class for a resource value that holds a date.
+- **`ResourceMapping.valueMapping` is the richer value source**, winning over `valueFeature` when
+  both are set: a `ValueMapping` carries the path plus `collectionIndex`/`collectionFilter`, the
+  `converterId`, and a constant `value` that answers when the path yields nothing (the same
+  fallback shape `NameMapping.name` and `TimestampMapping.timestamp` already had). A constant is
+  parsed with `EcoreUtil.createFromString`, not coerced, and is never run through a converter.
+  The expander only emits a `valueMapping` on a generated resource when a
+  `ReferenceResourceBinding.converterId` gives it something to carry, so existing generated output
+  is unchanged.
+- **`functionId`, `expression` and `TimestampStrategy` are still not read by anything.** The user
+  guide now says so instead of documenting them as working.
 - All twin interaction happens on the SensiNact **`GatewayThread`** (via
   `AbstractSensinactCommand`); tests follow the same pattern.
 - `MappingConfigurator` is a **generated** DS component in `src-gen`, not hand-written code.

@@ -215,6 +215,12 @@
         <details key="documentation" value="Optional deletion rule controlling purging of this resource's stored history data.&#xA;Contained: the rule belongs to this resource alone. Nothing enforces deletion rules yet."/>
       </eAnnotations>
     </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="valueMapping" eType="#//ValueMapping"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Optional richer description of where this resource's value comes from.&#xA;&#xA;'valueFeature' states a plain feature path and nothing else. A valueMapping states the same&#xA;path (as its inherited 'featurePath') and adds the whole FeatureMapping chain on top: an OCL&#xA;'expression' or a 'functionId' to produce the value, a 'converterId' to post-process whatever&#xA;produced it, 'collectionIndex'/'collectionFilter' to pick an element where the path crosses a&#xA;collection, and its own 'value' attribute for a constant pushed on every instance.&#xA;&#xA;Both are supported: valueFeature is used when valueMapping is absent, so a mapping written&#xA;before this attribute existed behaves exactly as before. When both are set, valueMapping wins&#xA;and the ignored valueFeature is logged once - the same precedence collectionFilter has over&#xA;collectionIndex."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="AdminMapping" eSuperTypes="#//ServiceMapping">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="friendlyName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
@@ -287,7 +293,11 @@
     </eLiterals>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="FeatureMapping">
-    <eStructuralFeatures xsi:type="ecore:EAttribute" name="functionId" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="functionId" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The id of the function to be invoked for this FeatureMapping. If featurePath is also set, then the function is applied to the feature of featurePath, otherwise the entire source EObject is passed as input for the function. If, in addition to functionId, expression is set, then the functionId is ignored."/>
+      </eAnnotations>
+    </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EReference" name="featurePath" upperBound="-1"
         eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EStructuralFeature"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="collectionIndex" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
@@ -299,6 +309,16 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="collectionFilter" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Optional filter expression to select a specific element from the collection instead of using a fixed index. The expression syntax and evaluation mechanism are implementation-specific.&#xA;If both collectionIndex and collectionFilter are set, collectionFilter takes precedence.&#xA;This allows for more dynamic selection criteria, such as 'select the element with the earliest timestamp' or 'select the element where type=CURRENT'.&#xA;This attribute is ignored if collectionFeature is not set."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="converterId" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The id of the converter to be invoked for this FeatureMapping. If this is set, the converter logic will be applied on the resulting value of the OCL expression (if expression is set), on the resulting value of the function (if no expression is set and functionId is set), or on the featurePath value (if neither expression nor functionId is set)."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="expression" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The OCL expression to compute the actual value of this mapping. If this is set, it will take priority over the simple featurePath and also over functionId. If also converterId is set, this will be executed on the result of this OCL expression."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>
@@ -456,6 +476,11 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="unit" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Optional unit for the selected resources, applied as ResourceMapping.unit.&#xA;&#xA;A generated resource otherwise takes its unit from the source attribute's 'sensinact.mapping'&#xA;annotation, which is copied along with the attribute. Set this when that is not an option -&#xA;a source model that cannot be annotated - or when the mapping publishes a different unit than&#xA;the model declares, for instance an attribute annotated 'F' exposed as 'C' after conversion.&#xA;ResourceMapping.unit takes precedence over the annotation."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="converterId" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Optional converter for the selected resources, applied as the 'converterId' of the&#xA;valueMapping that each generated resource receives.&#xA;&#xA;A reference mapping generates one resource per attribute of the referenced type, so a&#xA;converter declared on the ReferenceMapping itself applies to all of them - rarely what is&#xA;wanted, since a Fahrenheit-to-Celsius converter would also be handed the humidity. Name the&#xA;attributes here to convert only those.&#xA;&#xA;Resolved like every other binding setting: the nearest declaration wins, and a binding with an&#xA;empty 'attributes' list is the default for the whole reference. This is the slot the 'unit'&#xA;documentation above already refers to when it speaks of an attribute annotated 'F' exposed as&#xA;'C' after conversion."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>

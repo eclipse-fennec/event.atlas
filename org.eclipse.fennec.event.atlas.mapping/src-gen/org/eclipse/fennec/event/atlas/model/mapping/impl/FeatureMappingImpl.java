@@ -42,6 +42,8 @@ import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.FeatureMappingImpl#getFeaturePath <em>Feature Path</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.FeatureMappingImpl#getCollectionIndex <em>Collection Index</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.FeatureMappingImpl#getCollectionFilter <em>Collection Filter</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.FeatureMappingImpl#getConverterId <em>Converter Id</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.FeatureMappingImpl#getExpression <em>Expression</em>}</li>
  * </ul>
  *
  * @generated
@@ -116,6 +118,46 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 	 * @ordered
 	 */
 	protected String collectionFilter = COLLECTION_FILTER_EDEFAULT;
+
+	/**
+	 * The default value of the '{@link #getConverterId() <em>Converter Id</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getConverterId()
+	 * @generated
+	 * @ordered
+	 */
+	protected static final String CONVERTER_ID_EDEFAULT = null;
+
+	/**
+	 * The cached value of the '{@link #getConverterId() <em>Converter Id</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getConverterId()
+	 * @generated
+	 * @ordered
+	 */
+	protected String converterId = CONVERTER_ID_EDEFAULT;
+
+	/**
+	 * The default value of the '{@link #getExpression() <em>Expression</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getExpression()
+	 * @generated
+	 * @ordered
+	 */
+	protected static final String EXPRESSION_EDEFAULT = null;
+
+	/**
+	 * The cached value of the '{@link #getExpression() <em>Expression</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getExpression()
+	 * @generated
+	 * @ordered
+	 */
+	protected String expression = EXPRESSION_EDEFAULT;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -224,6 +266,52 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 	 * @generated
 	 */
 	@Override
+	public String getConverterId() {
+		return converterId;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setConverterId(String newConverterId) {
+		String oldConverterId = converterId;
+		converterId = newConverterId;
+		if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.FEATURE_MAPPING__CONVERTER_ID, oldConverterId, converterId));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public String getExpression() {
+		return expression;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setExpression(String newExpression) {
+		String oldExpression = expression;
+		expression = newExpression;
+		if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.FEATURE_MAPPING__EXPRESSION, oldExpression, expression));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public Object eGet(int featureID, boolean resolve, boolean coreType) {
 		switch (featureID) {
 			case MappingPackage.FEATURE_MAPPING__FUNCTION_ID:
@@ -234,6 +322,10 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 				return getCollectionIndex();
 			case MappingPackage.FEATURE_MAPPING__COLLECTION_FILTER:
 				return getCollectionFilter();
+			case MappingPackage.FEATURE_MAPPING__CONVERTER_ID:
+				return getConverterId();
+			case MappingPackage.FEATURE_MAPPING__EXPRESSION:
+				return getExpression();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -260,6 +352,12 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 			case MappingPackage.FEATURE_MAPPING__COLLECTION_FILTER:
 				setCollectionFilter((String)newValue);
 				return;
+			case MappingPackage.FEATURE_MAPPING__CONVERTER_ID:
+				setConverterId((String)newValue);
+				return;
+			case MappingPackage.FEATURE_MAPPING__EXPRESSION:
+				setExpression((String)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -284,6 +382,12 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 			case MappingPackage.FEATURE_MAPPING__COLLECTION_FILTER:
 				setCollectionFilter(COLLECTION_FILTER_EDEFAULT);
 				return;
+			case MappingPackage.FEATURE_MAPPING__CONVERTER_ID:
+				setConverterId(CONVERTER_ID_EDEFAULT);
+				return;
+			case MappingPackage.FEATURE_MAPPING__EXPRESSION:
+				setExpression(EXPRESSION_EDEFAULT);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -304,6 +408,10 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 				return collectionIndex != COLLECTION_INDEX_EDEFAULT;
 			case MappingPackage.FEATURE_MAPPING__COLLECTION_FILTER:
 				return COLLECTION_FILTER_EDEFAULT == null ? collectionFilter != null : !COLLECTION_FILTER_EDEFAULT.equals(collectionFilter);
+			case MappingPackage.FEATURE_MAPPING__CONVERTER_ID:
+				return CONVERTER_ID_EDEFAULT == null ? converterId != null : !CONVERTER_ID_EDEFAULT.equals(converterId);
+			case MappingPackage.FEATURE_MAPPING__EXPRESSION:
+				return EXPRESSION_EDEFAULT == null ? expression != null : !EXPRESSION_EDEFAULT.equals(expression);
 		}
 		return super.eIsSet(featureID);
 	}
@@ -324,6 +432,10 @@ public class FeatureMappingImpl extends MinimalEObjectImpl.Container implements 
 		result.append(collectionIndex);
 		result.append(", collectionFilter: ");
 		result.append(collectionFilter);
+		result.append(", converterId: ");
+		result.append(converterId);
+		result.append(", expression: ");
+		result.append(expression);
 		result.append(')');
 		return result.toString();
 	}

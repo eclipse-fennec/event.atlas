@@ -53,4 +53,21 @@ public class ValueMapperFactory {
             ChangeRuleFilter changeRuleFilter) {
         return new ValueMapperImpl(twin, mapping, changeRuleFilter);
     }
+
+    /**
+     * Creates a value mapper that applies the resources' change rules and the converters their
+     * value mappings name.
+     *
+     * @param twin the digital twin to update
+     * @param mapping the provider mapping to apply
+     * @param changeRuleFilter decides per resource whether a mapped value is pushed, or
+     *        <code>null</code> to push every value
+     * @param converterRegistry applies the converter a value mapping names, or
+     *        <code>null</code> to push every value unconverted
+     * @return a new value mapper
+     */
+    public static ValueMapper createValueMapper(SensinactDigitalTwin twin, ProviderMapping mapping,
+            ChangeRuleFilter changeRuleFilter, ValueConverterRegistry converterRegistry) {
+        return new ValueMapperImpl(twin, mapping, changeRuleFilter, converterRegistry);
+    }
 }

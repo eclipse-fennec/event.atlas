@@ -48,6 +48,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ReferenceResourceBinding;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
 import org.eclipse.sensinact.core.emf.model.EMFModel;
 import org.eclipse.sensinact.core.emf.model.SensinactEMFModelManager;
 import org.eclipse.sensinact.core.emf.twin.SensinactEMFDigitalTwin;
@@ -453,9 +454,24 @@ public class ProviderModelSensinactMapper {
 			attribute.getEAnnotations().forEach(a -> resourceMapping.getEAnnotations().add(EcoreUtil.copy(a)));
 
 			// Set the complete feature path: base path + attribute
-			// This allows ValueMapperImpl to correctly extract values from the root object
-			if(nested) resourceMapping.getValueFeature().addAll(baseFeaturePath);
-			resourceMapping.getValueFeature().add(attribute);
+			// This allows ValueMapperImpl to correctly extract values from the root object.
+			//
+			// Where the path goes depends on whether this resource has anything to carry
+			// besides the path itself. A bound converter needs a valueMapping, because
+			// converterId lives on FeatureMapping and plain valueFeature is only a list of
+			// features. Without one the resource keeps the original shape, so the generated
+			// output of every mapping written so far is unchanged.
+			String boundConverterId = bindings.converterId(attribute);
+			if (boundConverterId == null) {
+				if(nested) resourceMapping.getValueFeature().addAll(baseFeaturePath);
+				resourceMapping.getValueFeature().add(attribute);
+			} else {
+				ValueMapping valueMapping = MappingFactory.eINSTANCE.createValueMapping();
+				if(nested) valueMapping.getFeaturePath().addAll(baseFeaturePath);
+				valueMapping.getFeaturePath().add(attribute);
+				valueMapping.setConverterId(boundConverterId);
+				resourceMapping.setValueMapping(valueMapping);
+			}
 
 			// Per-attribute settings from the reference mapping's bindings. Resolving them
 			// here is what keeps the engine ResourceMapping-only: a generated resource is
@@ -584,6 +600,10 @@ public class ProviderModelSensinactMapper {
 
 		String unit(EAttribute attribute) {
 			return resolve(attribute, ReferenceResourceBinding::getUnit);
+		}
+
+		String converterId(EAttribute attribute) {
+			return resolve(attribute, ReferenceResourceBinding::getConverterId);
 		}
 
 		private <T> T resolve(EAttribute attribute, Function<ReferenceResourceBinding, T> setting) {

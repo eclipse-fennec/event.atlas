@@ -175,34 +175,39 @@ attribute is typically set (`<name name="Battery"/>`).
 
 ### Timestamps
 
-A `TimestampMapping` decides the observation time. It carries a `strategy` and an optional
-formatting `hint`:
+A `TimestampMapping` decides the observation time. The engine resolves it in this order, and
+the first answer wins:
 
-| `strategy` | Behaviour |
-|---|---|
-| `FEATURE` | Read the time from the timestamp's `featurePath`. |
-| `NOW` | Use the current time. |
-| `FUNCTION` | Compute it from a registered [function](#custom-functions-advanced). |
+1. the `featurePath`, if one is set and this payload carries it;
+2. the static `timestamp` literal;
+3. the current time.
 
 ```xml
 <!-- from the payload -->
-<timestamp strategy="FEATURE">
+<timestamp>
   <featurePath xsi:type="ecore:EAttribute" href="m.ecore#//UplinkMessage/time"/>
 </timestamp>
 
-<!-- gateway clock -->
-<timestamp strategy="NOW"/>
+<!-- gateway clock: no path and no literal -->
+<timestamp/>
 
 <!-- parse a non-standard textual timestamp -->
-<timestamp strategy="FEATURE" hint="yyyy-MM-dd'T'HH:mm:ssX">
+<timestamp hint="yyyy-MM-dd'T'HH:mm:ssX">
   <featurePath xsi:type="ecore:EAttribute" href="m.ecore#//Reading/observedAt"/>
 </timestamp>
 ```
 
-In practice the engine resolves a timestamp by trying the feature path first, then a static
-value, and finally falling back to the current time — so a bare `<timestamp>` with a
-feature path behaves like `FEATURE`. `Instant`, `java.util.Date`, epoch-millis `Long`, and
-(with a `hint`) formatted strings are all understood.
+`Instant`, `java.util.Date` and an epoch-millis `Long` are read as they are. A `String` is read
+with the `hint` when one is set, and as an ISO-8601 instant otherwise — or as ISO when the hint
+does not fit that value.
+
+> **`strategy` does nothing.** The `TimestampStrategy` enum (`NOW`, `FEATURE`, `FUNCTION`) is in
+> the metamodel, and the engine never reads it. The order above is implicit. Do not write
+> `strategy="NOW"` and expect the current time: a mapping with a feature path reads the path.
+
+> **The `hint` reads a string only.** If the feature is an `EDate`, the codec has already made a
+> `java.util.Date` before the mapping runs, and the hint is never used. A date format for a
+> payload belongs to the codec, and not here.
 
 The static value is the `timestamp` attribute on the `<timestamp>` element itself, an ISO-8601
 instant literal:
@@ -259,6 +264,7 @@ a SensiNact resource:
 | `unit` | Unit string → `unit` metadata (falls back to an Ecore annotation, below). |
 | `eType` | Target `EDataType` (e.g. `EDouble`). The value is converted to it. |
 | `valueFeature` (0..\*) | Feature path to the source value. |
+| `valueMapping` | Richer alternative to `valueFeature`: a `ValueMapping` with the path plus `collectionIndex`/`collectionFilter`, a `converterId` and a constant `value`. Wins when both are set. |
 | `unitFeature` (0..\*) | Feature path to a dynamic unit value. |
 | `timestamp` | Resource-level timestamp, or a reference to one (`//@timestamp`). |
 | `extraMetadata` (0..\*) | Arbitrary `key`/`value` metadata entries. |
@@ -373,7 +379,7 @@ collection — current weather from `reports[0]`, the 3-hour forecast from `repo
 ```xml
 <services mid="currentWeather">
   <name name="Current Weather"/>
-  <timestamp strategy="FEATURE">  <!-- resolved against reports[0] -->
+  <timestamp>  <!-- resolved against reports[0] -->
     <featurePath xsi:type="ecore:EAttribute" href="w.ecore#//WeatherReport/timestamp"/>
   </timestamp>
 
@@ -411,7 +417,7 @@ every attribute of a target EClass automatically.
 ```xml
 <services mid="currentWeather">
   <name name="Current Weather"/>
-  <timestamp strategy="FEATURE">
+  <timestamp>
     <featurePath xsi:type="ecore:EAttribute" href="w.ecore#//WeatherReport/timestamp"/>
   </timestamp>
 
@@ -563,14 +569,111 @@ Profile services and resources carry a `required` flag (default `true`) plus
 `expectedType`/`expectedUnit`, which the `MappingProfileRegistry` uses to validate that a
 conforming mapping actually provides what the profile demands.
 
+## Converting values
+
+A feature path reads a value. A **converter** changes it on the way into the twin: Fahrenheit to
+Celsius, tenths of a degree to degrees, a device's own date format to an instant.
+
+A converter is an OSGi whiteboard service. Register a `ValueConverter` with the service property
+`event.atlas.converter.id`, and a mapping selects it by that id:
+
+```java
+@Component(property = ValueConverter.CONVERTER_ID + "=my-converter")
+public class MyConverter implements ValueConverter {
+    public Object convert(Object value) { … }
+}
+```
+
+```xml
+<resources mid="temperature">
+  <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+  <valueMapping converterId="f2c">
+    <featurePath xsi:type="ecore:EAttribute" href="m.ecore#//Reading/tempF"/>
+  </valueMapping>
+</resources>
+```
+
+`converterId` lives on `FeatureMapping`, so it works wherever one appears: a `ValueMapping`, a
+`NameMapping` and a `TimestampMapping`. The converter runs on what the **feature path**
+produced, and before the value is read as the resource's `eType` — so a converter may return a
+different type than it was handed.
+
+Two outcomes are worth knowing:
+
+- **An unknown id passes the value through unconverted**, and the id is logged once. A typo
+  does not empty a resource, but it does publish an unconverted value.
+- **A converter that throws, or returns `null`, drops the value.** The resource keeps what it
+  had.
+
+### The two converters that ship here
+
+Both are factory components with `configuration-policy=require`, so a runtime that configures
+none publishes no converter at all.
+
+| factory pid | properties | what it does |
+|---|---|---|
+| `event.atlas.converter.linear` | `factor`, `offset` | `value * factor + offset` |
+| `event.atlas.converter.instant` | `pattern` | reads a value as an instant |
+
+```json
+"event.atlas.converter.linear~f2c": {
+    "event.atlas.converter.id": "f2c",
+    "factor": 0.5555555555555556,
+    "offset": -17.77777777777778
+}
+```
+
+One configurable component beats a drawer of named arithmetic: millivolts to volts is
+`factor = 0.001`, and tenths of a unit is `factor = 0.1`.
+
+`event.atlas.converter.instant` is for a **resource value** that holds a date.
+`TimestampMapping.hint` already covers a timestamp, and it needs nothing deployed.
+
+### Converters on generated resources
+
+A `ReferenceMapping` generates one resource for each attribute of the referenced type, so a
+converter named there applies to all of them — rarely what you want, because a
+Fahrenheit converter would also be handed the humidity. Name the attributes in a binding:
+
+```xml
+<referencedResource>
+  <featurePath xsi:type="ecore:EReference" href="m.ecore#//Station/reading"/>
+  <bindings converterId="f2c">
+    <attributes href="m.ecore#//Reading/temperature"/>
+  </bindings>
+</referencedResource>
+```
+
+A binding with an empty `attributes` list is the default for the whole reference. The nearest
+declaration wins, as it does for `changeRule`, `deletionRule` and `unit`.
+
+## Constant values
+
+A `valueMapping` may carry a constant in its `value`. The feature path answers first, and the
+constant answers when the path yields nothing — because the resource declares no path, or
+because this payload does not carry the feature:
+
+```xml
+<resources mid="source">
+  <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+  <valueMapping value="field-gateway"/>
+</resources>
+```
+
+The constant is read as the resource's `eType`, so `value="42"` on an `EInt` resource gives the
+integer 42. A constant that does not fit the type is dropped, and the warning names it.
+
+A converter does **not** touch a constant: it is already written in its final form. The same
+holds for a `NameMapping`'s `name` and a `TimestampMapping`'s `timestamp`.
+
 ## Custom functions (advanced)
 
-Any feature-path element (name, timestamp, value, …) may set a `functionId` instead of, or
-in addition to, a feature path. At runtime the engine looks the id up in a function registry
-and applies the registered `Function<EObject, ?>`; if none is found it falls back to feature
-path traversal. Use this for values that need computation (unit conversion, composing
-fields) that a plain path can't express. Registering functions is done in code against the
-southbound's function registry.
+> **Not implemented.** `FeatureMapping.functionId` and `TimestampStrategy.FUNCTION` are in the
+> metamodel, and the engine never reads them. An earlier version of this guide described a
+> function registry that applies a `Function<EObject, ?>`; no such registry is published, and
+> setting a `functionId` has no effect. Use a [converter](#converting-values) for a value that
+> needs computation. The slot is reserved for a producer that replaces the feature path, and
+> `expression` beside it is reserved for OCL; neither is read yet.
 
 ## Persistence rules (history control)
 
@@ -785,6 +888,11 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 - **Admin resource reads are incomplete** — see the note under [Admin service](#admin-service).
 - **Metadata precedence** — an explicit `unit`/`extraMetadata` on the resource overrides the
   Ecore annotation; leave them off to let model annotations flow through.
+- **A converted value needs a floating-point `eType`** — a scaling converter produces a
+  `Double`, and a resource typed `EInt` reports **nothing at all** for it. The value is dropped
+  and logged, not rounded. Declare `EDouble` or `EFloat` for anything a converter scales.
+- **`strategy` and `functionId` do nothing** — both are in the metamodel and neither is read.
+  See [Timestamps](#timestamps) and [Custom functions](#custom-functions-advanced).
 
 ## Reference: metamodel at a glance
 
@@ -792,13 +900,14 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 |---|---|
 | `ProviderMapping` | `mid`, `providerClasses`, `providerTimestamp`, `name`, `timestamp`, `services`, `admin`, `profile` |
 | `ServiceMapping` | `mid`, `name`, `timestamp`, `resources`, `referencedResource` |
-| `ResourceMapping` | `mid`, `name`, `unit`, `eType`, `valueFeature`, `unitFeature`, `timestamp`, `extraMetadata`, `defaultValueLiteral`, `changeRule`, `deletionRule` |
+| `ResourceMapping` | `mid`, `name`, `unit`, `eType`, `valueFeature`, `valueMapping`, `unitFeature`, `timestamp`, `extraMetadata`, `defaultValueLiteral`, `changeRule`, `deletionRule` |
 | `AdminMapping` | `friendlyName`/`friendlyNameFeature`, `latitude`/`latitudeRef` (+ longitude, elevation), `providerPackage` |
-| `NameMapping` | `name`, `featurePath`, `collectionIndex`, `collectionFilter` |
-| `TimestampMapping` | `strategy` (`NOW`/`FEATURE`/`FUNCTION`), `hint`, `timestamp`, `featurePath` |
+| `FeatureMapping` (abstract) | `featurePath`, `collectionIndex`, `collectionFilter`, `converterId`, `functionId` (not read), `expression` (not read) |
+| `NameMapping` | the above + `name` |
+| `ValueMapping` | the above + `value` (a constant) |
+| `TimestampMapping` | the above + `hint`, `timestamp`, `strategy` (not read) |
 | `ReferenceMapping` | `featurePath`, `targetEClass`, `filter`, `exclude`, `referenceMappings`, `collectionIndex`, `collectionFilter`, `bindings` |
-| `ReferenceResourceBinding` | `attributes` (empty = all), `changeRule`, `deletionRule`, `unit` |
-| `FeatureMapping` (base) | `functionId`, `featurePath`, `collectionIndex`, `collectionFilter` |
+| `ReferenceResourceBinding` | `attributes` (empty = all), `changeRule`, `deletionRule`, `unit`, `converterId` |
 | `MappingProfile` | `profileId`, `name`, `version`, `providerStrategy`, `provider` |
 | `ProfileProvider` / `ProfileService` / `ProfileResource` / `ProfileAdmin` | `*Id`, `required`, `expectedType`, `expectedUnit`, `requiresLocation`, `requiresFriendlyName` |
 | `PersistenceRuleRegistry` | `changeRules` (containment), `deletionRules` (containment) |

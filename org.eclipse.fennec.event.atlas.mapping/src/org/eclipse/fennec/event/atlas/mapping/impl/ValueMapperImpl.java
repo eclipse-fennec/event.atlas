@@ -14,16 +14,11 @@
 package org.eclipse.fennec.event.atlas.mapping.impl;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,8 +35,10 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
+import org.eclipse.fennec.event.atlas.mapping.ValueConverterRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapper;
 import org.eclipse.fennec.event.atlas.mapping.ValueMappingException;
+import org.eclipse.fennec.event.atlas.mapping.converters.impl.InstantConverter;
 import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
@@ -52,6 +49,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ReferenceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
 import org.eclipse.sensinact.core.twin.SensinactDigitalTwin;
 import org.eclipse.sensinact.core.twin.SensinactProvider;
 import org.eclipse.sensinact.core.twin.SensinactResource;
@@ -78,6 +76,7 @@ public class ValueMapperImpl implements ValueMapper {
 	private final ProviderMapping mapping;
 	private final String providerModel;
 	private final ChangeRuleFilter changeRuleFilter;
+	private final ValueConverterRegistry converterRegistry;
 
 	/**
 	 * Creates a new ValueMapper instance with custom function registry.
@@ -87,7 +86,7 @@ public class ValueMapperImpl implements ValueMapper {
 	 * @param functionRegistry Registry of function services keyed by functionId
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping) {
-		this(twin, mapping, null);
+		this(twin, mapping, null, null);
 	}
 
 	/**
@@ -99,10 +98,27 @@ public class ValueMapperImpl implements ValueMapper {
 	 * <code>null</code> to push every value
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter) {
+		this(twin, mapping, changeRuleFilter, null);
+	}
+
+	/**
+	 * Creates a new ValueMapper instance that applies the resources' change rules and the
+	 * converters their value mappings name.
+	 *
+	 * @param twin The SensiNact digital twin to update with mapped values
+	 * @param mapping The ProviderMapping configuration defining the transformation rules
+	 * @param changeRuleFilter Decides per resource whether a mapped value is pushed, or
+	 * <code>null</code> to push every value
+	 * @param converterRegistry Applies the converter a {@code ValueMapping} names, or
+	 * <code>null</code> to push every value unconverted
+	 */
+	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter,
+			ValueConverterRegistry converterRegistry) {
 		this.twin = requireNonNull(twin, "Digital twin cannot be null");
 		this.mapping = requireNonNull(mapping, "Provider mapping cannot be null");
 		this.providerModel = determineProviderModel(mapping);
 		this.changeRuleFilter = changeRuleFilter;
+		this.converterRegistry = converterRegistry;
 	}
 
 	@Override
@@ -334,14 +350,105 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
+	 * Applies the converter a feature mapping names, if any.
+	 * <p>
+	 * Every FeatureMapping carries a converterId, so this is reached from the resource value,
+	 * the name and the timestamp alike. It converts what the <em>feature path</em> produced; a
+	 * static literal - a NameMapping's name, a TimestampMapping's timestamp - is authored in
+	 * its final form and is not run through a converter.
+	 *
+	 * @param converterId the id the mapping names, may be <code>null</code> or blank
+	 * @param value the value the feature path produced
+	 * @param context what is being converted, for the log line
+	 * @return the value to use, or an empty optional to drop it
+	 */
+	private Optional<Object> applyConverter(String converterId, Object value, String context) {
+		if (converterId == null || converterId.isBlank()) {
+			return Optional.ofNullable(value);
+		}
+		if (converterRegistry == null) {
+			// No whiteboard wired in - a plain-Java ValueMapper, or a runtime that deploys no
+			// converters. Pushing the value unconverted matches what an unknown id does.
+			logger.fine(String.format(
+					"%s names converter '%s' but no ValueConverterRegistry is available - using it unconverted",
+					context, converterId));
+			return Optional.ofNullable(value);
+		}
+		return converterRegistry.convert(converterId, value);
+	}
+
+	/**
+	 * The constant a value mapping carries, read as the resource's declared type.
+	 * <p>
+	 * {@code ValueMapping.value} is an EString, so a resource of another type needs the literal
+	 * parsed rather than coerced. {@code EcoreUtil.createFromString} is what reads a literal,
+	 * and it is the same call that turns a {@code defaultValueLiteral} into the twin resource's
+	 * initial value.
+	 *
+	 * @return the constant, or an empty optional when there is none or it does not fit the type
+	 */
+	private Optional<Object> constantValue(ValueMapping valueMapping, ResourceMapping resourceMapping) {
+		String literal = valueMapping.getValue();
+		if (literal == null || literal.isEmpty()) {
+			return Optional.empty();
+		}
+		EDataType targetType = resourceMapping.getEAttributeType();
+		if (targetType == null) {
+			return Optional.of(literal);
+		}
+		try {
+			return Optional.ofNullable(EcoreUtil.createFromString(targetType, literal));
+		} catch (Exception e) {
+			logger.warning(String.format("Resource %s has the constant '%s', which is no %s: %s",
+					resourceMapping.getMid(), literal, targetType.getName(), e.getMessage()));
+			return Optional.empty();
+		}
+	}
+
+	/**
 	 * Extracts a value from an EObject instance using a ResourceMapping configuration.
+	 * <p>
+	 * A resource states where its value comes from in one of two ways. A {@code valueMapping}
+	 * is the richer one and wins when present: it is a FeatureMapping, so it carries the path
+	 * plus the collection selection and the {@code converterId}. Plain {@code valueFeature} is
+	 * the original form and stays supported, so a mapping written before valueMapping existed
+	 * behaves exactly as it did.
+	 * <p>
+	 * A {@code valueMapping} may also carry a constant in its {@code value}. The constant is the
+	 * last producer: the feature path answers first, and the constant answers when the path
+	 * yields nothing - because the resource declares no path, or because this payload does not
+	 * carry the feature. A NameMapping's {@code name} and a TimestampMapping's {@code timestamp}
+	 * already work this way, so the three literals behave alike.
 	 */
 	private Optional<Object> extractValue(EObject sourceInstance, ResourceMapping resourceMapping) {
-		List<EStructuralFeature> featurePath = resourceMapping.getValueFeature();
-		Optional<Object> rawValue = getRawValue(sourceInstance, featurePath);
+		ValueMapping valueMapping = resourceMapping.getValueMapping();
+		Optional<Object> rawValue;
+		if (valueMapping == null) {
+			rawValue = getRawValue(sourceInstance, resourceMapping.getValueFeature());
+		} else {
+			if (!resourceMapping.getValueFeature().isEmpty()) {
+				logger.fine(String.format(
+						"Resource %s sets both valueMapping and valueFeature - the valueFeature is ignored",
+						resourceMapping.getMid()));
+			}
+			rawValue = getRawValue(sourceInstance, valueMapping);
+		}
 
 		if (!rawValue.isPresent()) {
-			return Optional.empty();
+			// The constant is the last producer in the chain. It is already written in its
+			// final form, so it is not run through a converter - the same rule a NameMapping's
+			// name and a TimestampMapping's timestamp follow.
+			return valueMapping == null ? Optional.empty() : constantValue(valueMapping, resourceMapping);
+		}
+
+		// Convert before coercing to the resource's declared type: a converter may well return
+		// a different type than it was handed, and the coercion below is what settles that.
+		if (valueMapping != null) {
+			rawValue = applyConverter(valueMapping.getConverterId(), rawValue.get(),
+					"Resource " + resourceMapping.getMid());
+			if (!rawValue.isPresent()) {
+				return Optional.empty();
+			}
 		}
 
 		// Convert the raw value using the resource's type information
@@ -587,7 +694,12 @@ public class ValueMapperImpl implements ValueMapper {
 		if (featurePath != null && !featurePath.isEmpty()) {
 			Optional<Object> rawValue = getRawValue(sourceInstance, nameMapping);
 			if (rawValue.isPresent() && rawValue.get() != null) {
-				return rawValue.get().toString();
+				Optional<Object> converted = applyConverter(nameMapping.getConverterId(), rawValue.get(),
+						"Name mapping");
+				// A dropped value is no name from this path, so the fallbacks below take over.
+				if (converted.isPresent() && converted.get() != null) {
+					return converted.get().toString();
+				}
 			}
 		}
 
@@ -657,7 +769,13 @@ public class ValueMapperImpl implements ValueMapper {
 		if (featurePath != null && !featurePath.isEmpty()) {
 			Optional<Object> rawValue = getRawValue(sourceInstance, timestampMapping);
 			if (rawValue.isPresent() && rawValue.get() != null) {
-				return convertToInstant(rawValue.get(), timestampMapping.getHint());
+				Optional<Object> converted = applyConverter(timestampMapping.getConverterId(), rawValue.get(),
+						"Timestamp mapping");
+				// A dropped value leaves the static literal below, and then the caller's own
+				// fallback chain, to answer - exactly as an unreadable feature path would.
+				if (converted.isPresent() && converted.get() != null) {
+					return new InstantConverter(timestampMapping.getHint()).toInstant(converted.get());
+				}
 			}
 		}
 
@@ -666,58 +784,12 @@ public class ValueMapperImpl implements ValueMapper {
 		// parsed here - through the same conversion a string picked up from the feature path gets.
 		String staticTimestamp = timestampMapping.getTimestamp();
 		if (staticTimestamp != null && !staticTimestamp.isBlank()) {
-			return convertToInstant(staticTimestamp.trim(), timestampMapping.getHint());
+			return new InstantConverter(timestampMapping.getHint()).toInstant(staticTimestamp.trim());
 		}
 
 		return null;
 	}
 
-	/**
-	 * Converts a raw timestamp value to Instant, using optional hint for format patterns.
-	 */
-	private Instant convertToInstant(Object rawValue, String hint) {
-		if (rawValue instanceof Instant) {
-			return (Instant) rawValue;
-		}
-		if (rawValue instanceof Date) {
-			return ((Date) rawValue).toInstant();
-		}
-
-		if (rawValue instanceof Long) {
-			// Assume milliseconds since epoch
-			return Instant.ofEpochMilli((Long) rawValue);
-		}
-
-		if (rawValue instanceof String) {
-			String stringValue = (String) rawValue;
-			boolean useHint = nonNull(hint) && !hint.trim().isEmpty();
-			try {
-				// If hint is provided, use it as DateTimeFormatter pattern first
-				if (useHint) {
-					DateTimeFormatter formatter = DateTimeFormatter.ofPattern(hint.trim());
-					LocalDateTime localDateTime = LocalDateTime.parse(stringValue, formatter);
-					return localDateTime.toInstant(ZoneOffset.UTC);
-				} else {
-					// Try parsing as ISO instant
-					return Instant.parse(stringValue);
-				}
-			} catch (Exception e) {
-				// If hint parsing failed, try ISO parsing as fallback
-				if (useHint) {
-					try {
-						return Instant.parse(stringValue);
-					} catch (Exception isoException) {
-						logger.warning(String.format("Failed to parse timestamp string '%s' using pattern '%s' and as ISO instant: %s", stringValue, hint, e.getMessage()));
-					}
-				} else {
-					logger.warning(String.format("Failed to parse timestamp string '%s' as ISO instant: %s", stringValue, e.getMessage()));
-				}
-			}
-		}
-
-		logger.warning(String.format("Cannot convert timestamp value of type %s to Instant: %s", rawValue.getClass().getName(), rawValue));
-		return null;
-	}
 
 	/**
 	 * Determines the provider ID based on the mapping strategy.
@@ -759,7 +831,10 @@ public class ValueMapperImpl implements ValueMapper {
 	 */
 	private void validateResourceMapping(EObject sourceInstance, ResourceMapping resourceMapping, 
 			String serviceName, ValidationResultImpl result) {
-		List<EStructuralFeature> featurePath = resourceMapping.getValueFeature();
+		ValueMapping valueMapping = resourceMapping.getValueMapping();
+		List<EStructuralFeature> featurePath = valueMapping == null
+				? resourceMapping.getValueFeature()
+				: valueMapping.getFeaturePath();
 		if (featurePath == null || featurePath.isEmpty()) {
 			result.addWarning("Empty feature path for resource " + serviceName + "." + resourceMapping.getMid());
 			return;
