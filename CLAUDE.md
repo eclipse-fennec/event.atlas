@@ -770,8 +770,21 @@ important thing to know, and the part that changed most recently:
   The expander only emits a `valueMapping` on a generated resource when a
   `ReferenceResourceBinding.converterId` gives it something to carry, so existing generated output
   is unchanged.
-- **`functionId`, `expression` and `TimestampStrategy` are still not read by anything.** The user
-  guide now says so instead of documenting them as working.
+- **`functions/` is the function whiteboard** (issue #91). `ValueFunction`
+  (`Object apply(Object)`, selected by the `event.atlas.function.id` service property) is the
+  exported API; `functions/impl` holds `ValueFunctionRegistryImpl`. A function is the *producer*:
+  with no `featurePath` it is handed the whole source EObject, with one it is handed what that
+  path found, and a `converterId` then post-processes the result. It is applied inside
+  `getRawValue(EObject, FeatureMapping)`, so the value, the name and the timestamp paths all get
+  it from one place. **An unknown function id produces nothing** (unlike an unknown converter id,
+  which passes the value through), which leaves the mapping's own fallback — a name literal, a
+  timestamp literal, a `ValueMapping` constant — to answer. The dead package-private
+  `FunctionRegistryImpl` was deleted.
+  - Watch the guard that caused the one bug here: `getNameMapping` and `extractTimestamp` used to
+    call `getRawValue` **only when a feature path was set**, so a function-only mapping never
+    reached it. Both now call it unconditionally and let `getRawValue` decide.
+- **`expression` and `TimestampStrategy` are still not read by anything.** `expression` is
+  reserved for OCL. The user guide says so instead of documenting them as working.
 - All twin interaction happens on the SensiNact **`GatewayThread`** (via
   `AbstractSensinactCommand`); tests follow the same pattern.
 - `MappingConfigurator` is a **generated** DS component in `src-gen`, not hand-written code.

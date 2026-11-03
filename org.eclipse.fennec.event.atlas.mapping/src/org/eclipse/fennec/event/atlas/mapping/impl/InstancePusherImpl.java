@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.ValueConverterRegistry;
+import org.eclipse.fennec.event.atlas.mapping.ValueFunctionRegistry;
 import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapperFactory;
@@ -71,6 +72,11 @@ public class InstancePusherImpl implements InstancePusher {
 			policyOption = ReferencePolicyOption.GREEDY)
 	private volatile ValueConverterRegistry converterRegistry;
 
+	/** Optional and dynamic for the same reasons as the two above. */
+	@Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC, //
+			policyOption = ReferencePolicyOption.GREEDY)
+	private volatile ValueFunctionRegistry functionRegistry;
+
 	/*
 	 * (non-Javadoc)
 	 * @see org.eclipse.fennec.event.atlas.mapping.InstancePusher#pushInstance(org.eclipse.emf.ecore.EObject)
@@ -91,8 +97,8 @@ public class InstancePusherImpl implements InstancePusher {
 				int applied = 0;
 				for (ProviderMapping mapping : mappings) {
 					try {
-						ValueMapperFactory.createValueMapper(twin, mapping, changeRuleFilter, converterRegistry)
-								.mapInstance(instance);
+						ValueMapperFactory.createValueMapper(twin, mapping, changeRuleFilter, converterRegistry,
+								functionRegistry).mapInstance(instance);
 						applied++;
 					} catch (Throwable e) {
 						// the cause names the resource or feature, the outer message only says that it failed

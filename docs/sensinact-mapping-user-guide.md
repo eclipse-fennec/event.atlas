@@ -649,9 +649,9 @@ declaration wins, as it does for `changeRule`, `deletionRule` and `unit`.
 
 ## Constant values
 
-A `valueMapping` may carry a constant in its `value`. The feature path answers first, and the
-constant answers when the path yields nothing — because the resource declares no path, or
-because this payload does not carry the feature:
+A `valueMapping` may carry a constant in its `value`. The producer answers first — a
+[function](#functions), or the feature path — and the constant answers when it yields nothing,
+because the resource declares neither, or because this payload does not carry the feature:
 
 ```xml
 <resources mid="source">
@@ -666,14 +666,61 @@ integer 42. A constant that does not fit the type is dropped, and the warning na
 A converter does **not** touch a constant: it is already written in its final form. The same
 holds for a `NameMapping`'s `name` and a `TimestampMapping`'s `timestamp`.
 
-## Custom functions (advanced)
+## Functions
 
-> **Not implemented.** `FeatureMapping.functionId` and `TimestampStrategy.FUNCTION` are in the
-> metamodel, and the engine never reads them. An earlier version of this guide described a
-> function registry that applies a `Function<EObject, ?>`; no such registry is published, and
-> setting a `functionId` has no effect. Use a [converter](#converting-values) for a value that
-> needs computation. The slot is reserved for a producer that replaces the feature path, and
-> `expression` beside it is reserved for OCL; neither is read yet.
+A converter changes a value. A **function** produces one: the mean of two sensors, a name built
+from several fields, anything a feature path cannot reach.
+
+A function is an OSGi whiteboard service. Register a `ValueFunction` with the service property
+`event.atlas.function.id`, and a mapping selects it by that id:
+
+```java
+@Component(property = ValueFunction.FUNCTION_ID + "=mean-temperature")
+public class MeanTemperature implements ValueFunction {
+    public Object apply(Object input) {
+        EObject reading = (EObject) input;
+        return (…);
+    }
+}
+```
+
+**What the function receives depends on the mapping:**
+
+| the mapping has | the function is handed |
+|---|---|
+| `functionId` only | the whole source EObject, and it reads what it needs |
+| `functionId` **and** a `featurePath` | the value that path produced |
+
+```xml
+<!-- a producer: it reads the source object itself -->
+<valueMapping functionId="mean-temperature"/>
+
+<!-- a transformer: it is handed reading/tempA -->
+<valueMapping functionId="double">
+  <featurePath xsi:type="ecore:EAttribute" href="m.ecore#//Reading/tempA"/>
+</valueMapping>
+```
+
+`functionId` lives on `FeatureMapping`, so it works for a `ValueMapping`, a `NameMapping` and a
+`TimestampMapping` alike. A provider id computed from several fields is a `NameMapping` with a
+`functionId` and no path.
+
+**The order is function, then converter.** A mapping may set both: the function computes the
+value and the converter post-processes it.
+
+**A function that produces nothing leaves the mapping's own fallback to answer** — a
+`NameMapping`'s literal, a `TimestampMapping`'s literal, a `ValueMapping`'s constant. This
+happens when the function returns `null`, when it throws, or when **no function is registered
+for the id**.
+
+> That last case differs from a converter on purpose. An unknown *converter* id passes the value
+> through, because an unconverted reading is still a reading. An unknown *function* id produces
+> nothing, because a function may be handed the whole source object, and there is no sensible
+> identity answer for that.
+
+> **`TimestampStrategy.FUNCTION` still does nothing.** The enum is in the metamodel and the
+> engine never reads it. A timestamp computed by a function is a `<timestamp functionId="…">`,
+> with no `strategy`.
 
 ## Persistence rules (history control)
 
@@ -891,8 +938,10 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 - **A converted value needs a floating-point `eType`** — a scaling converter produces a
   `Double`, and a resource typed `EInt` reports **nothing at all** for it. The value is dropped
   and logged, not rounded. Declare `EDouble` or `EFloat` for anything a converter scales.
-- **`strategy` and `functionId` do nothing** — both are in the metamodel and neither is read.
-  See [Timestamps](#timestamps) and [Custom functions](#custom-functions-advanced).
+- **`strategy` and `expression` do nothing** — both are in the metamodel and neither is read.
+  `expression` is reserved for OCL. See [Timestamps](#timestamps).
+- **An unknown `functionId` produces no value, an unknown `converterId` passes the value
+  through** — see [Functions](#functions) for why they differ.
 
 ## Reference: metamodel at a glance
 
@@ -902,7 +951,7 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 | `ServiceMapping` | `mid`, `name`, `timestamp`, `resources`, `referencedResource` |
 | `ResourceMapping` | `mid`, `name`, `unit`, `eType`, `valueFeature`, `valueMapping`, `unitFeature`, `timestamp`, `extraMetadata`, `defaultValueLiteral`, `changeRule`, `deletionRule` |
 | `AdminMapping` | `friendlyName`/`friendlyNameFeature`, `latitude`/`latitudeRef` (+ longitude, elevation), `providerPackage` |
-| `FeatureMapping` (abstract) | `featurePath`, `collectionIndex`, `collectionFilter`, `converterId`, `functionId` (not read), `expression` (not read) |
+| `FeatureMapping` (abstract) | `featurePath`, `collectionIndex`, `collectionFilter`, `functionId`, `converterId`, `expression` (not read) |
 | `NameMapping` | the above + `name` |
 | `ValueMapping` | the above + `value` (a constant) |
 | `TimestampMapping` | the above + `hint`, `timestamp`, `strategy` (not read) |

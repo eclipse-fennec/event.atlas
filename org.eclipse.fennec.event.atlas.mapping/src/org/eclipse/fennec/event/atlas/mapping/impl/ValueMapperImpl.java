@@ -36,6 +36,7 @@ import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.ValueConverterRegistry;
+import org.eclipse.fennec.event.atlas.mapping.ValueFunctionRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapper;
 import org.eclipse.fennec.event.atlas.mapping.ValueMappingException;
 import org.eclipse.fennec.event.atlas.mapping.converters.impl.InstantConverter;
@@ -77,6 +78,7 @@ public class ValueMapperImpl implements ValueMapper {
 	private final String providerModel;
 	private final ChangeRuleFilter changeRuleFilter;
 	private final ValueConverterRegistry converterRegistry;
+	private final ValueFunctionRegistry functionRegistry;
 
 	/**
 	 * Creates a new ValueMapper instance with custom function registry.
@@ -86,7 +88,7 @@ public class ValueMapperImpl implements ValueMapper {
 	 * @param functionRegistry Registry of function services keyed by functionId
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping) {
-		this(twin, mapping, null, null);
+		this(twin, mapping, null, null, null);
 	}
 
 	/**
@@ -98,7 +100,7 @@ public class ValueMapperImpl implements ValueMapper {
 	 * <code>null</code> to push every value
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter) {
-		this(twin, mapping, changeRuleFilter, null);
+		this(twin, mapping, changeRuleFilter, null, null);
 	}
 
 	/**
@@ -114,11 +116,29 @@ public class ValueMapperImpl implements ValueMapper {
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter,
 			ValueConverterRegistry converterRegistry) {
+		this(twin, mapping, changeRuleFilter, converterRegistry, null);
+	}
+
+	/**
+	 * Creates a new ValueMapper instance with every extension point wired in.
+	 *
+	 * @param twin The SensiNact digital twin to update with mapped values
+	 * @param mapping The ProviderMapping configuration defining the transformation rules
+	 * @param changeRuleFilter Decides per resource whether a mapped value is pushed, or
+	 * <code>null</code> to push every value
+	 * @param converterRegistry Applies the converter a mapping names, or <code>null</code> to
+	 * push every value unconverted
+	 * @param functionRegistry Applies the function a mapping names, or <code>null</code> to
+	 * leave every functionId unread
+	 */
+	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter,
+			ValueConverterRegistry converterRegistry, ValueFunctionRegistry functionRegistry) {
 		this.twin = requireNonNull(twin, "Digital twin cannot be null");
 		this.mapping = requireNonNull(mapping, "Provider mapping cannot be null");
 		this.providerModel = determineProviderModel(mapping);
 		this.changeRuleFilter = changeRuleFilter;
 		this.converterRegistry = converterRegistry;
+		this.functionRegistry = functionRegistry;
 	}
 
 	@Override
@@ -689,17 +709,15 @@ public class ValueMapperImpl implements ValueMapper {
 			throw new ValueMappingException("A mapping is needed to determine a name from an instance");
 		}
 
-		// First try: Extract value using the name mapping's feature path and collection index
-		List<EStructuralFeature> featurePath = nameMapping.getFeaturePath();
-		if (featurePath != null && !featurePath.isEmpty()) {
-			Optional<Object> rawValue = getRawValue(sourceInstance, nameMapping);
-			if (rawValue.isPresent() && rawValue.get() != null) {
-				Optional<Object> converted = applyConverter(nameMapping.getConverterId(), rawValue.get(),
-						"Name mapping");
-				// A dropped value is no name from this path, so the fallbacks below take over.
-				if (converted.isPresent() && converted.get() != null) {
-					return converted.get().toString();
-				}
+		// First try: the producer chain - a function, or the feature path with its collection
+		// selection. getRawValue answers empty when the mapping declares neither.
+		Optional<Object> rawValue = getRawValue(sourceInstance, nameMapping);
+		if (rawValue.isPresent() && rawValue.get() != null) {
+			Optional<Object> converted = applyConverter(nameMapping.getConverterId(), rawValue.get(),
+					"Name mapping");
+			// A dropped value is no name from this path, so the fallbacks below take over.
+			if (converted.isPresent() && converted.get() != null) {
+				return converted.get().toString();
 			}
 		}
 
@@ -764,18 +782,16 @@ public class ValueMapperImpl implements ValueMapper {
 			return null;
 		}
 
-		// First try: Extract value using the timestamp mapping's feature path and collection index
-		List<EStructuralFeature> featurePath = timestampMapping.getFeaturePath();
-		if (featurePath != null && !featurePath.isEmpty()) {
-			Optional<Object> rawValue = getRawValue(sourceInstance, timestampMapping);
-			if (rawValue.isPresent() && rawValue.get() != null) {
-				Optional<Object> converted = applyConverter(timestampMapping.getConverterId(), rawValue.get(),
-						"Timestamp mapping");
-				// A dropped value leaves the static literal below, and then the caller's own
-				// fallback chain, to answer - exactly as an unreadable feature path would.
-				if (converted.isPresent() && converted.get() != null) {
-					return new InstantConverter(timestampMapping.getHint()).toInstant(converted.get());
-				}
+		// First try: the producer chain - a function, or the feature path with its collection
+		// selection. getRawValue answers empty when the mapping declares neither.
+		Optional<Object> rawValue = getRawValue(sourceInstance, timestampMapping);
+		if (rawValue.isPresent() && rawValue.get() != null) {
+			Optional<Object> converted = applyConverter(timestampMapping.getConverterId(), rawValue.get(),
+					"Timestamp mapping");
+			// A dropped value leaves the static literal below, and then the caller's own
+			// fallback chain, to answer - exactly as an unreadable feature path would.
+			if (converted.isPresent() && converted.get() != null) {
+				return new InstantConverter(timestampMapping.getHint()).toInstant(converted.get());
 			}
 		}
 
@@ -1050,11 +1066,49 @@ public class ValueMapperImpl implements ValueMapper {
 		if (featureMapping == null) {
 			return Optional.empty();
 		}
-		// First priority: Use feature path if available
 		List<EStructuralFeature> featurePath = featureMapping.getFeaturePath();
-		if (featurePath == null || featurePath.isEmpty()) {
+		boolean hasPath = featurePath != null && !featurePath.isEmpty();
+
+		// The function is a producer. With a feature path it is handed what the path found;
+		// without one it is handed the whole source object and reads what it needs itself.
+		// An 'expression' would win over both, and nothing reads it yet.
+		String functionId = featureMapping.getFunctionId();
+		if (functionId != null && !functionId.isBlank()) {
+			if (!hasPath) {
+				return applyFunction(functionId, source);
+			}
+			Optional<Object> pathValue = followPath(source, featureMapping, featurePath);
+			return pathValue.isEmpty() ? Optional.empty() : applyFunction(functionId, pathValue.get());
+		}
+
+		if (!hasPath) {
 			return Optional.empty();
 		}
+		return followPath(source, featureMapping, featurePath);
+	}
+
+	/**
+	 * Applies the function a feature mapping names.
+	 *
+	 * @return the produced value, or an empty optional - which leaves the mapping's own fallback
+	 *         to answer, exactly as an unreadable feature path does
+	 */
+	private Optional<Object> applyFunction(String functionId, Object input) {
+		if (functionRegistry == null) {
+			// No whiteboard wired in. Producing nothing is right: the alternative would push the
+			// source object, or the unprocessed path value, as if it were the computed one.
+			logger.fine(String.format(
+					"A mapping names function '%s' but no ValueFunctionRegistry is available", functionId));
+			return Optional.empty();
+		}
+		return functionRegistry.apply(functionId, input);
+	}
+
+	/**
+	 * Walks a feature path, selecting an element wherever it crosses a collection.
+	 */
+	private Optional<Object> followPath(EObject source, FeatureMapping featureMapping,
+			List<EStructuralFeature> featurePath) {
 
 		int collectionIndex = featureMapping.getCollectionIndex(); // Default is 0
 		Optional<CollectionFilter> filter = CollectionFilter.of(featureMapping, "feature path " + featurePath);
