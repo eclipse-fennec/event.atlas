@@ -45,6 +45,7 @@ import org.eclipse.fennec.event.atlas.mapping.converters.impl.InstantConverter;
 import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
+import org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.NameMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy;
@@ -810,6 +811,55 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
+	 * Writes the metadata entries whose value the payload decides.
+	 * <p>
+	 * {@code extraMetadata} carries what is the same for every payload and is written into the
+	 * twin model once, at registration. A {@code MetadataMapping} is read per push instead: it
+	 * is a {@code FeatureMapping}, so the value comes from a sibling feature of the mapped
+	 * value, from a function or from an expression, and a {@code converterId} post-processes
+	 * it. Where both name one key, the produced value overwrites the constant.
+	 * <p>
+	 * <b>A producer that yields nothing leaves the entry as it is.</b> A payload that does not
+	 * carry the value is not a statement that the metadata is gone - the same reason a
+	 * collectionFilter matching nothing skips a service rather than failing the instance.
+	 * <p>
+	 * Nothing here fails the push. Metadata describes the value; losing a description must not
+	 * cost the reading it describes.
+	 */
+	private void mapResourceMetadata(EObject sourceInstance, ResourceMapping resourceMapping,
+			SensinactResource resource, Instant timestamp, String serviceName) {
+
+		for (MetadataMapping metadataMapping : resourceMapping.getMetadata()) {
+			String key = metadataMapping.getKey();
+			if (key == null || key.isBlank()) {
+				logger.warning(String.format(
+						"A metadata mapping of resource %s.%s carries no key - it is ignored",
+						serviceName, resourceMapping.getMid()));
+				continue;
+			}
+			try {
+				Optional<Object> value = getRawValue(sourceInstance, metadataMapping);
+				if (value.isPresent() && value.get() != null) {
+					value = applyConverter(metadataMapping.getConverterId(), value.get(),
+							String.format("Metadata '%s'", key));
+				}
+				if (value.isEmpty() || value.get() == null) {
+					logger.fine(String.format(
+							"No value for metadata '%s' of %s.%s - the entry is left as it is",
+							key, serviceName, resourceMapping.getMid()));
+					continue;
+				}
+				resource.setMetadataValue(key, value.get(), timestamp);
+				logger.finest(String.format("Set metadata %s.%s[%s] = %s", serviceName,
+						resourceMapping.getMid(), key, value.get()));
+			} catch (Exception e) {
+				logger.warning(String.format("Failed to set metadata '%s' of %s.%s: %s", key,
+						serviceName, resourceMapping.getMid(), e.getMessage()));
+			}
+		}
+	}
+
+	/**
 	 * Returns the list of attributes to map based on ReferenceMapping filter configuration.
 	 *
 	 * @param eClass The EClass of the referenced object
@@ -865,6 +915,12 @@ public class ValueMapperImpl implements ValueMapper {
 		if (resource == null) {
 			throw new ValueMappingException("Resource not found: " + resourceMapping.getMid());
 		}
+
+		// Before the value, deliberately: the change rule below may drop the value and return,
+		// and that rule describes what the history keeps of the *value*. It says nothing about
+		// a unit or a signal group, and a resource whose value rarely moves still carries
+		// metadata that a payload decides.
+		mapResourceMetadata(sourceInstance, resourceMapping, resource, timestamp, service.getName());
 
 		Optional<Object> value = extractValue(sourceInstance, resourceMapping);
 		if (value.isPresent()) {

@@ -39,6 +39,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getTimestamp <em>Timestamp</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getMid <em>Mid</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getExtraMetadata <em>Extra Metadata</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getMetadata <em>Metadata</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDescriptionMapping <em>Description Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getChangeRule <em>Change Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDeletionRule <em>Deletion Rule</em>}</li>
@@ -153,6 +154,23 @@ public interface ResourceMapping extends EObject, EAttribute {
 	 * @generated
 	 */
 	EMap<String, String> getExtraMetadata();
+
+	/**
+	 * Returns the value of the '<em><b>Metadata</b></em>' containment reference list.
+	 * The list contents are of type {@link org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping}.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The metadata entries this resource takes from the payload, beside the constant ones in extraMetadata.
+	 * 
+	 * ILSA is the case: it   writes 'type' and 'signalGroup' on its color resource, and both values come from the signal that the payload carries.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Metadata</em>' containment reference list.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getResourceMapping_Metadata()
+	 * @model containment="true"
+	 * @generated
+	 */
+	EList<MetadataMapping> getMetadata();
 
 	/**
 	 * Returns the value of the '<em><b>Description Mapping</b></em>' reference.

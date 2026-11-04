@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:337b0fdb7388232df018dfcfa7953af74a2423dee290ace8a59d7be22a583b2c", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:5f232a2e8a37c324f3a484a36bb45633a27fad28f04604f0137cfc3ffd91c00c", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -997,13 +997,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int RESOURCE_MAPPING__EXTRA_METADATA = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 5;
 
 	/**
+	 * The feature id for the '<em><b>Metadata</b></em>' containment reference list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int RESOURCE_MAPPING__METADATA = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 6;
+
+	/**
 	 * The feature id for the '<em><b>Description Mapping</b></em>' reference.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int RESOURCE_MAPPING__DESCRIPTION_MAPPING = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 6;
+	int RESOURCE_MAPPING__DESCRIPTION_MAPPING = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 7;
 
 	/**
 	 * The feature id for the '<em><b>Change Rule</b></em>' containment reference.
@@ -1012,7 +1021,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 * @ordered
 	 */
-	int RESOURCE_MAPPING__CHANGE_RULE = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 7;
+	int RESOURCE_MAPPING__CHANGE_RULE = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 8;
 
 	/**
 	 * The feature id for the '<em><b>Deletion Rule</b></em>' containment reference.
@@ -1021,7 +1030,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 * @ordered
 	 */
-	int RESOURCE_MAPPING__DELETION_RULE = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 8;
+	int RESOURCE_MAPPING__DELETION_RULE = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 9;
 
 	/**
 	 * The feature id for the '<em><b>Value Mapping</b></em>' containment reference.
@@ -1030,7 +1039,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 * @ordered
 	 */
-	int RESOURCE_MAPPING__VALUE_MAPPING = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 9;
+	int RESOURCE_MAPPING__VALUE_MAPPING = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 10;
 
 	/**
 	 * The number of structural features of the '<em>Resource Mapping</em>' class.
@@ -1039,7 +1048,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 * @ordered
 	 */
-	int RESOURCE_MAPPING_FEATURE_COUNT = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 10;
+	int RESOURCE_MAPPING_FEATURE_COUNT = EcorePackage.EATTRIBUTE_FEATURE_COUNT + 11;
 
 	/**
 	 * The operation id for the '<em>Get EAnnotation</em>' operation.
@@ -1313,34 +1322,6 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int ADMIN_MAPPING_OPERATION_COUNT = SERVICE_MAPPING_OPERATION_COUNT + 0;
 
 	/**
-	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MetadataMappingImpl <em>Metadata Mapping</em>}' class.
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MetadataMappingImpl
-	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getMetadataMapping()
-	 * @generated
-	 */
-	int METADATA_MAPPING = 9;
-
-	/**
-	 * The number of structural features of the '<em>Metadata Mapping</em>' class.
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 * @ordered
-	 */
-	int METADATA_MAPPING_FEATURE_COUNT = 0;
-
-	/**
-	 * The number of operations of the '<em>Metadata Mapping</em>' class.
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 * @ordered
-	 */
-	int METADATA_MAPPING_OPERATION_COUNT = 0;
-
-	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.FeatureMappingImpl <em>Feature Mapping</em>}' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -1421,6 +1402,97 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @ordered
 	 */
 	int FEATURE_MAPPING_OPERATION_COUNT = 0;
+
+	/**
+	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MetadataMappingImpl <em>Metadata Mapping</em>}' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MetadataMappingImpl
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getMetadataMapping()
+	 * @generated
+	 */
+	int METADATA_MAPPING = 9;
+
+	/**
+	 * The feature id for the '<em><b>Function Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__FUNCTION_ID = FEATURE_MAPPING__FUNCTION_ID;
+
+	/**
+	 * The feature id for the '<em><b>Feature Path</b></em>' reference list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__FEATURE_PATH = FEATURE_MAPPING__FEATURE_PATH;
+
+	/**
+	 * The feature id for the '<em><b>Collection Index</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__COLLECTION_INDEX = FEATURE_MAPPING__COLLECTION_INDEX;
+
+	/**
+	 * The feature id for the '<em><b>Collection Filter</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__COLLECTION_FILTER = FEATURE_MAPPING__COLLECTION_FILTER;
+
+	/**
+	 * The feature id for the '<em><b>Converter Id</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__CONVERTER_ID = FEATURE_MAPPING__CONVERTER_ID;
+
+	/**
+	 * The feature id for the '<em><b>Expression</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__EXPRESSION = FEATURE_MAPPING__EXPRESSION;
+
+	/**
+	 * The feature id for the '<em><b>Key</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING__KEY = FEATURE_MAPPING_FEATURE_COUNT + 0;
+
+	/**
+	 * The number of structural features of the '<em>Metadata Mapping</em>' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING_FEATURE_COUNT = FEATURE_MAPPING_FEATURE_COUNT + 1;
+
+	/**
+	 * The number of operations of the '<em>Metadata Mapping</em>' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int METADATA_MAPPING_OPERATION_COUNT = FEATURE_MAPPING_OPERATION_COUNT + 0;
 
 	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.TimestampMappingImpl <em>Timestamp Mapping</em>}' class.
@@ -3006,6 +3078,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getResourceMapping_ExtraMetadata();
 
 	/**
+	 * Returns the meta object for the containment reference list '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getMetadata <em>Metadata</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference list '<em>Metadata</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getMetadata()
+	 * @see #getResourceMapping()
+	 * @generated
+	 */
+	EReference getResourceMapping_Metadata();
+
+	/**
 	 * Returns the meta object for the reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping#getDescriptionMapping <em>Description Mapping</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -3221,6 +3304,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 */
 	EClass getMetadataMapping();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping#getKey <em>Key</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Key</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping#getKey()
+	 * @see #getMetadataMapping()
+	 * @generated
+	 */
+	EAttribute getMetadataMapping_Key();
 
 	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.Mapping <em>Mapping</em>}'.
@@ -4321,6 +4415,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference RESOURCE_MAPPING__EXTRA_METADATA = eINSTANCE.getResourceMapping_ExtraMetadata();
 
 		/**
+		 * The meta object literal for the '<em><b>Metadata</b></em>' containment reference list feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference RESOURCE_MAPPING__METADATA = eINSTANCE.getResourceMapping_Metadata();
+
+		/**
 		 * The meta object literal for the '<em><b>Description Mapping</b></em>' reference feature.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
@@ -4483,6 +4585,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EClass METADATA_MAPPING = eINSTANCE.getMetadataMapping();
+
+		/**
+		 * The meta object literal for the '<em><b>Key</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute METADATA_MAPPING__KEY = eINSTANCE.getMetadataMapping_Key();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MappingImpl <em>Mapping</em>}' class.

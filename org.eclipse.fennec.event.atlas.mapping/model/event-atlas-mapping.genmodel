@@ -77,6 +77,7 @@
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/timestamp"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ResourceMapping/mid"/>
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/extraMetadata"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/metadata"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/descriptionMapping"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/changeRule"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ResourceMapping/deletionRule"/>
@@ -102,7 +103,9 @@
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/longitudeMapping"/>
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/elevationMapping"/>
     </genClasses>
-    <genClasses ecoreClass="event-atlas-mapping.ecore#//MetadataMapping"/>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//MetadataMapping">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MetadataMapping/key"/>
+    </genClasses>
     <genClasses ecoreClass="event-atlas-mapping.ecore#//Mapping">
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//Mapping/mid"/>
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//Mapping/timestamp"/>

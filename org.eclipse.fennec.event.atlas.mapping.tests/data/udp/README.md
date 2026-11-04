@@ -12,7 +12,7 @@ The analysis behind each line is in `docs/udp-adapter-mapping-gaps.md`.
 | flow | mapping | state |
 |---|---|---|
 | ILSA signal state | `ilsa-signal-state-mapping.xmi` | **complete**, except the provider id |
-| ILSA configuration | `ilsa-configuration-mapping.xmi` | one gap: metadata from the payload |
+| ILSA configuration | `ilsa-configuration-mapping.xmi` | **complete** |
 | TrafiCam configuration | `traficam-config-mapping.xmi` | two gaps: the provider id, the admin viewport |
 | TrafiCam detections | — | **stays in the adapter**, and is not planned to move |
 
@@ -25,12 +25,13 @@ The analysis behind each line is in `docs/udp-adapter-mapping-gaps.md`.
 | 3, functions | the TrafiCam viewport, a `GeometryCollection` from a whole `Scene` |
 | 5, payload-named services | one service for each ILSA signal, from one block instead of nine; and the signal-state service, created on the model when the first state arrives |
 | 7, admin feature mappings | both friendly names, and the ILSA location inside a `Double[]` |
+| 6, payload metadata | ILSA's `type` and `signalGroup` on the color resource |
 
 ## What is left
 
 | what | where | kind |
 |---|---|---|
-| metadata from the payload | ILSA `color`: `type`, `signalGroup` | #91 item 6 |
+| a shared UNIFIED profile | the two ILSA mappings must reach one provider | a mapping to write, no engine gap |
 | an extra admin attribute | TrafiCam `viewport`; also ILSA's `Thermal extends Admin` | #91 item 8 |
 | the id from the MQTT topic | `TLSignalState.intersectionId`, `CamConfig.camId` | a transient attribute, Jena's change |
 | binary EMF on ingress | TrafiCam only | southbound, not the engine |

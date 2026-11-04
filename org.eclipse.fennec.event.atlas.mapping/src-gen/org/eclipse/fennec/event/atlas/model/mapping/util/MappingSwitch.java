@@ -151,6 +151,7 @@ public class MappingSwitch<T> extends Switch<T> {
 			case MappingPackage.METADATA_MAPPING: {
 				MetadataMapping metadataMapping = (MetadataMapping)theEObject;
 				T result = caseMetadataMapping(metadataMapping);
+				if (result == null) result = caseFeatureMapping(metadataMapping);
 				if (result == null) result = defaultCase(theEObject);
 				return result;
 			}

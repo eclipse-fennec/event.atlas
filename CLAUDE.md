@@ -63,16 +63,16 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ```
 
 Baseline as of 2026-11-04: `./gradlew clean build` is green — **86 OSGi tests, 0 `@Disabled`**
-— plus **383 plain-JUnit tests** across eleven projects. The
-mapping project contributes 154 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+— plus **391 plain-JUnit tests** across eleven projects. The
+mapping project contributes 160 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
 `DynamicMappingPackageTest`, `AdminResourceGateTest`, `CollectionFilterTest`,
 `FilteredServiceSourceTest`, the #91 set — `ValueConverterMappingTest`,
 `ValueFunctionMappingTest`, `ConstantResourceValueTest`, `ScaledResourceValueTest`,
 `ExpressionMappingTest` — and the payload-named-service set, `ServiceNameMappingTest` and
-`ForEachServiceTest`, `AdminFeatureMappingTest`); the deployment project 44 (`DeploymentPlannerTest`,
+`ForEachServiceTest`, `AdminFeatureMappingTest`, `ResourceMetadataMappingTest`); the deployment project 44 (`DeploymentPlannerTest`,
 `DeploymentConfiguratorImplTest`, `ExampleDeploymentTest`, `ShippedConfigOverlapTest`,
-`DynamicDeploymentPackageTest`); `…mapping.ocl` 14.
+`DynamicDeploymentPackageTest`); `…mapping.ocl` 16.
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -876,6 +876,16 @@ important thing to know, and the part that changed most recently:
     and have the fixed one. A converter remains the route that needs no runtime configuration.
     TrafiCam needs neither - its location is two plain attributes, which the old `*Ref` paths
     already read.
+- **A resource's metadata can come from the payload since 2026-11-04** (issue #91 item 6).
+  `MetadataMapping` was an empty EClass; it extends `FeatureMapping` and carries a `key` now,
+  and `ResourceMapping.metadata` holds them. `extraMetadata` keeps the constants, written into
+  the model once at registration; a `metadata` entry is read per push and calls
+  `SensinactResource.setMetadataValue`, so it overwrites a constant of the same key. Two
+  deliberate rules: a producer that yields nothing **leaves the entry alone** rather than
+  unsetting it, and metadata is written **even when the change rule drops the value** - the rule
+  describes the value's history, not its description. A metadata failure is logged and never
+  fails the push. `mapResourceMetadata` runs before the value for exactly that reason, because
+  the change-rule branch returns. Guard: `ResourceMetadataMappingTest`.
 - **`TimestampStrategy` is still not read by anything.** The user guide says so instead of
   documenting it as working.
 - All twin interaction happens on the SensiNact **`GatewayThread`** (via

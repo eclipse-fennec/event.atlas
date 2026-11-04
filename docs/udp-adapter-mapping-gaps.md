@@ -376,3 +376,29 @@ no converter, and every later expression over that model can use the same operat
 |---|---|
 | `converterId="udp.array.element.0"` | a three-line `ValueConverter` per case; no engine configuration |
 | `expression="self.geoJson.bbox.at(1)"` **(chosen)** | an `OclOperationProvider` from the model bundle, plus `ocl.customOperationsEnabled=true` on the engine PID |
+
+## Item 6 landed — 2026-11-04
+
+`MetadataMapping` extends `FeatureMapping` and carries a `key`; `ResourceMapping.metadata` holds
+them. The ILSA configuration mapping now writes `type` and `signalGroup` on its `color` resource,
+which was the last open gap in that file, and `IlsaListener.describeSignal` can go.
+
+The resource is declared there with **no value**: the configuration describes the signal, the
+signal-state flow fills the colour. Declaring it is what gives the metadata somewhere to live,
+the way `Signal.color` in the Ilsa package does for the adapter.
+
+### A new open point the exercise surfaced: two mappings, one provider
+
+The adapter pushes **both** ILSA flows into one `Ilsa` provider named after the intersection. A
+mapping's provider model comes from its own `fqMid`, unless a `MappingProfile` with
+`providerStrategy=UNIFIED` names one — `ValueMapperImpl.determineProviderModel`. So as written,
+`ilsa-configuration` and `ilsa-signal-state` build **two** providers, not one.
+
+The pair therefore needs a shared profile before it is deployed. Nothing is missing from the
+engine for it; it is a piece of the mapping that has not been written yet, and it applies to
+TrafiCam too the day its detections are mapped. The same question decides what the `color`
+resource declared in the configuration mapping is for: with a UNIFIED profile it is the very
+resource the state flow writes into.
+
+Remaining after this: **item 8** (TrafiCam `viewport`, ILSA `Thermal`), the UNIFIED profile for
+the ILSA pair, the transient id attributes (Jena's change) and binary EMF on ingress.

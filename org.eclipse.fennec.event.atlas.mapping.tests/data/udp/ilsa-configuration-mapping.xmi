@@ -14,10 +14,15 @@
           Needs the `at` operation contributed by the model bundle, and
           ocl.customOperationsEnabled=true on PID DefaultOclEngine           (#91 item 7)
     DONE  observedArea through a ValueConverter, replacing the qvto black box (#91 item 1)
-    OPEN  the `type` and `signalGroup` metadata on the color resource. Both values come
-          from the signal, and extraMetadata holds constants only            (#91 item 6)
+    DONE  the `type` and `signalGroup` metadata on the color resource, read from the
+          signal on every push                                               (#91 item 6)
+    OPEN  nothing in this mapping. But see the note below: this mapping and the signal-state
+          one must reach the SAME provider, which needs a shared MappingProfile.
 
-  One gap left; it stays in IlsaListener.describeSignal until item 6 lands.
+  TWO MAPPINGS, ONE PROVIDER. The adapter pushes both flows into one `Ilsa` provider named
+  after the intersection. A mapping's provider model comes from its own `fqMid` unless a
+  MappingProfile with providerStrategy=UNIFIED names one, so as written these two build two
+  providers. The pair needs that profile before it is deployed.
 -->
 <sensinactMapping:ProviderMapping
     xmi:version="2.0"
@@ -73,14 +78,29 @@
     </resources>
 
     <!--
-      TODO(gap 2, issue #91 item 6): metadata from the payload.
-      IlsaListener.describeSignal writes these two on the `color` resource, and both values
-      come from the signal. extraMetadata holds constants only, so this stays in the adapter:
+      IlsaListener.describeSignal writes `type` and `signalGroup` on the color resource, and
+      both values come from the signal. extraMetadata holds constants only, so these are
+      MetadataMappings - a FeatureMapping with a key, read on every push.
 
-        <metadata key="type">       <featurePath .../TLSignal/signalType/></metadata>
-        <metadata key="signalGroup"><featurePath .../TLSignal/signalGroup/>
-                                    <featurePath .../TLSignalGroup/id/></metadata>
+      The resource carries no value here: the configuration describes the signal, and the
+      signal-state mapping fills the colour. Declaring it is what gives the metadata somewhere
+      to live, the way the Ilsa package's Signal.color does for the adapter.
     -->
+    <resources name="color" mid="color">
+      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <extraMetadata key="sensorthings.unit.name" value="Farbe"/>
+      <metadata key="type">
+        <featurePath xsi:type="ecore:EAttribute"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/signalType"/>
+      </metadata>
+      <metadata key="signalGroup">
+        <featurePath xsi:type="ecore:EReference"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/signalGroup"/>
+        <featurePath xsi:type="ecore:EAttribute"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalGroup/id"/>
+      </metadata>
+    </resources>
+
   </services>
 
   <admin mid="admin">

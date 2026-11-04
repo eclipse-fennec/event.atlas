@@ -782,7 +782,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
-	public EReference getResourceMapping_DescriptionMapping() {
+	public EReference getResourceMapping_Metadata() {
 		return (EReference)resourceMappingEClass.getEStructuralFeatures().get(6);
 	}
 
@@ -792,7 +792,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
-	public EReference getResourceMapping_ChangeRule() {
+	public EReference getResourceMapping_DescriptionMapping() {
 		return (EReference)resourceMappingEClass.getEStructuralFeatures().get(7);
 	}
 
@@ -802,7 +802,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
-	public EReference getResourceMapping_DeletionRule() {
+	public EReference getResourceMapping_ChangeRule() {
 		return (EReference)resourceMappingEClass.getEStructuralFeatures().get(8);
 	}
 
@@ -812,8 +812,18 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
-	public EReference getResourceMapping_ValueMapping() {
+	public EReference getResourceMapping_DeletionRule() {
 		return (EReference)resourceMappingEClass.getEStructuralFeatures().get(9);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getResourceMapping_ValueMapping() {
+		return (EReference)resourceMappingEClass.getEStructuralFeatures().get(10);
 	}
 
 	/**
@@ -974,6 +984,16 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	@Override
 	public EClass getMetadataMapping() {
 		return metadataMappingEClass;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getMetadataMapping_Key() {
+		return (EAttribute)metadataMappingEClass.getEStructuralFeatures().get(0);
 	}
 
 	/**
@@ -1724,6 +1744,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEReference(resourceMappingEClass, RESOURCE_MAPPING__TIMESTAMP);
 		createEAttribute(resourceMappingEClass, RESOURCE_MAPPING__MID);
 		createEReference(resourceMappingEClass, RESOURCE_MAPPING__EXTRA_METADATA);
+		createEReference(resourceMappingEClass, RESOURCE_MAPPING__METADATA);
 		createEReference(resourceMappingEClass, RESOURCE_MAPPING__DESCRIPTION_MAPPING);
 		createEReference(resourceMappingEClass, RESOURCE_MAPPING__CHANGE_RULE);
 		createEReference(resourceMappingEClass, RESOURCE_MAPPING__DELETION_RULE);
@@ -1746,6 +1767,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEReference(adminMappingEClass, ADMIN_MAPPING__ELEVATION_MAPPING);
 
 		metadataMappingEClass = createEClass(METADATA_MAPPING);
+		createEAttribute(metadataMappingEClass, METADATA_MAPPING__KEY);
 
 		mappingEClass = createEClass(MAPPING);
 		createEAttribute(mappingEClass, MAPPING__MID);
@@ -1868,6 +1890,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		serviceMappingEClass.getESuperTypes().add(this.getMapping());
 		resourceMappingEClass.getESuperTypes().add(ecorePackage.getEAttribute());
 		adminMappingEClass.getESuperTypes().add(this.getServiceMapping());
+		metadataMappingEClass.getESuperTypes().add(this.getFeatureMapping());
 		timestampMappingEClass.getESuperTypes().add(this.getFeatureMapping());
 		nameMappingEClass.getESuperTypes().add(this.getFeatureMapping());
 		valueMappingEClass.getESuperTypes().add(this.getFeatureMapping());
@@ -1929,6 +1952,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getResourceMapping_Timestamp(), this.getTimestampMapping(), null, "timestamp", null, 1, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getResourceMapping_Mid(), ecorePackage.getEString(), "mid", null, 1, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getResourceMapping_ExtraMetadata(), this.getStringToStringMap(), null, "extraMetadata", null, 0, -1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getResourceMapping_Metadata(), this.getMetadataMapping(), null, "metadata", null, 0, -1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getResourceMapping_DescriptionMapping(), this.getNameMapping(), null, "descriptionMapping", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, IS_DERIVED, IS_ORDERED);
 		initEReference(getResourceMapping_ChangeRule(), this.getChangeRule(), null, "changeRule", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getResourceMapping_DeletionRule(), this.getDeletionRule(), null, "deletionRule", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
@@ -1954,6 +1978,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getAdminMapping_ElevationMapping(), this.getFeatureMapping(), null, "elevationMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(metadataMappingEClass, MetadataMapping.class, "MetadataMapping", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
+		initEAttribute(getMetadataMapping_Key(), ecorePackage.getEString(), "key", null, 1, 1, MetadataMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(mappingEClass, Mapping.class, "Mapping", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 		initEAttribute(getMapping_Mid(), ecorePackage.getEString(), "mid", null, 1, 1, Mapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);

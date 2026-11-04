@@ -34,6 +34,7 @@ import org.eclipse.emf.ecore.InternalEObject;
 import org.eclipse.emf.ecore.impl.EAttributeImpl;
 import org.eclipse.emf.ecore.impl.ENotificationImpl;
 
+import org.eclipse.emf.ecore.util.EObjectContainmentEList;
 import org.eclipse.emf.ecore.util.EObjectResolvingEList;
 import org.eclipse.emf.ecore.util.EcoreEMap;
 import org.eclipse.emf.ecore.util.InternalEList;
@@ -41,6 +42,7 @@ import org.eclipse.emf.ecore.util.InternalEList;
 import org.eclipse.fennec.event.atlas.model.mapping.ChangeRule;
 import org.eclipse.fennec.event.atlas.model.mapping.DeletionRule;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
+import org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.NameMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping;
@@ -60,6 +62,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getTimestamp <em>Timestamp</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getMid <em>Mid</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getExtraMetadata <em>Extra Metadata</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getMetadata <em>Metadata</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getDescriptionMapping <em>Description Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getChangeRule <em>Change Rule</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl#getDeletionRule <em>Deletion Rule</em>}</li>
@@ -148,6 +151,16 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 	 * @ordered
 	 */
 	protected EMap<String, String> extraMetadata;
+
+	/**
+	 * The cached value of the '{@link #getMetadata() <em>Metadata</em>}' containment reference list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getMetadata()
+	 * @generated
+	 * @ordered
+	 */
+	protected EList<MetadataMapping> metadata;
 
 	/**
 	 * The cached value of the '{@link #getDescriptionMapping() <em>Description Mapping</em>}' reference.
@@ -331,6 +344,19 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 			extraMetadata = new EcoreEMap<String,String>(MappingPackage.Literals.STRING_TO_STRING_MAP, StringToStringMapImpl.class, this, MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA);
 		}
 		return extraMetadata;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EList<MetadataMapping> getMetadata() {
+		if (metadata == null) {
+			metadata = new EObjectContainmentEList<MetadataMapping>(MetadataMapping.class, this, MappingPackage.RESOURCE_MAPPING__METADATA);
+		}
+		return metadata;
 	}
 
 	/**
@@ -530,6 +556,8 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 		switch (featureID) {
 			case MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA:
 				return ((InternalEList<?>)getExtraMetadata()).basicRemove(otherEnd, msgs);
+			case MappingPackage.RESOURCE_MAPPING__METADATA:
+				return ((InternalEList<?>)getMetadata()).basicRemove(otherEnd, msgs);
 			case MappingPackage.RESOURCE_MAPPING__CHANGE_RULE:
 				return basicSetChangeRule(null, msgs);
 			case MappingPackage.RESOURCE_MAPPING__DELETION_RULE:
@@ -562,6 +590,8 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 			case MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA:
 				if (coreType) return getExtraMetadata();
 				else return getExtraMetadata().map();
+			case MappingPackage.RESOURCE_MAPPING__METADATA:
+				return getMetadata();
 			case MappingPackage.RESOURCE_MAPPING__DESCRIPTION_MAPPING:
 				if (resolve) return getDescriptionMapping();
 				return basicGetDescriptionMapping();
@@ -603,6 +633,10 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 				return;
 			case MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA:
 				((EStructuralFeature.Setting)getExtraMetadata()).set(newValue);
+				return;
+			case MappingPackage.RESOURCE_MAPPING__METADATA:
+				getMetadata().clear();
+				getMetadata().addAll((Collection<? extends MetadataMapping>)newValue);
 				return;
 			case MappingPackage.RESOURCE_MAPPING__DESCRIPTION_MAPPING:
 				setDescriptionMapping((NameMapping)newValue);
@@ -646,6 +680,9 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 			case MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA:
 				getExtraMetadata().clear();
 				return;
+			case MappingPackage.RESOURCE_MAPPING__METADATA:
+				getMetadata().clear();
+				return;
 			case MappingPackage.RESOURCE_MAPPING__DESCRIPTION_MAPPING:
 				setDescriptionMapping((NameMapping)null);
 				return;
@@ -682,6 +719,8 @@ public class ResourceMappingImpl extends EAttributeImpl implements ResourceMappi
 				return MID_EDEFAULT == null ? mid != null : !MID_EDEFAULT.equals(mid);
 			case MappingPackage.RESOURCE_MAPPING__EXTRA_METADATA:
 				return extraMetadata != null && !extraMetadata.isEmpty();
+			case MappingPackage.RESOURCE_MAPPING__METADATA:
+				return metadata != null && !metadata.isEmpty();
 			case MappingPackage.RESOURCE_MAPPING__DESCRIPTION_MAPPING:
 				return descriptionMapping != null;
 			case MappingPackage.RESOURCE_MAPPING__CHANGE_RULE:

@@ -315,6 +315,42 @@ The annotation sources and keys are defined in `SensinactMapperConstants`:
 `sensinact.mapping` (with `sensinact.mapping.unit` / `sensinact.mapping.description`) and
 `sensinact.mapping.metadata`.
 
+### Metadata the payload decides
+
+`extraMetadata` carries the entries that are the same for every payload, and they are written
+into the twin model once, at registration. A `metadata` entry is read **per push** instead: it is
+a `MetadataMapping`, which is a `FeatureMapping` with a `key`, so the value comes from a sibling
+feature of the mapped value, from a function or from an expression, with a `converterId` after
+it.
+
+```xml
+<resources name="color" mid="color">
+  <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+
+  <extraMetadata key="sensorthings.unit.name" value="Farbe"/>   <!-- the same every time -->
+
+  <metadata key="signalGroup">                                   <!-- read from the payload -->
+    <featurePath xsi:type="ecore:EReference" href="t.ecore#//TLSignal/signalGroup"/>
+    <featurePath xsi:type="ecore:EAttribute" href="t.ecore#//TLSignalGroup/id"/>
+  </metadata>
+</resources>
+```
+
+Both write into one namespace, so a `metadata` entry overwrites an `extraMetadata` constant of
+the same key on every push that produces a value.
+
+Two rules are worth knowing because they are deliberate:
+
+- **A producer that yields nothing leaves the entry as it is.** A payload that does not carry the
+  value is not a statement that the metadata is gone — the same reasoning that makes a
+  `collectionFilter` matching nothing skip a service instead of failing the instance. Nothing
+  unsets an entry.
+- **Metadata is written although the change rule drops the value.** The rule describes what the
+  history keeps of the *value*; a unit or a signal group is a different claim. It also lets a
+  resource whose value rarely moves still carry metadata the payload decides. For the same
+  reason a metadata failure is logged and never fails the push: losing a description must not
+  cost the reading it describes.
+
 ## Collections
 
 When a feature path crosses a multi-valued reference, pick the element with
