@@ -89,4 +89,26 @@ public class ValueMapperFactory {
             ValueFunctionRegistry functionRegistry) {
         return new ValueMapperImpl(twin, mapping, changeRuleFilter, converterRegistry, functionRegistry);
     }
+
+    /**
+     * Creates a value mapper with every extension point wired in, expressions included.
+     *
+     * @param twin the digital twin to update
+     * @param mapping the provider mapping to apply
+     * @param changeRuleFilter decides per resource whether a mapped value is pushed, or
+     *        <code>null</code> to push every value
+     * @param converterRegistry applies the converter a mapping names, or <code>null</code> to
+     *        push every value unconverted
+     * @param functionRegistry applies the function a mapping names, or <code>null</code> to
+     *        leave every functionId unread
+     * @param expressionEvaluator evaluates the expression a mapping carries, or
+     *        <code>null</code> to leave every expression unread
+     * @return a new value mapper
+     */
+    public static ValueMapper createValueMapper(SensinactDigitalTwin twin, ProviderMapping mapping,
+            ChangeRuleFilter changeRuleFilter, ValueConverterRegistry converterRegistry,
+            ValueFunctionRegistry functionRegistry, ExpressionEvaluator expressionEvaluator) {
+        return new ValueMapperImpl(twin, mapping, changeRuleFilter, converterRegistry, functionRegistry,
+                expressionEvaluator);
+    }
 }

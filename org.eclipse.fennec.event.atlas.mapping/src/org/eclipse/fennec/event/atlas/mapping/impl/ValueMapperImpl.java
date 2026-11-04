@@ -35,6 +35,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
+import org.eclipse.fennec.event.atlas.mapping.ExpressionEvaluator;
 import org.eclipse.fennec.event.atlas.mapping.ValueConverterRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueFunctionRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapper;
@@ -79,6 +80,7 @@ public class ValueMapperImpl implements ValueMapper {
 	private final ChangeRuleFilter changeRuleFilter;
 	private final ValueConverterRegistry converterRegistry;
 	private final ValueFunctionRegistry functionRegistry;
+	private final ExpressionEvaluator expressionEvaluator;
 
 	/**
 	 * Creates a new ValueMapper instance with custom function registry.
@@ -133,12 +135,35 @@ public class ValueMapperImpl implements ValueMapper {
 	 */
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter,
 			ValueConverterRegistry converterRegistry, ValueFunctionRegistry functionRegistry) {
+		this(twin, mapping, changeRuleFilter, converterRegistry, functionRegistry, null);
+	}
+
+	/**
+	 * Creates a new ValueMapper instance with every extension point wired in, expressions
+	 * included.
+	 *
+	 * @param twin The SensiNact digital twin to update with mapped values
+	 * @param mapping The ProviderMapping configuration defining the transformation rules
+	 * @param changeRuleFilter Decides per resource whether a mapped value is pushed, or
+	 * <code>null</code> to push every value
+	 * @param converterRegistry Applies the converter a mapping names, or <code>null</code> to
+	 * push every value unconverted
+	 * @param functionRegistry Applies the function a mapping names, or <code>null</code> to
+	 * leave every functionId unread
+	 * @param expressionEvaluator Evaluates the expression a mapping carries, or
+	 * <code>null</code> to leave every expression unread - which is what a runtime that
+	 * deploys no expression language does
+	 */
+	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter,
+			ValueConverterRegistry converterRegistry, ValueFunctionRegistry functionRegistry,
+			ExpressionEvaluator expressionEvaluator) {
 		this.twin = requireNonNull(twin, "Digital twin cannot be null");
 		this.mapping = requireNonNull(mapping, "Provider mapping cannot be null");
 		this.providerModel = determineProviderModel(mapping);
 		this.changeRuleFilter = changeRuleFilter;
 		this.converterRegistry = converterRegistry;
 		this.functionRegistry = functionRegistry;
+		this.expressionEvaluator = expressionEvaluator;
 	}
 
 	@Override
@@ -848,6 +873,12 @@ public class ValueMapperImpl implements ValueMapper {
 	private void validateResourceMapping(EObject sourceInstance, ResourceMapping resourceMapping, 
 			String serviceName, ValidationResultImpl result) {
 		ValueMapping valueMapping = resourceMapping.getValueMapping();
+		if (valueMapping != null && producesWithoutAPath(valueMapping)) {
+			// An expression, a function or a constant is a value source in its own right, so
+			// the resource is not missing anything. Only a producer that reads the payload can
+			// be checked against this instance, and none of these three does.
+			return;
+		}
 		List<EStructuralFeature> featurePath = valueMapping == null
 				? resourceMapping.getValueFeature()
 				: valueMapping.getFeaturePath();
@@ -867,6 +898,18 @@ public class ValueMapperImpl implements ValueMapper {
 			result.addError("Invalid feature path for resource " + serviceName + "." + 
 					resourceMapping.getMid() + ": " + e.getMessage());
 		}
+	}
+
+	/**
+	 * Whether a value mapping names a value source that needs no feature path of its own.
+	 */
+	private static boolean producesWithoutAPath(ValueMapping valueMapping) {
+		return isSet(valueMapping.getExpression()) || isSet(valueMapping.getFunctionId())
+				|| isSet(valueMapping.getValue());
+	}
+
+	private static boolean isSet(String text) {
+		return text != null && !text.isBlank();
 	}
 
 	/**
@@ -1053,10 +1096,14 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
-	 * Traverses a path of {@link EStructuralFeature}s to retrieve a raw, untyped value.
-	 * First checks if a functionId is specified and invokes the registered function.
-	 * If no function is found or no functionId is specified, falls back to feature path traversal.
-	 * Handles multi-value features by using the collectionIndex from the FeatureMapping.
+	 * Produces the raw, untyped value a feature mapping stands for.
+	 * <p>
+	 * Three producers can answer, in this order: the {@code expression}, the {@code functionId},
+	 * and the plain feature path. The first one the mapping declares is the one that answers -
+	 * it is not a fallback chain, because a declared producer that yields nothing means this
+	 * payload carries no value for the resource, not that the next producer should guess one.
+	 * What a producer yields still meets the mapping's own literal fallback further up
+	 * (a NameMapping's name, a TimestampMapping's timestamp, a ValueMapping's constant).
 	 *
 	 * @param source         The starting object.
 	 * @param featureMapping The feature mapping containing the path and collection index.
@@ -1069,9 +1116,20 @@ public class ValueMapperImpl implements ValueMapper {
 		List<EStructuralFeature> featurePath = featureMapping.getFeaturePath();
 		boolean hasPath = featurePath != null && !featurePath.isEmpty();
 
+		// The expression is the first producer and reads the source object itself, so a
+		// feature path alongside it is redundant rather than an input - unlike a function's.
+		String expression = featureMapping.getExpression();
+		if (expression != null && !expression.isBlank()) {
+			if (hasPath) {
+				logger.fine(String.format(
+						"A mapping sets both an expression and a feature path %s - the feature path is ignored",
+						featurePath));
+			}
+			return applyExpression(expression, source);
+		}
+
 		// The function is a producer. With a feature path it is handed what the path found;
 		// without one it is handed the whole source object and reads what it needs itself.
-		// An 'expression' would win over both, and nothing reads it yet.
 		String functionId = featureMapping.getFunctionId();
 		if (functionId != null && !functionId.isBlank()) {
 			if (!hasPath) {
@@ -1085,6 +1143,23 @@ public class ValueMapperImpl implements ValueMapper {
 			return Optional.empty();
 		}
 		return followPath(source, featureMapping, featurePath);
+	}
+
+	/**
+	 * Evaluates the expression a feature mapping carries.
+	 *
+	 * @return the computed value, or an empty optional - which leaves the mapping's own
+	 *         fallback to answer, exactly as an unreadable feature path does
+	 */
+	private Optional<Object> applyExpression(String expression, EObject source) {
+		if (expressionEvaluator == null) {
+			// No expression language deployed. Producing nothing is right: the alternative
+			// would be to fall through to a feature path the expression was written to replace.
+			logger.fine(String.format(
+					"A mapping carries an expression but no ExpressionEvaluator is available: %s", expression));
+			return Optional.empty();
+		}
+		return expressionEvaluator.evaluate(expression, source);
 	}
 
 	/**

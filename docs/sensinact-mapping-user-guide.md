@@ -264,7 +264,7 @@ a SensiNact resource:
 | `unit` | Unit string → `unit` metadata (falls back to an Ecore annotation, below). |
 | `eType` | Target `EDataType` (e.g. `EDouble`). The value is converted to it. |
 | `valueFeature` (0..\*) | Feature path to the source value. |
-| `valueMapping` | Richer alternative to `valueFeature`: a `ValueMapping` with the path plus `collectionIndex`/`collectionFilter`, a `converterId` and a constant `value`. Wins when both are set. |
+| `valueMapping` | Richer alternative to `valueFeature`: a `ValueMapping` with the path plus `collectionIndex`/`collectionFilter`, an `expression`, a `functionId`, a `converterId` and a constant `value`. Wins when both are set. |
 | `unitFeature` (0..\*) | Feature path to a dynamic unit value. |
 | `timestamp` | Resource-level timestamp, or a reference to one (`//@timestamp`). |
 | `extraMetadata` (0..\*) | Arbitrary `key`/`value` metadata entries. |
@@ -722,6 +722,124 @@ for the id**.
 > engine never reads it. A timestamp computed by a function is a `<timestamp functionId="…">`,
 > with no `strategy`.
 
+## Expressions (OCL)
+
+A function needs Java code and a deployed bundle. An **expression** needs neither. You write it
+in the mapping, in OCL, and it reads the payload.
+
+```xml
+<!-- Fahrenheit from a Celsius payload. No converter and no function. -->
+<resources mid="fahrenheit" name="fahrenheit" eType="ecore:EDataType …#//EDouble">
+  <valueMapping expression="self.temperature * 1.8 + 32"/>
+</resources>
+```
+
+Put the expression on the `valueMapping`. This is the same element that holds a `converterId` or
+a collection selection. A `ResourceMapping` has no `expression` of its own. It has no
+`featurePath` of its own either.
+
+**`self` is the payload object.** A `featurePath` starts at the same object. The expression can
+read all data in the payload. This is the purpose of an expression:
+
+| Expression | Result |
+|---|---|
+| `self.temperature * 1.8 + 32` | arithmetic on a feature |
+| `self.reports->size()` | a count; a feature path cannot give you one |
+| `self.reports->first().windSpeed` | an element, then a feature of that element |
+| `self.reports->select(r \| r.windSpeed > 10)->size()` | a count of the elements that agree with a condition |
+| `if self.battery < 10 then 'low' else 'ok' endif` | a condition |
+| `self.device.toUpperCase()` | the OCL string library |
+
+`expression` is an attribute of `FeatureMapping`. Thus you can use it in a `ValueMapping`, a
+`NameMapping` and a `TimestampMapping`. To calculate a provider id from more than one feature,
+write `<name expression="…"/>`.
+
+### The sequence of the three producers
+
+**An expression has priority over a `functionId`. Both have priority over a `featurePath`.**
+
+| The mapping has | The value comes from |
+|---|---|
+| `expression` | the expression. The engine ignores a `featurePath` in the same element. |
+| `functionId`, but no expression | the function. The function gets the value of the path, or the source object if there is no path. |
+| only `featurePath` | the path |
+
+A `converterId` then changes the value that the first producer gives. Thus an expression and a
+converter operate together.
+
+**If a producer gives no value, the engine does not use the next producer.** The literal of the
+mapping gives the value: the constant of a `ValueMapping`, the `name` of a `NameMapping`, or the
+`timestamp` of a `TimestampMapping`. If there is no literal, the resource reports no value for
+this payload. The engine never reads the feature path that is adjacent to an expression. The
+expression replaces that path.
+
+### How to deploy it
+
+The mapping engine declares the port and no more. The implementation is the bundle
+**`org.eclipse.fennec.event.atlas.mapping.ocl`**. This bundle brings the OCL engine, the parser
+and the model bundles with it. The development runtime (`launch.bndrun`) and the docker image
+contain it.
+
+**In a runtime without this bundle, each expression gives no value.** There is no error, and the
+ingest does not fail. The other parts of the mapping operate as before. The chat adapter for
+model inference has the same structure: one bundle is the only bundle that needs the large
+stack.
+
+### When an expression gives no value
+
+An expression cannot cause the failure of a payload. For each of these conditions, the
+expression gives no value, and the literal of the mapping gives the value:
+
+- **The engine cannot parse the expression.** An expression that names a feature of a different
+  type is also a parse error, because OCL is a typed language. The engine writes one log message
+  with the position of the error. Then it keeps the result, and it does not parse the same text
+  again for the same **model version**.
+
+  The model version is the fingerprint of the EPackage, which `MetadataService` gives. It is a
+  digest of the content of the model. Thus:
+
+  | You change | Result |
+  |---|---|
+  | the mapping | The text is different. The engine parses it with the next payload. |
+  | the model, and you register the package again | The fingerprint is different. The engine parses the text again with the next payload. |
+  | nothing | The engine does not parse the text again. |
+
+  Two copies of one nsURI with different content are two model versions. They do not share a
+  result. Two copies with identical content are one model version, and they share one result.
+  If a runtime has no metadata service, the key is the nsURI, and all content under that nsURI
+  shares one result.
+- **The expression gives the OCL value `invalid` or `null`.** An example is a feature that has
+  no value.
+- **The expression causes an exception.**
+
+### Two conditions for the data types
+
+- **The OCL type `Real` is a Java `Double`.** If you write `self.temperature * 1.8` for a
+  resource with the type `EInt`, the resource gets **no value**. The engine removes the value and
+  writes a log message. It does not round the value. Use `EDouble` or `EFloat`. A converter that
+  scales a value has the same condition.
+- **`tokenize` removes an empty part.** It uses `StringTokenizer`. Thus `'a//b'` gives two parts,
+  not three.
+
+### Where the engine does not read an expression
+
+`expression` is an attribute of `FeatureMapping`. Two elements look applicable, but the engine
+does not read an expression in them:
+
+- **`referencedResource` (a `ReferenceMapping`)** selects the EObject for the generated service.
+  It uses only its `featurePath` with `collectionIndex` or `collectionFilter`. An expression in
+  this element would be a more general `collectionFilter`. That is a different function, and it
+  is not available.
+- **The admin elements `latitudeRef`, `longitudeRef` and `friendlyNameFeature`**, and the other
+  `*Ref` lists, are feature paths. They are not `FeatureMapping` elements. Thus they have no
+  `expression`, no `functionId` and no `converterId`.
+
+### The available data
+
+`self` is the only variable. An expression cannot read the source of the ingest, such as the
+MQTT topic or the REST channel. If a payload must know its source, the payload model must
+contain it. `allInstances()` has no model extent, because the engine maps one payload at a time.
+
 ## Persistence rules (history control)
 
 > **Status: change rules are enforced on the way *into* the twin, as an interim measure.**
@@ -938,8 +1056,14 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 - **A converted value needs a floating-point `eType`** — a scaling converter produces a
   `Double`, and a resource typed `EInt` reports **nothing at all** for it. The value is dropped
   and logged, not rounded. Declare `EDouble` or `EFloat` for anything a converter scales.
-- **`strategy` and `expression` do nothing** — both are in the metamodel and neither is read.
-  `expression` is reserved for OCL. See [Timestamps](#timestamps).
+- **`TimestampStrategy` does nothing** — the enum is in the metamodel and is never read. See
+  [Timestamps](#timestamps).
+- **An expression needs its bundle** — if you do not deploy `…event.atlas.mapping.ocl`, each
+  `expression` gives no value, and there is no error message. See
+  [Expressions (OCL)](#expressions-ocl).
+- **The engine does not parse a bad expression again for the same model version** — it keeps
+  the text with the fingerprint of the EPackage. A correction of the mapping or a new version
+  of the model gives a new key. A restart is not necessary for either.
 - **An unknown `functionId` produces no value, an unknown `converterId` passes the value
   through** — see [Functions](#functions) for why they differ.
 
@@ -951,7 +1075,7 @@ Map<String,Object> values = mapper.mapResourceValues(sourceInstance);  // inspec
 | `ServiceMapping` | `mid`, `name`, `timestamp`, `resources`, `referencedResource` |
 | `ResourceMapping` | `mid`, `name`, `unit`, `eType`, `valueFeature`, `valueMapping`, `unitFeature`, `timestamp`, `extraMetadata`, `defaultValueLiteral`, `changeRule`, `deletionRule` |
 | `AdminMapping` | `friendlyName`/`friendlyNameFeature`, `latitude`/`latitudeRef` (+ longitude, elevation), `providerPackage` |
-| `FeatureMapping` (abstract) | `featurePath`, `collectionIndex`, `collectionFilter`, `functionId`, `converterId`, `expression` (not read) |
+| `FeatureMapping` (abstract) | `featurePath`, `collectionIndex`, `collectionFilter`, `expression` (OCL), `functionId`, `converterId` |
 | `NameMapping` | the above + `name` |
 | `ValueMapping` | the above + `value` (a constant) |
 | `TimestampMapping` | the above + `hint`, `timestamp`, `strategy` (not read) |

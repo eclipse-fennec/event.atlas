@@ -18,6 +18,7 @@ Gradle graph automatically):
 | Directory | Contents |
 |---|---|
 | `…event.atlas.mapping` | the mapping metamodel (`model/event-atlas-mapping.ecore` → `src-gen`) + the mapping engine + its DS components |
+| `…event.atlas.mapping.ocl` | `OclExpressionEvaluator` — the only bundle here that depends on an expression language: it binds the mapping engine's `ExpressionEvaluator` port to the Fennec m2x OCL engine, so a `FeatureMapping.expression` is read where it is deployed and produces nothing where it is not. Same shape as `…model.inference.chat`. Added 2026-11-04 (#91) |
 | `…event.atlas.deployment` | the **deployment** metamodel (`model/event-atlas-deployment.ecore` → `src-gen`) + `DeploymentConfigurator`, which turns an `EventAtlasDeployment` XMI into ConfigAdmin configurations. Additive: an absent section is not written, and a PID another writer already owns is left alone. See `docs/event-atlas-deployment-model.md` |
 | `…event.atlas.mapping.tests` | OSGi integration tests (Felix via the bnd launcher) + the domain test models |
 | `…event.atlas.mapping.runtime` | **no code** — carries `launch.bndrun` and `eventatlas.runtime_docker.bndrun`, and the `runtime/{mappings,profiles,deployment}` mount-point skeleton |
@@ -61,14 +62,16 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-10-23: `./gradlew clean build` is green — **80 OSGi tests, 0 `@Disabled`**
-— plus **270 plain-JUnit tests** across ten projects. The
-mapping project contributes 55 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+Baseline as of 2026-11-04: `./gradlew clean build` is green — **82 OSGi tests, 0 `@Disabled`**
+— plus **363 plain-JUnit tests** across eleven projects. The
+mapping project contributes 135 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
 `DynamicMappingPackageTest`, `AdminResourceGateTest`, `CollectionFilterTest`,
-`FilteredServiceSourceTest`); the deployment project 44 (`DeploymentPlannerTest`,
+`FilteredServiceSourceTest`, and the #91 set — `ValueConverterMappingTest`,
+`ValueFunctionMappingTest`, `ConstantResourceValueTest`, `ScaledResourceValueTest`,
+`ExpressionMappingTest`); the deployment project 44 (`DeploymentPlannerTest`,
 `DeploymentConfiguratorImplTest`, `ExampleDeploymentTest`, `ShippedConfigOverlapTest`,
-`DynamicDeploymentPackageTest`).
+`DynamicDeploymentPackageTest`); `…mapping.ocl` 13.
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -783,8 +786,38 @@ important thing to know, and the part that changed most recently:
   - Watch the guard that caused the one bug here: `getNameMapping` and `extractTimestamp` used to
     call `getRawValue` **only when a feature path was set**, so a function-only mapping never
     reached it. Both now call it unconditionally and let `getRawValue` decide.
-- **`expression` and `TimestampStrategy` are still not read by anything.** `expression` is
-  reserved for OCL. The user guide says so instead of documenting them as working.
+- **`expression` is OCL, and it is the first producer** (issue #91, 2026-11-04). The precedence
+  inside `getRawValue` is `expression` → `functionId` → `featurePath`, and a `converterId`
+  post-processes whichever won; the mapping's own literal (a `ValueMapping` constant, a
+  `NameMapping` name, a `TimestampMapping` timestamp) answers when the producer yields nothing.
+  A feature path beside an expression is **ignored, not a fallback** — it was replaced.
+  - The engine declares `ExpressionEvaluator` (in `…mapping`, beside `ValueConverterRegistry`
+    and `ValueFunctionRegistry`) and nothing else; `…event.atlas.mapping.ocl` is the only bundle
+    that depends on m2x. Its `Import-Package` is EMF plus `m2x.ocl.api`, and it requires the
+    `OclEngine` **service**, which is why every bndrun carrying it needs
+    `-resolve.effective: active` — `test.bndrun` got that setting for exactly this reason, and
+    without it the engine and parser resolve away silently and the service never appears.
+  - **The engine caches a parse, but only a successful one.** `OclEngineImpl.parse` goes through
+    the `OclExpressionCache`, so no per-payload parsing — a failure throws, though, so
+    `OclExpressionEvaluator` keeps its own set of texts known not to parse.
+  - **That set is keyed by the model *fingerprint*, not the nsURI** — `MetadataService
+    .getPackageMetadata(EPackage)` → `PackageMetadata.getModelFingerprint()`, a canonical digest
+    of the package content (`org.eclipse.fennec.emf.osgi.metadata`, already a runbundle
+    everywhere here; the reference is OPTIONAL/DYNAMIC and falls back to the nsURI). Whether a
+    text parses depends on the *content* of the package, so the fingerprint is the honest key:
+    two copies of one nsURI that differ get their own verdict, identical copies share one, and a
+    re-registered model is parsed again with **no restart**. It costs two map reads per
+    evaluation, not a walk: `MetadataServiceImpl` memoizes the fingerprint per EPackage instance
+    in a `WeakHashMap`. The one trap is that `getPackageMetadata(EPackage)` *builds and
+    publishes* a metadata tree under its write lock for a package it does not know — bounded
+    here, because only a package that already has a mapping ever reaches an expression.
+  - Five bundles come in, not four: `m2x.ocl.{api,engine,model,parser}` **plus `m2x.unit`**.
+    All from `fennecM2X.maven`, nothing added to `central.mvn`; antlr was already there for the
+    SensorThings filter parser.
+  - OCL `Real` is a `Double`, so an expression feeding an `EInt` resource hits the same drop
+    `ScaledResourceValueTest` pins for converters.
+- **`TimestampStrategy` is still not read by anything.** The user guide says so instead of
+  documenting it as working.
 - All twin interaction happens on the SensiNact **`GatewayThread`** (via
   `AbstractSensinactCommand`); tests follow the same pattern.
 - `MappingConfigurator` is a **generated** DS component in `src-gen`, not hand-written code.
