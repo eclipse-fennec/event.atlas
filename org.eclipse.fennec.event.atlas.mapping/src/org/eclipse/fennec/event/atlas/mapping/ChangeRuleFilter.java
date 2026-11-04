@@ -54,8 +54,11 @@ public interface ChangeRuleFilter {
 	 * grouping key for {@link #reset(String)}. Parameter must not be <code>null</code>
 	 * @param providerId the id of the target provider in the twin. Parameter must not be
 	 * <code>null</code>
-	 * @param serviceMid the {@code mid} of the target service. Parameter must not be
-	 * <code>null</code>
+	 * @param serviceName the name of the target service in the twin. This is the service's
+	 * {@code mid} for a statically named service, and the name the mapping produced for one
+	 * named from its payload - so a set of services built from one {@code ServiceMapping}
+	 * keeps one rule state per service rather than sharing a single one. Parameter must not
+	 * be <code>null</code>
 	 * @param resourceMapping the resource mapping carrying the rule; a mapping without a
 	 * {@link ResourceMapping#getChangeRule() changeRule} always accepts. Parameter must not
 	 * be <code>null</code>
@@ -67,7 +70,7 @@ public interface ChangeRuleFilter {
 	 * @throws NullPointerException if any parameter but the value or the timestamp is
 	 * <code>null</code>
 	 */
-	boolean accept(String mappingMid, String providerId, String serviceMid, ResourceMapping resourceMapping,
+	boolean accept(String mappingMid, String providerId, String serviceName, ResourceMapping resourceMapping,
 			Object value, Instant timestamp);
 
 	/**

@@ -62,16 +62,17 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
 ```
 
-Baseline as of 2026-11-04: `./gradlew clean build` is green — **82 OSGi tests, 0 `@Disabled`**
-— plus **363 plain-JUnit tests** across eleven projects. The
-mapping project contributes 135 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
+Baseline as of 2026-11-04: `./gradlew clean build` is green — **86 OSGi tests, 0 `@Disabled`**
+— plus **383 plain-JUnit tests** across eleven projects. The
+mapping project contributes 154 of them (`ProviderModelMapperTest`, `ChangeRuleFilterImplTest`,
 `BindingResolverTest`, `MappingProfileValidationTest`, `GeneratedResourceValidationTest`,
 `DynamicMappingPackageTest`, `AdminResourceGateTest`, `CollectionFilterTest`,
-`FilteredServiceSourceTest`, and the #91 set — `ValueConverterMappingTest`,
+`FilteredServiceSourceTest`, the #91 set — `ValueConverterMappingTest`,
 `ValueFunctionMappingTest`, `ConstantResourceValueTest`, `ScaledResourceValueTest`,
-`ExpressionMappingTest`); the deployment project 44 (`DeploymentPlannerTest`,
+`ExpressionMappingTest` — and the payload-named-service set, `ServiceNameMappingTest` and
+`ForEachServiceTest`, `AdminFeatureMappingTest`); the deployment project 44 (`DeploymentPlannerTest`,
 `DeploymentConfiguratorImplTest`, `ExampleDeploymentTest`, `ShippedConfigOverlapTest`,
-`DynamicDeploymentPackageTest`); `…mapping.ocl` 13.
+`DynamicDeploymentPackageTest`); `…mapping.ocl` 14.
 
 - **`build` already runs `testOSGi`** — the tests project's `check` depends on it, so a plain
   `./gradlew build` launches Felix. No need to add `testOSGi` to the command line.
@@ -735,7 +736,7 @@ important thing to know, and the part that changed most recently:
   `sensinact.mapping.changerule.filter`, `enabled=true` by default) is consulted by
   `ValueMapperImpl.mapSingleResource` immediately before `resource.setValue`, and drops a value
   its `ResourceMapping`'s `ChangeRule` rejects. It is *stateful* — last accepted value, its
-  timestamp and a notification counter per `mappingMid/providerId/serviceMid/resourceMid` —
+  timestamp and a notification counter per `mappingMid/providerId/serviceName/resourceMid` —
   because a fresh `ValueMapperImpl` is created per push; comparisons are against the last
   *accepted* value, so a slow drift is not filtered away one step at a time, and the first value
   of a resource is always accepted. Time throttling measures the *payload's* timestamp, not
@@ -816,6 +817,65 @@ important thing to know, and the part that changed most recently:
     SensorThings filter parser.
   - OCL `Real` is a `Double`, so an expression feeding an `EInt` resource hits the same drop
     `ScaledResourceValueTest` pins for converters.
+- **A service can be named by the payload, and then one block can make several services**
+  (issue #91 follow-up, 2026-11-04). `ServiceMapping` inherits `name : NameMapping` from
+  `Mapping` and nothing read it; it is read now, but **only when it carries a producer** - an
+  expression, a function or a feature path. A *constant* name stays a label and the `mid` still
+  names the service, because every mapping in the repo fills that slot with a label beside a
+  differing `mid` (`mid="co2"`, `<name name="CO2"/>`) and reading it would have renamed the
+  services of all of them at once, twin ids, history rows and SensorThings ids with them.
+  `ServiceNameMappingTest.constantName_usesTheMid` is the guard.
+  - **One service per collection element follows from the same rule**: a produced name plus a
+    source path that still holds a collection. A set of services needs a name for each, and only
+    a producer can give one, so no flag and no `.ecore` change was needed. `collectionFilter`
+    narrows the set first; a **non-zero** `collectionIndex` still selects one element, while a
+    zero one cannot - EMF generates `eIsSet` as "differs from the default" and the default is 0,
+    so an explicit `collectionIndex="0"` is invisible. That is also why the plain rule
+    "a collection means one service each" was rejected: it would have silently turned
+    `WeatherReportsProviderMapping.xmi`'s `reports[0]` service into one service per report.
+  - **The model grows at push time.** `ValueMapperImpl` holds a `SensinactModelManager` (a new
+    constructor and factory overload; `InstancePusherImpl` passes the one its command already
+    receives) and calls `ProviderModelSensinactMapper.createServiceOn(model, mapping, name)` -
+    the same code registration uses, so a service built from a payload carries the same resource
+    types, units and metadata. A **statically** named service the twin does not carry is still a
+    thrown error; a produced one that cannot be created is skipped with a warning, so the other
+    services of that payload still land.
+  - Proven end to end by `PayloadNamedServiceTest` (OSGi): the provider that registration
+    built gains `r1`/`r2` when the first payload names them, a later payload adds `r3`/`r4` to
+    the same provider, and a constant name still leaves the mid naming one service. Forcing the
+    model never to grow fails three of its four tests.
+  - Profile conformance is unaffected: `MappingProfileRegistryImpl` matches `ProfileService.serviceId`
+    against the **mapping's** `mid`, which stays static, so `required`/`expectedType`/`expectedUnit`
+    keep working. Cardinality is what a profile cannot express.
+  - `ChangeRuleFilter.accept` already received `service.getName()`, so each service of a set
+    always kept its own rule state; the parameter was named `serviceMid` and documented as a mid.
+    It is `serviceName` now, and the mapper passes the name it resolved rather than what the twin
+    echoes back. Guards: `ForEachServiceTest`, `ServiceNameMappingTest`.
+- **The admin slots take a `FeatureMapping` since 2026-11-04** (issue #91 item 7, driven by the
+  UDP exercise). `AdminMapping` gained `friendlyNameMapping`, `latitudeMapping`,
+  `longitudeMapping` and `elevationMapping`, each an optional containment of the concrete
+  `FeatureMapping` - so no `xsi:type` in the XMI - beside the existing bare `*Ref` paths. The
+  `*Mapping` replaces its `*Ref` and the sibling constant answers when the producer yields
+  nothing. `elevationMapping` is also the first time an elevation is read at all: `elevationRef`
+  was never consulted by `mapLocation`. `adminValue` in `ValueMapperImpl` is the one place that
+  decides. Guard: `AdminFeatureMappingTest`.
+  - **The case is a value holding two numbers.** ILSA's position is `geoJson.bbox[0]`/`[1]`,
+    one attribute of datatype `Array1D` (`java.lang.Double[]`), so no feature path and no
+    `collectionIndex` reaches an element - `navigateFeaturePath` tests for a `java.util.List`.
+    The OCL **standard library** cannot either - the array is one scalar to it, `->size()` is 1
+    and `->at`/`->first`/`->flatten` are invalid
+    (`OclExpressionEvaluatorTest.javaArrayDatatype_isNotACollection`). **A contributed
+    `OclOperation` on the datatype can**, and then no converter is needed:
+    `self.bbox.at(1)` answers 11.6 (`ContributedOperationTest`). One condition, and it is not
+    the default: **`ocl.customOperationsEnabled` on PID `DefaultOclEngine`** must be `true`. One
+    property is enough, because the engine propagates it into the default evaluation options.
+    Every published `OclOperationProvider` binds (`cardinality="0..n"`), so contributions from
+    several model bundles compose - **check the version before believing otherwise**: the
+    `0.1.0-SNAPSHOT` engine still in `~/.m2` binds exactly one and ships a no-op placeholder,
+    which is the shape m2x `9e8bfee` replaced on 2026-08-09. The bndruns pin `[0.1.1,0.1.2)`
+    and have the fixed one. A converter remains the route that needs no runtime configuration.
+    TrafiCam needs neither - its location is two plain attributes, which the old `*Ref` paths
+    already read.
 - **`TimestampStrategy` is still not read by anything.** The user guide says so instead of
   documenting it as working.
 - All twin interaction happens on the SensiNact **`GatewayThread`** (via

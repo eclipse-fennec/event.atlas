@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -52,6 +53,8 @@ import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
+import org.eclipse.sensinact.core.model.Model;
+import org.eclipse.sensinact.core.model.SensinactModelManager;
 import org.eclipse.sensinact.core.twin.SensinactDigitalTwin;
 import org.eclipse.sensinact.core.twin.SensinactProvider;
 import org.eclipse.sensinact.core.twin.SensinactResource;
@@ -75,6 +78,8 @@ public class ValueMapperImpl implements ValueMapper {
 	private static final String ADMIN_SERVICE = "admin";
 
 	private final SensinactDigitalTwin twin;
+	/** Lets the push path extend the twin model; <code>null</code> where it may not. */
+	private final SensinactModelManager modelManager;
 	private final ProviderMapping mapping;
 	private final String providerModel;
 	private final ChangeRuleFilter changeRuleFilter;
@@ -157,7 +162,35 @@ public class ValueMapperImpl implements ValueMapper {
 	public ValueMapperImpl(SensinactDigitalTwin twin, ProviderMapping mapping, ChangeRuleFilter changeRuleFilter,
 			ValueConverterRegistry converterRegistry, ValueFunctionRegistry functionRegistry,
 			ExpressionEvaluator expressionEvaluator) {
+		this(twin, null, mapping, changeRuleFilter, converterRegistry, functionRegistry, expressionEvaluator);
+	}
+
+	/**
+	 * Creates a new ValueMapper instance that may also extend the twin model.
+	 * <p>
+	 * A service whose name a payload decides cannot exist before that payload arrives, so the
+	 * model has to grow at push time. Everything else is unchanged: a statically named service
+	 * is built at registration as before, and this mapper only fills it.
+	 *
+	 * @param twin The SensiNact digital twin to update with mapped values
+	 * @param modelManager Lets a payload-named service be created on the provider's model, or
+	 * <code>null</code> to leave the model as registration built it - in which case a mapping
+	 * that names a service from its payload is skipped with a warning
+	 * @param mapping The ProviderMapping configuration defining the transformation rules
+	 * @param changeRuleFilter Decides per resource whether a mapped value is pushed, or
+	 * <code>null</code> to push every value
+	 * @param converterRegistry Applies the converter a mapping names, or <code>null</code> to
+	 * push every value unconverted
+	 * @param functionRegistry Applies the function a mapping names, or <code>null</code> to
+	 * leave every functionId unread
+	 * @param expressionEvaluator Evaluates the expression a mapping carries, or
+	 * <code>null</code> to leave every expression unread
+	 */
+	public ValueMapperImpl(SensinactDigitalTwin twin, SensinactModelManager modelManager, ProviderMapping mapping,
+			ChangeRuleFilter changeRuleFilter, ValueConverterRegistry converterRegistry,
+			ValueFunctionRegistry functionRegistry, ExpressionEvaluator expressionEvaluator) {
 		this.twin = requireNonNull(twin, "Digital twin cannot be null");
+		this.modelManager = modelManager;
 		this.mapping = requireNonNull(mapping, "Provider mapping cannot be null");
 		this.providerModel = determineProviderModel(mapping);
 		this.changeRuleFilter = changeRuleFilter;
@@ -190,16 +223,37 @@ public class ValueMapperImpl implements ValueMapper {
 				// A service whose filter matches nothing is not carried by this payload - a
 				// device that splits its readings over several uplinks sends a different
 				// subset each time, and the services it did not send keep their last values.
-				Optional<EObject> serviceSource = getServiceSource(sourceInstance, serviceMapping);
-				if (serviceSource.isEmpty()) {
+				List<EObject> serviceSources = getServiceSources(sourceInstance, serviceMapping);
+				if (serviceSources.isEmpty()) {
 					logger.fine(String.format("Instance carries no source for service %s - skipped",
 							serviceMapping.getMid()));
 					continue;
 				}
 
-				// Service timestamp takes precedence, fallback to provider timestamp
-				Instant serviceTimestamp = determineTimestamp(serviceSource.get(), serviceMapping, providerTimestamp);
-				mapServiceResources(serviceSource.get(), serviceMapping, provider, serviceTimestamp, providerId);
+				// One service per source. There is more than one only where the mapping
+				// produces its name, because a set of services needs a name for each.
+				LinkedHashSet<String> used = new LinkedHashSet<>();
+				for (EObject serviceSource : serviceSources) {
+					// The twin name of the service: the mid, unless the mapping produces one
+					// from the payload. Resolved against the service source, which is the
+					// object its resources read from, so an expression's self is the same
+					// object there.
+					String serviceName = resolveServiceName(serviceMapping, serviceSource);
+					if (!used.add(serviceName) && serviceSources.size() > 1) {
+						// Two elements that produce one name are one service. Refusing the
+						// payload would throw away the elements that did produce distinct
+						// names, so the later value wins and the mapping is reported instead.
+						logger.warning(String.format(
+								"Mapping %s produced the service name '%s' more than once for provider %s"
+								+ " - those elements share one service and the last value wins",
+								mapping.getMid(), serviceName, providerId));
+					}
+
+					// Service timestamp takes precedence, fallback to provider timestamp
+					Instant serviceTimestamp = determineTimestamp(serviceSource, serviceMapping, providerTimestamp);
+					mapServiceResources(serviceSource, serviceMapping, provider, serviceTimestamp, providerId,
+							serviceName);
+				}
 			}
 
 			// Map admin service if configured
@@ -238,44 +292,11 @@ public class ValueMapperImpl implements ValueMapper {
 
 		for (ServiceMapping serviceMapping : mapping.getServices()) {
 			try {
-				// Determine the source object for this service (may be from a collection)
-				Optional<EObject> source = getServiceSource(sourceInstance, serviceMapping);
-				if (source.isEmpty()) {
-					continue;
-				}
-				EObject serviceSource = source.get();
-
-				// Add auto-generated resources from ReferenceMapping if configured. The
-				// service source already is the referenced element - getServiceSource
-				// resolved it through the very same ReferenceMapping.
-				if (serviceMapping.getReferencedResource() != null) {
-					ReferenceMapping refMapping = serviceMapping.getReferencedResource();
-
-					for (EStructuralFeature attribute : getFilteredAttributes(serviceSource.eClass(), refMapping)) {
-						String resourcePath = serviceMapping.getMid() + "." + attribute.getName();
-						try {
-							Object value = serviceSource.eGet(attribute);
-							if (value != null) {
-								values.put(resourcePath, value);
-							}
-						} catch (Exception e) {
-							logger.warning(String.format("Failed to extract auto-generated value for resource path %s: %s", resourcePath, e.getMessage()));
-						}
-					}
-				}
-
-				// Add explicitly defined resources
-				for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
-					String resourcePath = serviceMapping.getMid() + "." + resourceMapping.getMid();
-
-					try {
-						Optional<Object> value = extractValue(serviceSource, resourceMapping);
-						if (value.isPresent()) {
-							values.put(resourcePath, value.get());
-						}
-					} catch (Exception e) {
-						logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
-					}
+				// One entry set per source. There is more than one source only where the
+				// mapping produces its service name over a collection - exactly as
+				// mapInstance expands it, so the two faces of the engine agree.
+				for (EObject serviceSource : getServiceSources(sourceInstance, serviceMapping)) {
+					collectServiceValues(serviceSource, serviceMapping, values);
 				}
 			} catch (ValueMappingException e) {
 				logger.warning(String.format("Failed to get service source for %s: %s", serviceMapping.getMid(), e.getMessage()));
@@ -512,6 +533,246 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
+	 * Extracts one service's values from one source into the result map.
+	 * <p>
+	 * The key prefix is the service's twin name, which is the mid unless the mapping produces
+	 * one - so the keys of every mapping written so far are unchanged, and a set of services
+	 * gets one group of keys for each member instead of overwriting itself.
+	 */
+	private void collectServiceValues(EObject serviceSource, ServiceMapping serviceMapping,
+			Map<String, Object> values) throws ValueMappingException {
+
+		String servicePrefix = resolveServiceName(serviceMapping, serviceSource);
+
+		// Add auto-generated resources from ReferenceMapping if configured. The service source
+		// already is the referenced element - getServiceSources resolved it through the very
+		// same ReferenceMapping.
+		if (serviceMapping.getReferencedResource() != null) {
+			ReferenceMapping refMapping = serviceMapping.getReferencedResource();
+
+			for (EStructuralFeature attribute : getFilteredAttributes(serviceSource.eClass(), refMapping)) {
+				String resourcePath = servicePrefix + "." + attribute.getName();
+				try {
+					Object value = serviceSource.eGet(attribute);
+					if (value != null) {
+						values.put(resourcePath, value);
+					}
+				} catch (Exception e) {
+					logger.warning(String.format("Failed to extract auto-generated value for resource path %s: %s", resourcePath, e.getMessage()));
+				}
+			}
+		}
+
+		// Add explicitly defined resources
+		for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
+			String resourcePath = servicePrefix + "." + resourceMapping.getMid();
+
+			try {
+				Optional<Object> value = extractValue(serviceSource, resourceMapping);
+				if (value.isPresent()) {
+					values.put(resourcePath, value.get());
+				}
+			} catch (Exception e) {
+				logger.warning(String.format("Failed to extract value for resource path %s: %s", resourcePath, e.getMessage()));
+			}
+		}
+	}
+
+	/**
+	 * The objects a service maps, one service for each.
+	 * <p>
+	 * Normally one - the element a {@code ReferenceMapping} selects, or the payload itself.
+	 * It is a set only where the mapping <em>produces</em> its service name and the path keeps
+	 * a collection: a set of services needs a name for each, and only a producer can give one.
+	 * A collection with a constant name therefore keeps selecting a single element, which is
+	 * what every mapping written so far means by it - the weather mapping's reports[0] and
+	 * reports[1] are two positions with two meanings, not a set.
+	 * @param rootSource the payload. Must not be <code>null</code>
+	 * @param serviceMapping the mapping of the service. Must not be <code>null</code>
+	 * @return the sources, possibly empty where the payload carries none
+	 */
+	private List<EObject> getServiceSources(EObject rootSource, ServiceMapping serviceMapping)
+			throws ValueMappingException {
+
+		ReferenceMapping referenced = serviceMapping.getReferencedResource();
+		if (referenced == null || !hasProducer(serviceMapping.getName())) {
+			return getServiceSource(rootSource, serviceMapping).map(List::of).orElseGet(List::of);
+		}
+		return expandSources(rootSource, referenced, "service: " + serviceMapping.getMid());
+	}
+
+	/**
+	 * Navigates a reference path and keeps every element the mapping does not narrow away.
+	 * <p>
+	 * A {@code collectionFilter} narrows the set and every survivor becomes a service. A
+	 * <em>non-zero</em> {@code collectionIndex} still selects one element, because an author
+	 * who wrote one means one; a zero index cannot be told from an unset one - EMF generates
+	 * {@code eIsSet} as "differs from the default" and the default is 0 - so it expands. Use a
+	 * filter to select a single element beside a produced name.
+	 * @return every object the path reaches, in payload order
+	 */
+	private List<EObject> expandSources(EObject rootSource, ReferenceMapping referenced, String context)
+			throws ValueMappingException {
+
+		List<EStructuralFeature> featurePath = referenced.getFeaturePath();
+		if (featurePath == null || featurePath.isEmpty()) {
+			throw new ValueMappingException(
+				String.format("ReferenceMapping has no feature path (%s)", context));
+		}
+		Optional<CollectionFilter> filter = CollectionFilter.of(referenced, context);
+		int index = referenced.getCollectionIndex();
+
+		List<Object> current = new ArrayList<>();
+		current.add(rootSource);
+		for (EStructuralFeature feature : featurePath) {
+			List<Object> next = new ArrayList<>();
+			for (Object source : current) {
+				if (!(source instanceof EObject holder)) {
+					throw new ValueMappingException(
+						String.format("Cannot navigate feature '%s': value is not an EObject (%s)",
+							feature.getName(), context));
+				}
+				Object value = holder.eGet(feature);
+				if (value == null) {
+					// This branch carries nothing. Unlike the single-source path it is not an
+					// error: a set may well have members that do not answer every feature.
+					continue;
+				}
+				if (value instanceof List<?> collection) {
+					next.addAll(survivors(collection, filter, index, context));
+				} else {
+					next.add(value);
+				}
+			}
+			current = next;
+		}
+
+		List<EObject> sources = new ArrayList<>();
+		for (Object source : current) {
+			if (!(source instanceof EObject element)) {
+				throw new ValueMappingException(
+					String.format("Referenced target is not an EObject (%s)", context));
+			}
+			sources.add(element);
+		}
+		logger.fine(String.format("Expanded %d service source(s) (%s)", sources.size(), context));
+		return sources;
+	}
+
+	/**
+	 * The elements of one collection that a filter keeps, or the one a non-zero index selects.
+	 */
+	private List<Object> survivors(List<?> collection, Optional<CollectionFilter> filter, int index,
+			String context) throws ValueMappingException {
+
+		List<Object> kept = new ArrayList<>();
+		for (Object element : collection) {
+			if (filter.isEmpty() || filter.get().matches(element)) {
+				kept.add(element);
+			}
+		}
+		if (index == 0) {
+			return kept;
+		}
+		if (index < 0 || index >= kept.size()) {
+			throw new ValueMappingException(
+				String.format("Collection index %d out of bounds for collection of size %d (%s)",
+					index, kept.size(), context));
+		}
+		return List.of(kept.get(index));
+	}
+
+	/**
+	 * The name a service carries in the twin.
+	 * <p>
+	 * The mid, unless the mapping's {@code NameMapping} carries a <em>producer</em> - an
+	 * expression, a function or a feature path. A constant name does not win: every mapping
+	 * written so far fills that slot with a label beside a differing mid, and reading it as the
+	 * twin name would rename the services of all of them at once. A producer is new, and today
+	 * it is read by nothing, so it can mean this without breaking anything.
+	 * <p>
+	 * A producer that yields nothing leaves the mapping's own fallback to answer - the constant
+	 * first, then the mid - which is the rule every other producer here follows.
+	 * @param serviceMapping the mapping of the service. Must not be <code>null</code>
+	 * @param serviceSource the object the service reads from. Must not be <code>null</code>
+	 * @return the name, never <code>null</code>
+	 */
+	private String resolveServiceName(ServiceMapping serviceMapping, EObject serviceSource)
+			throws ValueMappingException {
+
+		NameMapping nameMapping = serviceMapping.getName();
+		if (!hasProducer(nameMapping)) {
+			return serviceMapping.getMid();
+		}
+
+		Optional<Object> rawValue = getRawValue(serviceSource, nameMapping);
+		if (rawValue.isPresent() && rawValue.get() != null) {
+			Optional<Object> converted = applyConverter(nameMapping.getConverterId(), rawValue.get(),
+					"Service name mapping");
+			if (converted.isPresent() && converted.get() != null) {
+				String produced = converted.get().toString().trim();
+				if (!produced.isEmpty()) {
+					return produced;
+				}
+			}
+		}
+
+		if (nameMapping.getName() != null && !nameMapping.getName().isBlank()) {
+			logger.fine(String.format("Service %s produced no name from this payload - using '%s'",
+					serviceMapping.getMid(), nameMapping.getName()));
+			return nameMapping.getName();
+		}
+		logger.fine(String.format("Service %s produced no name from this payload - using its mid",
+				serviceMapping.getMid()));
+		return serviceMapping.getMid();
+	}
+
+	/**
+	 * Whether a mapping computes its value rather than carrying a literal.
+	 * @param featureMapping the mapping to test, may be <code>null</code>
+	 * @return <code>true</code> where an expression, a function or a feature path is declared
+	 */
+	private static boolean hasProducer(FeatureMapping featureMapping) {
+		if (featureMapping == null) {
+			return false;
+		}
+		return (featureMapping.getExpression() != null && !featureMapping.getExpression().isBlank())
+				|| (featureMapping.getFunctionId() != null && !featureMapping.getFunctionId().isBlank())
+				|| !featureMapping.getFeaturePath().isEmpty();
+	}
+
+	/**
+	 * Adds a payload-named service to the provider's model, so the twin can carry it.
+	 * <p>
+	 * Only a produced name reaches this - the caller keeps a missing static service an error,
+	 * because creating it here would hide a broken mapping. The service is built by the same
+	 * code registration uses, so it carries the same resource types, units and metadata.
+	 * @return the new service, or <code>null</code> where the model may not grow
+	 */
+	private SensinactService growModel(ServiceMapping serviceMapping, SensinactProvider provider,
+			String serviceName) {
+
+		if (modelManager == null) {
+			logger.warning(String.format(
+					"Mapping %s names service '%s' from its payload, but this mapper cannot extend the"
+					+ " model - the service is skipped", mapping.getMid(), serviceName));
+			return null;
+		}
+		Model model = modelManager.getModel(providerModel);
+		if (model == null) {
+			logger.warning(String.format("No model '%s' to add service '%s' to", providerModel, serviceName));
+			return null;
+		}
+		ProviderModelSensinactMapper.createServiceOn(model, serviceMapping, serviceName);
+		logger.fine(String.format("Added service '%s' to model '%s' from mapping %s", serviceName,
+				providerModel, mapping.getMid()));
+		// Read it back from the provider rather than returning what the model built: the twin
+		// service is what carries values, and a provider that exists already picks up a service
+		// its model gained.
+		return provider.getServices().get(serviceName);
+	}
+
+	/**
 	 * Maps all resources for a specific service.
 	 * Handles both explicitly defined resources and automatically generated resources from ReferenceMapping.
 	 *
@@ -519,21 +780,32 @@ public class ValueMapperImpl implements ValueMapper {
 	 * by ProviderModelSensinactMapper and are already present in serviceMapping.getResources().
 	 */
 	private void mapServiceResources(EObject sourceInstance, ServiceMapping serviceMapping,
-			SensinactProvider provider, Instant timestamp, String providerId) throws ValueMappingException {
+			SensinactProvider provider, Instant timestamp, String providerId, String serviceName)
+			throws ValueMappingException {
 
-		SensinactService service = provider.getServices().get(serviceMapping.getMid());
+		SensinactService service = provider.getServices().get(serviceName);
 		if (service == null) {
-			throw new ValueMappingException("Service not found: " + serviceMapping.getMid());
+			// A statically named service is built at registration, so a missing one is a broken
+			// mapping and fails the instance, as it always has. A payload-named one cannot
+			// exist before this payload, so it is created here - and where it cannot be, the
+			// service is skipped and the other services of this payload still land.
+			if (!hasProducer(serviceMapping.getName())) {
+				throw new ValueMappingException("Service not found: " + serviceName);
+			}
+			service = growModel(serviceMapping, provider, serviceName);
+			if (service == null) {
+				return;
+			}
 		}
 
 		// Map all resources (both auto-generated and explicitly defined)
 		// Auto-generated resources are already in the list thanks to ProviderModelSensinactMapper
 		for (ResourceMapping resourceMapping : serviceMapping.getResources()) {
-			mapSingleResource(sourceInstance, resourceMapping, service, timestamp, providerId);
+			mapSingleResource(sourceInstance, resourceMapping, service, timestamp, providerId, serviceName);
 		}
 //		Go over the temporary ResourceMapping. These are the ones automatically created when the referencedResource is set
 		for (ResourceMapping resourceMapping : serviceMapping.getTemporaryResources()) {
-			mapSingleResource(sourceInstance, resourceMapping, service, timestamp, providerId);
+			mapSingleResource(sourceInstance, resourceMapping, service, timestamp, providerId, serviceName);
 		}
 	}
 
@@ -584,7 +856,8 @@ public class ValueMapperImpl implements ValueMapper {
 	 * Maps a single resource value.
 	 */
 	private void mapSingleResource(EObject sourceInstance, ResourceMapping resourceMapping, 
-			SensinactService service, Instant timestamp, String providerId) throws ValueMappingException {
+			SensinactService service, Instant timestamp, String providerId, String serviceName)
+			throws ValueMappingException {
 
 		SensinactResource resource = service.getResources().get(resourceMapping.getMid());
 		
@@ -598,8 +871,10 @@ public class ValueMapperImpl implements ValueMapper {
 			// The resource's change rule decides whether this value reaches the twin at all.
 			// Interim: the rule describes what the history provider should persist, and is
 			// applied here until that provider can apply it itself.
+			// The name this mapper resolved, not what the twin echoes back: it is what tells
+			// the services of a set apart, so each keeps its own last accepted value.
 			if (changeRuleFilter != null && !changeRuleFilter.accept(mapping.getMid(), providerId,
-					service.getName(), resourceMapping, value.get(), timestamp)) {
+					serviceName, resourceMapping, value.get(), timestamp)) {
 				return;
 			}
 			try {
@@ -646,7 +921,7 @@ public class ValueMapperImpl implements ValueMapper {
 						mapping.getMid(), resourceMapping.getMid(), adminService.getResources().keySet()));
 				continue;
 			}
-			mapSingleResource(sourceInstance, resourceMapping, adminService, timestamp, providerId);
+			mapSingleResource(sourceInstance, resourceMapping, adminService, timestamp, providerId, ADMIN_SERVICE);
 		}
 	}
 
@@ -662,12 +937,16 @@ public class ValueMapperImpl implements ValueMapper {
 		String friendlyName = adminMapping.getFriendlyName();
 		SensinactResource friendlyNameResource = adminService.getResources().get("friendlyName");
 		requireNonNull(friendlyNameResource, "No friendly name resource available in admin service");
-		// Map friendlyName resource if configured
-		if (!adminMapping.getFriendlyNameFeature().isEmpty()) {
-			List<EStructuralFeature> featurePath = adminMapping.getFriendlyNameFeature();
-			Optional<Object> friendlyNameValue = getRawValue(sourceInstance, featurePath);
+		// friendlyNameMapping first, then the plain feature path; the friendlyName attribute is
+		// the constant that answers when neither produces a value.
+		if (declares(adminMapping.getFriendlyNameMapping(), adminMapping.getFriendlyNameFeature())) {
+			Optional<Object> friendlyNameValue = adminValue(sourceInstance,
+					adminMapping.getFriendlyNameMapping(), adminMapping.getFriendlyNameFeature(),
+					"admin.friendlyName");
 			if (friendlyNameValue.isPresent()) {
-				friendlyName = (String) friendlyNameValue.get();
+				// String.valueOf, not a cast: an expression or a converter may produce any type,
+				// and the resource takes a string.
+				friendlyName = String.valueOf(friendlyNameValue.get());
 			} else {
 				logger.fine("No value extracted for admin.friendlyName");
 			}
@@ -683,6 +962,45 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
+	 * Whether an admin slot names a source at all.
+	 * @return <code>true</code> where either the mapping or the plain reference path is set
+	 */
+	private static boolean declares(FeatureMapping featureMapping, List<EStructuralFeature> referencePath) {
+		return featureMapping != null || !referencePath.isEmpty();
+	}
+
+	/**
+	 * One admin value, from the richer mapping where the admin carries one.
+	 * <p>
+	 * A {@code FeatureMapping} <em>replaces</em> the plain {@code *Ref} path rather than falling
+	 * back to it - the same rule an expression follows against a feature path - because the two
+	 * describe the same slot and the richer one was written later. It is what lets an admin value
+	 * be computed rather than only read: {@code "'ILSA ' + self.intersectionName"}, or a converter
+	 * that takes one element out of a value holding several, which a path cannot address.
+	 * <p>
+	 * The sibling constant ({@code friendlyName}, {@code latitude}, …) stays the fallback and is
+	 * applied by the caller, so a payload that carries nothing leaves the mapping's own value in
+	 * place.
+	 * @param what names the slot in a log line. Must not be <code>null</code>
+	 * @return the value, or empty where this payload yields none
+	 */
+	private Optional<Object> adminValue(EObject source, FeatureMapping featureMapping,
+			List<EStructuralFeature> referencePath, String what) throws ValueMappingException {
+
+		if (featureMapping != null) {
+			Optional<Object> produced = getRawValue(source, featureMapping);
+			if (produced.isEmpty() || produced.get() == null) {
+				return Optional.empty();
+			}
+			return applyConverter(featureMapping.getConverterId(), produced.get(), what);
+		}
+		if (referencePath.isEmpty()) {
+			return Optional.empty();
+		}
+		return getRawValue(source, referencePath);
+	}
+
+	/**
 	 * The admin location: the point read through {@code latitudeRef}/{@code longitudeRef}, else the
 	 * static {@code latitude}/{@code longitude} of the mapping. A mapping that defines neither, or
 	 * a payload without the referenced values, leaves the resource untouched - another source may
@@ -693,12 +1011,21 @@ public class ValueMapperImpl implements ValueMapper {
 		SensinactResource locationResource = adminService.getResources().get("location");
 		requireNonNull(locationResource, "No location resource available in admin service");
 		GeoJsonObject location = lookupLocation(adminMapping);
-		if (!adminMapping.getLatitudeRef().isEmpty() && !adminMapping.getLongitudeRef().isEmpty()) {
-			Optional<Object> latValue = getRawValue(sourceInstance, adminMapping.getLatitudeRef());
-			Optional<Object> lonValue = getRawValue(sourceInstance, adminMapping.getLongitudeRef());
+		if (declares(adminMapping.getLatitudeMapping(), adminMapping.getLatitudeRef())
+				&& declares(adminMapping.getLongitudeMapping(), adminMapping.getLongitudeRef())) {
+			Optional<Object> latValue = adminValue(sourceInstance, adminMapping.getLatitudeMapping(),
+					adminMapping.getLatitudeRef(), "admin.latitude");
+			Optional<Object> lonValue = adminValue(sourceInstance, adminMapping.getLongitudeMapping(),
+					adminMapping.getLongitudeRef(), "admin.longitude");
 			if (latValue.isPresent() && lonValue.isPresent()) {
 				try {
-					Coordinates coordinates = new Coordinates(toDouble(lonValue.get()), toDouble(latValue.get()));
+					// The elevation is optional and keeps the mapping's own value as its
+					// fallback, exactly as the static path does.
+					Object elevation = adminValue(sourceInstance, adminMapping.getElevationMapping(),
+							adminMapping.getElevationRef(), "admin.elevation")
+							.orElse(adminMapping.getElevation());
+					Coordinates coordinates = new Coordinates(toDouble(lonValue.get()),
+							toDouble(latValue.get()), toDouble(elevation));
 					location = new Point(coordinates, Collections.emptyList(), Collections.emptyMap());
 				} catch (Exception e) {
 					throw new ValueMappingException("Failed to read the admin location from the instance", e);

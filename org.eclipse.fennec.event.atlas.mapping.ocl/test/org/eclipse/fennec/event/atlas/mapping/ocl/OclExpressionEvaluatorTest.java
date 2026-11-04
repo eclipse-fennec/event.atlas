@@ -146,6 +146,32 @@ public class OclExpressionEvaluatorTest {
 	}
 
 	@Test
+	@DisplayName("An array-valued datatype is one scalar to the standard library")
+	void javaArrayDatatype_isNotACollection() {
+		// The ILSA case: geoJson.bbox is ONE attribute of datatype Array1D, instance class
+		// java.lang.Double[]. The expression reaches the value, but to the standard library it
+		// is a single scalar - `->` wraps it in a one-element set - so no collection operation
+		// takes an element out of it. The way to index it is a contributed OclOperation on the
+		// datatype; see ExpressionCacheKeyTest and docs/udp-adapter-mapping-gaps.md.
+		EDataType array = EcoreFactory.eINSTANCE.createEDataType();
+		array.setName("Array1D");
+		array.setInstanceClassName("java.lang.Double[]");
+		EAttribute bbox = attribute("bbox", array);
+		reading.getEStructuralFeatures().add(bbox);
+		ePackage.getEClassifiers().add(array);
+
+		EObject instance = instance();
+		instance.eSet(bbox, new Double[] { 11.6d, 50.9d });
+
+		assertTrue(evaluator.evaluate("self.bbox", instance).isPresent(), "the array itself is reachable");
+		assertEquals(1, evaluator.evaluate("self.bbox->size()", instance).orElse(null),
+				"one scalar, not two numbers");
+		assertTrue(evaluator.evaluate("self.bbox->at(1)", instance).isEmpty(), "->at does not apply");
+		assertTrue(evaluator.evaluate("self.bbox->flatten()->at(1)", instance).isEmpty(),
+				"and it cannot be flattened into one");
+	}
+
+	@Test
 	@DisplayName("No expression and no payload are not errors either")
 	void nothingToEvaluate() {
 		assertEquals(Optional.empty(), evaluator.evaluate(null, instance()));

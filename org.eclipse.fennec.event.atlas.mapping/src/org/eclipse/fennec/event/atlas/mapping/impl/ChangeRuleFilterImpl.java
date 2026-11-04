@@ -100,11 +100,11 @@ public class ChangeRuleFilterImpl implements ChangeRuleFilter {
 	 * @see org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter#accept(java.lang.String, java.lang.String, java.lang.String, org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping, java.lang.Object, java.time.Instant)
 	 */
 	@Override
-	public boolean accept(String mappingMid, String providerId, String serviceMid, ResourceMapping resourceMapping,
+	public boolean accept(String mappingMid, String providerId, String serviceName, ResourceMapping resourceMapping,
 			Object value, Instant timestamp) {
 		requireNonNull(mappingMid, "Mapping mid must not be null");
 		requireNonNull(providerId, "Provider id must not be null");
-		requireNonNull(serviceMid, "Service mid must not be null");
+		requireNonNull(serviceName, "Service name must not be null");
 		requireNonNull(resourceMapping, "Resource mapping must not be null");
 
 		ChangeRule rule = resourceMapping.getChangeRule();
@@ -112,7 +112,9 @@ public class ChangeRuleFilterImpl implements ChangeRuleFilter {
 			return true;
 		}
 
-		String resourceKey = providerId + "/" + serviceMid + "/" + resourceMapping.getMid();
+		// The service's twin name, not its mid: one ServiceMapping can build a set of
+		// services, and each of them keeps its own last accepted value.
+		String resourceKey = providerId + "/" + serviceName + "/" + resourceMapping.getMid();
 		if (rule.eIsProxy()) {
 			// Rules are contained, so this only happens to a mapping written against the older
 			// model, where a resource pointed at a rule in another document with an href. EMF

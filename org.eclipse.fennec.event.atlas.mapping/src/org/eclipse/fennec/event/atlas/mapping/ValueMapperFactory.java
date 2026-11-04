@@ -15,6 +15,7 @@ package org.eclipse.fennec.event.atlas.mapping;
 
 import org.eclipse.fennec.event.atlas.mapping.impl.ValueMapperImpl;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
+import org.eclipse.sensinact.core.model.SensinactModelManager;
 import org.eclipse.sensinact.core.twin.SensinactDigitalTwin;
 
 /**
@@ -110,5 +111,31 @@ public class ValueMapperFactory {
             ValueFunctionRegistry functionRegistry, ExpressionEvaluator expressionEvaluator) {
         return new ValueMapperImpl(twin, mapping, changeRuleFilter, converterRegistry, functionRegistry,
                 expressionEvaluator);
+    }
+
+    /**
+     * Creates a mapper that may also extend the twin model.
+     * <p>
+     * A service whose name its payload decides does not exist before that payload arrives, so
+     * the model has to grow at push time. Every other mapper here leaves the model as
+     * registration built it, which is what a caller holding no model manager - a test driving
+     * the twin directly - still gets.
+     *
+     * @param twin The SensiNact digital twin to update with mapped values
+     * @param modelManager Lets a payload-named service be created on the provider's model
+     * @param mapping The ProviderMapping configuration defining the transformation rules
+     * @param changeRuleFilter Decides per resource whether a mapped value is pushed, or
+     *        <code>null</code> to push every value
+     * @param converterRegistry Applies the converter a mapping names, or <code>null</code>
+     * @param functionRegistry Applies the function a mapping names, or <code>null</code>
+     * @param expressionEvaluator Evaluates the expression a mapping carries, or
+     *        <code>null</code>
+     * @return the mapper, never <code>null</code>
+     */
+    public static ValueMapper createValueMapper(SensinactDigitalTwin twin, SensinactModelManager modelManager,
+            ProviderMapping mapping, ChangeRuleFilter changeRuleFilter, ValueConverterRegistry converterRegistry,
+            ValueFunctionRegistry functionRegistry, ExpressionEvaluator expressionEvaluator) {
+        return new ValueMapperImpl(twin, modelManager, mapping, changeRuleFilter, converterRegistry,
+                functionRegistry, expressionEvaluator);
     }
 }

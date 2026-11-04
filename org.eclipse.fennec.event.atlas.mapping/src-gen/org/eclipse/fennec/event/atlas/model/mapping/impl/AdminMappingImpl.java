@@ -16,6 +16,7 @@ package org.eclipse.fennec.event.atlas.model.mapping.impl;
 import java.util.Collection;
 
 import org.eclipse.emf.common.notify.Notification;
+import org.eclipse.emf.common.notify.NotificationChain;
 
 import org.eclipse.emf.common.util.EList;
 
@@ -29,6 +30,7 @@ import org.eclipse.emf.ecore.impl.ENotificationImpl;
 import org.eclipse.emf.ecore.util.EObjectResolvingEList;
 
 import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
 
 /**
@@ -48,6 +50,10 @@ import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getLatitudeRef <em>Latitude Ref</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getLongitudeRef <em>Longitude Ref</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getElevationRef <em>Elevation Ref</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getFriendlyNameMapping <em>Friendly Name Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getLatitudeMapping <em>Latitude Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getLongitudeMapping <em>Longitude Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getElevationMapping <em>Elevation Mapping</em>}</li>
  * </ul>
  *
  * @generated
@@ -182,6 +188,46 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 	 * @ordered
 	 */
 	protected EList<EStructuralFeature> elevationRef;
+
+	/**
+	 * The cached value of the '{@link #getFriendlyNameMapping() <em>Friendly Name Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getFriendlyNameMapping()
+	 * @generated
+	 * @ordered
+	 */
+	protected FeatureMapping friendlyNameMapping;
+
+	/**
+	 * The cached value of the '{@link #getLatitudeMapping() <em>Latitude Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getLatitudeMapping()
+	 * @generated
+	 * @ordered
+	 */
+	protected FeatureMapping latitudeMapping;
+
+	/**
+	 * The cached value of the '{@link #getLongitudeMapping() <em>Longitude Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getLongitudeMapping()
+	 * @generated
+	 * @ordered
+	 */
+	protected FeatureMapping longitudeMapping;
+
+	/**
+	 * The cached value of the '{@link #getElevationMapping() <em>Elevation Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getElevationMapping()
+	 * @generated
+	 * @ordered
+	 */
+	protected FeatureMapping elevationMapping;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -392,6 +438,206 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 	 * @generated
 	 */
 	@Override
+	public FeatureMapping getFriendlyNameMapping() {
+		return friendlyNameMapping;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public NotificationChain basicSetFriendlyNameMapping(FeatureMapping newFriendlyNameMapping, NotificationChain msgs) {
+		FeatureMapping oldFriendlyNameMapping = friendlyNameMapping;
+		friendlyNameMapping = newFriendlyNameMapping;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING, oldFriendlyNameMapping, newFriendlyNameMapping);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setFriendlyNameMapping(FeatureMapping newFriendlyNameMapping) {
+		if (newFriendlyNameMapping != friendlyNameMapping) {
+			NotificationChain msgs = null;
+			if (friendlyNameMapping != null)
+				msgs = ((InternalEObject)friendlyNameMapping).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING, null, msgs);
+			if (newFriendlyNameMapping != null)
+				msgs = ((InternalEObject)newFriendlyNameMapping).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING, null, msgs);
+			msgs = basicSetFriendlyNameMapping(newFriendlyNameMapping, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING, newFriendlyNameMapping, newFriendlyNameMapping));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public FeatureMapping getLatitudeMapping() {
+		return latitudeMapping;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public NotificationChain basicSetLatitudeMapping(FeatureMapping newLatitudeMapping, NotificationChain msgs) {
+		FeatureMapping oldLatitudeMapping = latitudeMapping;
+		latitudeMapping = newLatitudeMapping;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING, oldLatitudeMapping, newLatitudeMapping);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setLatitudeMapping(FeatureMapping newLatitudeMapping) {
+		if (newLatitudeMapping != latitudeMapping) {
+			NotificationChain msgs = null;
+			if (latitudeMapping != null)
+				msgs = ((InternalEObject)latitudeMapping).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING, null, msgs);
+			if (newLatitudeMapping != null)
+				msgs = ((InternalEObject)newLatitudeMapping).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING, null, msgs);
+			msgs = basicSetLatitudeMapping(newLatitudeMapping, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING, newLatitudeMapping, newLatitudeMapping));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public FeatureMapping getLongitudeMapping() {
+		return longitudeMapping;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public NotificationChain basicSetLongitudeMapping(FeatureMapping newLongitudeMapping, NotificationChain msgs) {
+		FeatureMapping oldLongitudeMapping = longitudeMapping;
+		longitudeMapping = newLongitudeMapping;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING, oldLongitudeMapping, newLongitudeMapping);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setLongitudeMapping(FeatureMapping newLongitudeMapping) {
+		if (newLongitudeMapping != longitudeMapping) {
+			NotificationChain msgs = null;
+			if (longitudeMapping != null)
+				msgs = ((InternalEObject)longitudeMapping).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING, null, msgs);
+			if (newLongitudeMapping != null)
+				msgs = ((InternalEObject)newLongitudeMapping).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING, null, msgs);
+			msgs = basicSetLongitudeMapping(newLongitudeMapping, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING, newLongitudeMapping, newLongitudeMapping));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public FeatureMapping getElevationMapping() {
+		return elevationMapping;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public NotificationChain basicSetElevationMapping(FeatureMapping newElevationMapping, NotificationChain msgs) {
+		FeatureMapping oldElevationMapping = elevationMapping;
+		elevationMapping = newElevationMapping;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING, oldElevationMapping, newElevationMapping);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setElevationMapping(FeatureMapping newElevationMapping) {
+		if (newElevationMapping != elevationMapping) {
+			NotificationChain msgs = null;
+			if (elevationMapping != null)
+				msgs = ((InternalEObject)elevationMapping).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING, null, msgs);
+			if (newElevationMapping != null)
+				msgs = ((InternalEObject)newElevationMapping).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING, null, msgs);
+			msgs = basicSetElevationMapping(newElevationMapping, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING, newElevationMapping, newElevationMapping));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs) {
+		switch (featureID) {
+			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING:
+				return basicSetFriendlyNameMapping(null, msgs);
+			case MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING:
+				return basicSetLatitudeMapping(null, msgs);
+			case MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING:
+				return basicSetLongitudeMapping(null, msgs);
+			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
+				return basicSetElevationMapping(null, msgs);
+		}
+		return super.eInverseRemove(otherEnd, featureID, msgs);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public Object eGet(int featureID, boolean resolve, boolean coreType) {
 		switch (featureID) {
 			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME:
@@ -413,6 +659,14 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 				return getLongitudeRef();
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_REF:
 				return getElevationRef();
+			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING:
+				return getFriendlyNameMapping();
+			case MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING:
+				return getLatitudeMapping();
+			case MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING:
+				return getLongitudeMapping();
+			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
+				return getElevationMapping();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -457,6 +711,18 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 				getElevationRef().clear();
 				getElevationRef().addAll((Collection<? extends EStructuralFeature>)newValue);
 				return;
+			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING:
+				setFriendlyNameMapping((FeatureMapping)newValue);
+				return;
+			case MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING:
+				setLatitudeMapping((FeatureMapping)newValue);
+				return;
+			case MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING:
+				setLongitudeMapping((FeatureMapping)newValue);
+				return;
+			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
+				setElevationMapping((FeatureMapping)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -496,6 +762,18 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_REF:
 				getElevationRef().clear();
 				return;
+			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING:
+				setFriendlyNameMapping((FeatureMapping)null);
+				return;
+			case MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING:
+				setLatitudeMapping((FeatureMapping)null);
+				return;
+			case MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING:
+				setLongitudeMapping((FeatureMapping)null);
+				return;
+			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
+				setElevationMapping((FeatureMapping)null);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -526,6 +804,14 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 				return longitudeRef != null && !longitudeRef.isEmpty();
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_REF:
 				return elevationRef != null && !elevationRef.isEmpty();
+			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING:
+				return friendlyNameMapping != null;
+			case MappingPackage.ADMIN_MAPPING__LATITUDE_MAPPING:
+				return latitudeMapping != null;
+			case MappingPackage.ADMIN_MAPPING__LONGITUDE_MAPPING:
+				return longitudeMapping != null;
+			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
+				return elevationMapping != null;
 		}
 		return super.eIsSet(featureID);
 	}

@@ -320,9 +320,30 @@ public class ProviderModelSensinactMapper {
 	 * @param serviceMapping the {@link ServiceMapping}
 	 */
 	private Service mapService(Model model, ServiceMapping serviceMapping) {
-		Service service = model.getServices().get(serviceMapping.getMid());
+		return createServiceOn(model, serviceMapping, serviceMapping.getMid());
+	}
+
+	/**
+	 * Creates the service a mapping describes on a model, under a name the caller decides, and
+	 * fills it with the resources of that mapping.
+	 * <p>
+	 * Registration passes the mid, which is what a statically named service has always been
+	 * called. A payload-named service reaches this from the push path instead, through
+	 * {@code ValueMapperImpl}, because its name is not known before a payload carries it - and
+	 * it has to be the same code, so that a service built at push time carries the same
+	 * resource types, units and metadata as one built at registration.
+	 * <p>
+	 * Package private and static: it reads nothing of this mapper but its arguments.
+	 * @param model the model to extend. Must not be <code>null</code>
+	 * @param serviceMapping the mapping whose resources the service gets. Must not be
+	 * <code>null</code>
+	 * @param serviceName the name of the service on the model. Must not be <code>null</code>
+	 * @return the service, created or found
+	 */
+	static Service createServiceOn(Model model, ServiceMapping serviceMapping, String serviceName) {
+		Service service = model.getServices().get(serviceName);
 		if (isNull(service)) {
-			service = model.createService(serviceMapping.getMid()).build();
+			service = model.createService(serviceName).build();
 		}
 
 		for (ResourceMapping resourceMapping : serviceMapping.getResources()) {

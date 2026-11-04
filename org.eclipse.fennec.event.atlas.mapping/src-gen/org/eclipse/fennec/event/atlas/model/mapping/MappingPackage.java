@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:bb874fc30df5d406e61d3025167eaa85637eca384c26cd39d2dc9bd090d6f5a0", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:337b0fdb7388232df018dfcfa7953af74a2423dee290ace8a59d7be22a583b2c", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -1241,13 +1241,49 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int ADMIN_MAPPING__ELEVATION_REF = SERVICE_MAPPING_FEATURE_COUNT + 8;
 
 	/**
+	 * The feature id for the '<em><b>Friendly Name Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int ADMIN_MAPPING__FRIENDLY_NAME_MAPPING = SERVICE_MAPPING_FEATURE_COUNT + 9;
+
+	/**
+	 * The feature id for the '<em><b>Latitude Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int ADMIN_MAPPING__LATITUDE_MAPPING = SERVICE_MAPPING_FEATURE_COUNT + 10;
+
+	/**
+	 * The feature id for the '<em><b>Longitude Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int ADMIN_MAPPING__LONGITUDE_MAPPING = SERVICE_MAPPING_FEATURE_COUNT + 11;
+
+	/**
+	 * The feature id for the '<em><b>Elevation Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int ADMIN_MAPPING__ELEVATION_MAPPING = SERVICE_MAPPING_FEATURE_COUNT + 12;
+
+	/**
 	 * The number of structural features of the '<em>Admin Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int ADMIN_MAPPING_FEATURE_COUNT = SERVICE_MAPPING_FEATURE_COUNT + 9;
+	int ADMIN_MAPPING_FEATURE_COUNT = SERVICE_MAPPING_FEATURE_COUNT + 13;
 
 	/**
 	 * The operation id for the '<em>Map Id</em>' operation.
@@ -3133,6 +3169,50 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getAdminMapping_ElevationRef();
 
 	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getFriendlyNameMapping <em>Friendly Name Mapping</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Friendly Name Mapping</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getFriendlyNameMapping()
+	 * @see #getAdminMapping()
+	 * @generated
+	 */
+	EReference getAdminMapping_FriendlyNameMapping();
+
+	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLatitudeMapping <em>Latitude Mapping</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Latitude Mapping</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLatitudeMapping()
+	 * @see #getAdminMapping()
+	 * @generated
+	 */
+	EReference getAdminMapping_LatitudeMapping();
+
+	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLongitudeMapping <em>Longitude Mapping</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Longitude Mapping</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLongitudeMapping()
+	 * @see #getAdminMapping()
+	 * @generated
+	 */
+	EReference getAdminMapping_LongitudeMapping();
+
+	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getElevationMapping <em>Elevation Mapping</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Elevation Mapping</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getElevationMapping()
+	 * @see #getAdminMapping()
+	 * @generated
+	 */
+	EReference getAdminMapping_ElevationMapping();
+
+	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping <em>Metadata Mapping</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -4361,6 +4441,38 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EReference ADMIN_MAPPING__ELEVATION_REF = eINSTANCE.getAdminMapping_ElevationRef();
+
+		/**
+		 * The meta object literal for the '<em><b>Friendly Name Mapping</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference ADMIN_MAPPING__FRIENDLY_NAME_MAPPING = eINSTANCE.getAdminMapping_FriendlyNameMapping();
+
+		/**
+		 * The meta object literal for the '<em><b>Latitude Mapping</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference ADMIN_MAPPING__LATITUDE_MAPPING = eINSTANCE.getAdminMapping_LatitudeMapping();
+
+		/**
+		 * The meta object literal for the '<em><b>Longitude Mapping</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference ADMIN_MAPPING__LONGITUDE_MAPPING = eINSTANCE.getAdminMapping_LongitudeMapping();
+
+		/**
+		 * The meta object literal for the '<em><b>Elevation Mapping</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference ADMIN_MAPPING__ELEVATION_MAPPING = eINSTANCE.getAdminMapping_ElevationMapping();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MetadataMappingImpl <em>Metadata Mapping</em>}' class.

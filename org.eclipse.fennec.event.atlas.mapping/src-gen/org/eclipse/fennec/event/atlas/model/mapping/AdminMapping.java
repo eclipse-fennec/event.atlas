@@ -38,6 +38,10 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLatitudeRef <em>Latitude Ref</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLongitudeRef <em>Longitude Ref</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getElevationRef <em>Elevation Ref</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getFriendlyNameMapping <em>Friendly Name Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLatitudeMapping <em>Latitude Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLongitudeMapping <em>Longitude Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getElevationMapping <em>Elevation Mapping</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping()
@@ -203,5 +207,117 @@ public interface AdminMapping extends ServiceMapping {
 	 * @generated
 	 */
 	EList<EStructuralFeature> getElevationRef();
+
+	/**
+	 * Returns the value of the '<em><b>Friendly Name Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The richer source of the admin's friendly name, winning over friendlyNameFeature when both are set.
+	 * 
+	 * Carries the producers a   feature path alone cannot express - an expression, a function, a collection selection - plus a converterId that post-processes the result. "'ILSA ' +   self.intersectionName" is the case it exists for: friendlyNameFeature can name a feature but cannot combine one with anything.
+	 * 
+	 * The friendlyName attribute stays   the constant: it answers when this mapping produces nothing.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Friendly Name Mapping</em>' containment reference.
+	 * @see #setFriendlyNameMapping(FeatureMapping)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping_FriendlyNameMapping()
+	 * @model containment="true"
+	 * @generated
+	 */
+	FeatureMapping getFriendlyNameMapping();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getFriendlyNameMapping <em>Friendly Name Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Friendly Name Mapping</em>' containment reference.
+	 * @see #getFriendlyNameMapping()
+	 * @generated
+	 */
+	void setFriendlyNameMapping(FeatureMapping value);
+
+	/**
+	 * Returns the value of the '<em><b>Latitude Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The richer source of the admin location's latitude, winning over latitudeRef when both are set.
+	 * 
+	 * A latitudeRef is a plain path,   so it can only read a value that stands alone in the payload. Where two coordinates share one value - a bbox typed as a Double[] - a converter or an expression takes the   element, and that needs this slot.
+	 * 
+	 * The latitude attribute stays the constant: it answers when this mapping produces nothing.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Latitude Mapping</em>' containment reference.
+	 * @see #setLatitudeMapping(FeatureMapping)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping_LatitudeMapping()
+	 * @model containment="true"
+	 * @generated
+	 */
+	FeatureMapping getLatitudeMapping();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLatitudeMapping <em>Latitude Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Latitude Mapping</em>' containment reference.
+	 * @see #getLatitudeMapping()
+	 * @generated
+	 */
+	void setLatitudeMapping(FeatureMapping value);
+
+	/**
+	 * Returns the value of the '<em><b>Longitude Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The richer source of the admin location's longitude, winning over longitudeRef when both are set. See latitudeMapping.
+	 * 
+	 * The   longitude attribute stays the constant.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Longitude Mapping</em>' containment reference.
+	 * @see #setLongitudeMapping(FeatureMapping)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping_LongitudeMapping()
+	 * @model containment="true"
+	 * @generated
+	 */
+	FeatureMapping getLongitudeMapping();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLongitudeMapping <em>Longitude Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Longitude Mapping</em>' containment reference.
+	 * @see #getLongitudeMapping()
+	 * @generated
+	 */
+	void setLongitudeMapping(FeatureMapping value);
+
+	/**
+	 * Returns the value of the '<em><b>Elevation Mapping</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The richer source of the admin location's elevation, winning over elevationRef when both are set. See latitudeMapping.
+	 * 
+	 * The   elevation attribute stays the constant.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Elevation Mapping</em>' containment reference.
+	 * @see #setElevationMapping(FeatureMapping)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping_ElevationMapping()
+	 * @model containment="true"
+	 * @generated
+	 */
+	FeatureMapping getElevationMapping();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getElevationMapping <em>Elevation Mapping</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Elevation Mapping</em>' containment reference.
+	 * @see #getElevationMapping()
+	 * @generated
+	 */
+	void setElevationMapping(FeatureMapping value);
 
 } // AdminMapping

@@ -932,6 +932,46 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
+	public EReference getAdminMapping_FriendlyNameMapping() {
+		return (EReference)adminMappingEClass.getEStructuralFeatures().get(9);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getAdminMapping_LatitudeMapping() {
+		return (EReference)adminMappingEClass.getEStructuralFeatures().get(10);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getAdminMapping_LongitudeMapping() {
+		return (EReference)adminMappingEClass.getEStructuralFeatures().get(11);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getAdminMapping_ElevationMapping() {
+		return (EReference)adminMappingEClass.getEStructuralFeatures().get(12);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public EClass getMetadataMapping() {
 		return metadataMappingEClass;
 	}
@@ -1700,6 +1740,10 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEReference(adminMappingEClass, ADMIN_MAPPING__LATITUDE_REF);
 		createEReference(adminMappingEClass, ADMIN_MAPPING__LONGITUDE_REF);
 		createEReference(adminMappingEClass, ADMIN_MAPPING__ELEVATION_REF);
+		createEReference(adminMappingEClass, ADMIN_MAPPING__FRIENDLY_NAME_MAPPING);
+		createEReference(adminMappingEClass, ADMIN_MAPPING__LATITUDE_MAPPING);
+		createEReference(adminMappingEClass, ADMIN_MAPPING__LONGITUDE_MAPPING);
+		createEReference(adminMappingEClass, ADMIN_MAPPING__ELEVATION_MAPPING);
 
 		metadataMappingEClass = createEClass(METADATA_MAPPING);
 
@@ -1904,6 +1948,10 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getAdminMapping_LatitudeRef(), ecorePackage.getEStructuralFeature(), null, "latitudeRef", null, 0, -1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getAdminMapping_LongitudeRef(), ecorePackage.getEStructuralFeature(), null, "longitudeRef", null, 0, -1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getAdminMapping_ElevationRef(), ecorePackage.getEStructuralFeature(), null, "elevationRef", null, 0, -1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getAdminMapping_FriendlyNameMapping(), this.getFeatureMapping(), null, "friendlyNameMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getAdminMapping_LatitudeMapping(), this.getFeatureMapping(), null, "latitudeMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getAdminMapping_LongitudeMapping(), this.getFeatureMapping(), null, "longitudeMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getAdminMapping_ElevationMapping(), this.getFeatureMapping(), null, "elevationMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(metadataMappingEClass, MetadataMapping.class, "MetadataMapping", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 

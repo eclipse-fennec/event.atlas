@@ -408,6 +408,79 @@ so a two-index mapping requires at least two elements in the collection. The com
 worked example is the tests' `data/WeatherReportsProviderMapping.xmi` (its admin service
 selects `reports[0]` the same way).
 
+### One service for each element — a produced service name
+
+A service is normally called by its `mid`. It takes its name from the **payload** instead when
+its `<name>` carries a *producer* — an `expression`, a `functionId` or a `featurePath`. And when
+the service source still holds a collection at that point, the mapping makes **one service for
+each element**, each named from its own element.
+
+```xml
+<services mid="line">
+  <!-- a producer, so the payload names the service -->
+  <name>
+    <featurePath xsi:type="ecore:EAttribute" href="iotraffic.ecore#//TrafficLine/line_number"/>
+  </name>
+
+  <!-- no index, no filter: the collection is kept, so every element becomes a service -->
+  <referencedResource>
+    <featurePath xsi:type="ecore:EReference" href="iotraffic.ecore#//CounterUplink/object"/>
+    <featurePath xsi:type="ecore:EReference" href="iotraffic.ecore#//CounterData/lines"/>
+    <featurePath xsi:type="ecore:EReference" href="iotraffic.ecore#//LineEntry/value"/>
+  </referencedResource>
+</services>
+```
+
+An uplink carrying four lines gives four services — `1`, `3`, `7`, `9` — each with the resources
+generated from its own `TrafficLine`. The next uplink carrying two more adds two more services to
+the same provider.
+
+**A constant name is a label, not the service name.** `<name name="Current Weather"/>` beside
+`mid="currentWeather"` leaves the service called `currentWeather`, exactly as before this
+feature, and a collection beside a constant name still selects a single element. That is
+deliberate: every mapping written so far fills that slot with a label, so reading it as the twin
+name would rename the services of all of them at once — and a set of services needs a name for
+each, which only a producer can give.
+
+**Write one block per shape, not per instance.** Two services over `reports[0]` and `reports[1]`
+are a *positional tuple*: each position means something different and has a human name, so the
+indices are right. Nine services over nine traffic lines, or one per traffic-light signal, are a
+*homogeneous set* whose members identify themselves — one block with a produced name replaces all
+nine. A model that gains a discriminating feature can move from the first shape to the second.
+
+| the source path ends on | `<name>` | result |
+|---|---|---|
+| one object | anything | one service, named by the producer, else by the `mid` |
+| a collection | constant or absent | **one** service: `collectionIndex` or `collectionFilter` picks the element, the `mid` names it |
+| a collection | producer | **one service per element**, each named from its element |
+
+Four details worth knowing:
+
+- **`collectionFilter` narrows the set first**, and every survivor becomes a service. It is how
+  you take some elements and not all.
+- **A non-zero `collectionIndex` still selects one element**, even beside a produced name. A zero
+  one does not, because EMF cannot tell an explicit `collectionIndex="0"` from an unset one — the
+  generated `eIsSet` means "differs from the default", and the default is `0`. Use a
+  `collectionFilter` to select a single element beside a produced name.
+- **Two elements that produce the same name are one service**, the later value wins, and the
+  mapping is named in a warning. Refusing the payload would throw away the elements that *did*
+  produce distinct names.
+- **A producer that yields nothing** falls back to the `<name>`'s own constant, and then to the
+  `mid` — the same rule every other producer in this guide follows.
+
+**The model grows at push time.** A service whose name a payload decides cannot exist before that
+payload arrives, so the engine adds it to the provider's model when the first payload names it,
+with the same resource types, units and metadata that a statically named service gets at
+registration. This needs the pusher to hold a model manager, which `InstancePusher` does; a
+caller that drives the mapper with a twin alone logs a warning and skips such a service. A
+**statically** named service that the twin does not carry stays an error, because creating it
+would hide a broken mapping.
+
+Two things are unaffected. **Profile conformance** still validates the mapping by `mid`, which
+stays static — `required`, `expectedType` and `expectedUnit` all keep working; what a profile
+cannot express is how *many* services the set has. And each service of a set keeps **its own
+change-rule state**, because the rules are keyed by the service's twin name.
+
 ## Automatic resource generation
 
 Typing out one `ResourceMapping` per attribute is tedious for rich types. A
@@ -523,6 +596,44 @@ resource skipped with a warning.
 > dates an admin update earlier than the provider timestamp of the same payload: the admin
 > values describe the provider, not a measurement. `ValueMapperTest#providerMapping_admin`
 > covers exactly that case.
+
+### Computed admin values
+
+`friendlyNameFeature`, `latitudeRef`, `longitudeRef` and `elevationRef` are bare feature paths:
+they can *read* a value that stands alone in the payload, and nothing else. Each has an optional
+`FeatureMapping` beside it — `friendlyNameMapping`, `latitudeMapping`, `longitudeMapping`,
+`elevationMapping` — which brings the producers and a `converterId` to the same slot:
+
+```xml
+<admin mid="admin">
+  <name name="Admin"/>
+
+  <!-- an expression: a literal combined with a feature, which a path cannot express -->
+  <friendlyNameMapping expression="'ILSA ' + self.intersectionName"/>
+
+  <!-- a converter: two numbers packed into one value -->
+  <longitudeMapping converterId="udp.array.element.0">
+    <featurePath xsi:type="ecore:EReference" href="t.ecore#//TLConfiguration/geoJson"/>
+    <featurePath xsi:type="ecore:EAttribute" href="g.ecore#//GeoJSON/bbox"/>
+  </longitudeMapping>
+</admin>
+```
+
+The containment's declared type is the concrete `FeatureMapping`, so unlike `featurePath` these
+elements need **no `xsi:type`**.
+
+Three rules, the same ones the rest of the guide follows:
+
+- **A `*Mapping` replaces its `*Ref`**, it does not fall back to it — as an `expression`
+  replaces a `featurePath`.
+- **The sibling constant answers when the producer yields nothing**: `friendlyName`, `latitude`,
+  `longitude`, `elevation` keep their meaning.
+- **`elevationMapping` is read**, which `elevationRef` never was.
+
+The case these exist for is a value that holds more than one number. A GeoJSON `bbox` typed as
+`Double[]` is one attribute, so neither a path nor a `collectionIndex` reaches an element, and
+an expression cannot either — OCL returns the array but every collection operation on it
+produces nothing, since a Java array is no OCL collection. A converter takes the element.
 
 ## Mapping profiles
 

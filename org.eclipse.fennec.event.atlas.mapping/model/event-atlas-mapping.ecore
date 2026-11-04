@@ -236,6 +236,37 @@
         eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EStructuralFeature"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="elevationRef" upperBound="-1"
         eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EStructuralFeature"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="friendlyNameMapping"
+      eType="#//FeatureMapping" containment="true">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The richer source of the admin's friendly name, winning over friendlyNameFeature when both are set.&#xA;&#xA;Carries the producers a
+  feature path alone cannot express - an expression, a function, a collection selection - plus a converterId that post-processes the result. &quot;'ILSA ' +
+  self.intersectionName&quot; is the case it exists for: friendlyNameFeature can name a feature but cannot combine one with anything.&#xA;&#xA;The friendlyName attribute stays
+  the constant: it answers when this mapping produces nothing."/>
+    </eAnnotations>
+  </eStructuralFeatures>
+  <eStructuralFeatures xsi:type="ecore:EReference" name="latitudeMapping"
+      eType="#//FeatureMapping" containment="true">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The richer source of the admin location's latitude, winning over latitudeRef when both are set.&#xA;&#xA;A latitudeRef is a plain path,
+  so it can only read a value that stands alone in the payload. Where two coordinates share one value - a bbox typed as a Double[] - a converter or an expression takes the
+  element, and that needs this slot.&#xA;&#xA;The latitude attribute stays the constant: it answers when this mapping produces nothing."/>
+    </eAnnotations>
+  </eStructuralFeatures>
+  <eStructuralFeatures xsi:type="ecore:EReference" name="longitudeMapping"
+      eType="#//FeatureMapping" containment="true">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The richer source of the admin location's longitude, winning over longitudeRef when both are set. See latitudeMapping.&#xA;&#xA;The
+  longitude attribute stays the constant."/>
+    </eAnnotations>
+  </eStructuralFeatures>
+  <eStructuralFeatures xsi:type="ecore:EReference" name="elevationMapping"
+      eType="#//FeatureMapping" containment="true">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The richer source of the admin location's elevation, winning over elevationRef when both are set. See latitudeMapping.&#xA;&#xA;The
+  elevation attribute stays the constant."/>
+    </eAnnotations>
+  </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="MetadataMapping"/>
   <eClassifiers xsi:type="ecore:EDataType" name="JavaStringFunction" instanceTypeName="java.util.function.Function&lt;org.eclipse.emf.ecore.EObject, java.lang.String>"

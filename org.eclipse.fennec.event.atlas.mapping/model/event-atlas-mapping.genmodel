@@ -97,6 +97,10 @@
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/latitudeRef"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/longitudeRef"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/elevationRef"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/friendlyNameMapping"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/latitudeMapping"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/longitudeMapping"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//AdminMapping/elevationMapping"/>
     </genClasses>
     <genClasses ecoreClass="event-atlas-mapping.ecore#//MetadataMapping"/>
     <genClasses ecoreClass="event-atlas-mapping.ecore#//Mapping">

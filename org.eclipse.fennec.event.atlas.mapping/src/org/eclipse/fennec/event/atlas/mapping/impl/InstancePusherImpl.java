@@ -134,7 +134,7 @@ public class InstancePusherImpl implements InstancePusher {
 				int applied = 0;
 				for (ProviderMapping mapping : mappings) {
 					try {
-						ValueMapperFactory.createValueMapper(twin, mapping, changeRuleFilter.get(),
+						ValueMapperFactory.createValueMapper(twin, modelManager, mapping, changeRuleFilter.get(),
 								converterRegistry.get(), functionRegistry.get(), expressionEvaluator.get())
 								.mapInstance(instance);
 						applied++;
