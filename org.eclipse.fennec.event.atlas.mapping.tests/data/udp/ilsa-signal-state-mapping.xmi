@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ILSA - a signal state update (topic 5g/ilsa/<intersection>/.../<signal>).
+  Replaces: IlsaListener.updateSignal + TrafficLightDto.
+
+  STATUS 2026-11-04
+    DONE  the service is named by the payload, and created on the model when the first
+          state for that signal arrives                                      (#91 item 5)
+    DONE  the '/' -> '_' rewrite the adapter does in Java, as OCL replaceAll (#91 item 2)
+    DONE  the color value, the payload timestamp, the unit metadata
+    OPEN  the provider id. The intersection is in the MQTT topic, not in the payload.
+          Not an event.atlas change: it needs a transient `intersectionId` on
+          TLSignalState, added LAST in the EClass. The mapping below assumes it.
+
+  This mapping is complete except for that one attribute.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="ilsa-signal-state"
+    providerTimestamp="false">
+
+  <!-- The intersection, which the adapter copies from the topic into the payload.
+       TODO(gap 1): needs TLSignalState.intersectionId, transient, added LAST in the EClass. -->
+  <name>
+    <featurePath xsi:type="ecore:EAttribute"
+        href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/intersectionId"/>
+  </name>
+
+  <providerClasses href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState"/>
+
+  <!-- The payload decides the service: signalState.id with '/' replaced, exactly as
+       IlsaListener.updateSignal does it in Java. A producer on the name is what makes the
+       engine read it, and the service is created on the model the first time it appears. -->
+  <services mid="signal">
+    <name expression="self.id.replaceAll('/', '_')"/>
+
+    <timestamp>
+      <featurePath xsi:type="ecore:EAttribute"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/timestamp"/>
+    </timestamp>
+
+    <resources name="color" mid="color">
+      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <valueMapping>
+        <featurePath xsi:type="ecore:EAttribute"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/state"/>
+      </valueMapping>
+      <!-- The Ilsa package carries this as a model annotation; a mapping states it. -->
+      <extraMetadata key="sensorthings.unit.name" value="Farbe"/>
+    </resources>
+  </services>
+
+  <admin mid="admin">
+    <name name="Admin"/>
+  </admin>
+</sensinactMapping:ProviderMapping>

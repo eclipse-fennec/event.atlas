@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ILSA - the intersection configuration (topic .../config/retained).
+  Replaces: ilsa.qvto + IlsaListener.updateConfig.
+
+  STATUS 2026-11-04
+    DONE  one service for each TLSignal, from ONE block. The signals sit three nested
+          collections deep (subcircles -> serialPorts -> modules -> signals), which the
+          qvto walks with collect().collect().collect()                      (#91 item 5)
+    DONE  each service named from its own signal, '/' rewritten, as OCL      (#91 item 2)
+    DONE  the admin friendly name, 'ILSA ' + intersectionName - a literal combined with a
+          feature, which a bare feature path cannot express                  (#91 item 7)
+    DONE  the admin location out of geoJson.bbox, two numbers inside ONE Double[] value.
+          Needs the `at` operation contributed by the model bundle, and
+          ocl.customOperationsEnabled=true on PID DefaultOclEngine           (#91 item 7)
+    DONE  observedArea through a ValueConverter, replacing the qvto black box (#91 item 1)
+    OPEN  the `type` and `signalGroup` metadata on the color resource. Both values come
+          from the signal, and extraMetadata holds constants only            (#91 item 6)
+
+  One gap left; it stays in IlsaListener.describeSignal until item 6 lands.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="ilsa-configuration"
+    providerTimestamp="true">
+
+  <!-- qvto: id := self.intersectionId -->
+  <name>
+    <featurePath xsi:type="ecore:EAttribute"
+        href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration/intersectionId"/>
+  </name>
+
+  <providerClasses href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration"/>
+
+  <!--
+    qvto: services := self.subcircles->collect(serialPorts)->collect(modules)->collect(signals)
+    One block, one service for each signal: the path keeps the collection and the name is
+    produced, so the engine makes one service per element and creates it on the model.
+    The '/' -> '_' rewrite is the same one IlsaListener does in Java.
+  -->
+  <services mid="signal">
+    <name expression="self.id.replaceAll('/', '_')"/>
+
+    <!-- selector only: exclude="false" with no filter generates no resources -->
+    <referencedResource exclude="false">
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration/subcircles"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//Subcircle/serialPorts"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//SerialPort/modules"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLModule/signals"/>
+    </referencedResource>
+
+    <!--
+      qvto: observedArea := self.observedArea.convertToFeatureCollection()
+      The black box becomes a ValueConverter the UDP side publishes under this id. The
+      converter whiteboard is in place; only the converter itself has to be written.
+    -->
+    <resources name="observedArea" mid="observedArea">
+      <eType xsi:type="ecore:EDataType"
+          href="https://eclipse.org/sensinact/core/provider/1.0#//EGeoJsonObject"/>
+      <valueMapping converterId="udp.geojson.featurecollection">
+        <featurePath xsi:type="ecore:EReference"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/observedArea"/>
+      </valueMapping>
+      <extraMetadata key="sensorthings.observedArea" value="true"/>
+    </resources>
+
+    <!--
+      TODO(gap 2, issue #91 item 6): metadata from the payload.
+      IlsaListener.describeSignal writes these two on the `color` resource, and both values
+      come from the signal. extraMetadata holds constants only, so this stays in the adapter:
+
+        <metadata key="type">       <featurePath .../TLSignal/signalType/></metadata>
+        <metadata key="signalGroup"><featurePath .../TLSignal/signalGroup/>
+                                    <featurePath .../TLSignalGroup/id/></metadata>
+    -->
+  </services>
+
+  <admin mid="admin">
+    <!--
+      qvto: friendlyName := 'ILSA ' + self.intersectionName.
+      A friendlyNameMapping takes an expression, which a bare feature path cannot.
+    -->
+    <name name="Admin"/>
+    <friendlyNameMapping expression="'ILSA ' + self.intersectionName"/>
+
+    <!--
+      IlsaListener.location builds Point(geoJson.bbox[0], geoJson.bbox[1]).
+      `bbox` is ONE attribute of datatype Array1D, instance class java.lang.Double[], so no
+      feature path and no collectionIndex reaches an element, and no OCL *collection* operation
+      does either - to the standard library the array is a single scalar.
+      An OclOperation contributed ON the datatype does: `at` is published by the model's own
+      bundle as an OclOperationProvider. Every published provider binds, so contributions
+      compose; the runtime only has to set ocl.customOperationsEnabled=true on PID
+      DefaultOclEngine. Measured in ContributedOperationTest.
+    -->
+    <longitudeMapping expression="self.geoJson.bbox.at(1)"/>
+    <latitudeMapping expression="self.geoJson.bbox.at(2)"/>
+
+  </admin>
+</sensinactMapping:ProviderMapping>
