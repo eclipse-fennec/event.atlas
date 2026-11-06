@@ -26,9 +26,9 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EClass;
@@ -46,6 +46,8 @@ import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
+import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.sensinact.core.command.GatewayThread;
 import org.eclipse.sensinact.core.emf.command.AbstractSensinactEMFCommand;
 import org.eclipse.sensinact.core.emf.model.SensinactEMFModelManager;
@@ -269,8 +271,10 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 		if (!unknownAdminResources.isEmpty()) {
 			if (!quiet) {
 				logger.severe(String.format("ProviderMapping '%s' (%s) maps admin resource(s) %s the admin service "
-						+ "does not have (it has %s) - skipping", entry.key(), mapping.getMid(), unknownAdminResources,
-						adminResourceNames()));
+						+ "does not have (it has %s) - skipping.%s", entry.key(), mapping.getMid(),
+						unknownAdminResources, adminResourceNames(),
+						mapping.getAdmin() != null && mapping.getAdmin().isExtendAdmin() ? ""
+								: " Set extendAdmin on the admin mapping to have them carried by an Admin subclass."));
 			}
 			return Optional.empty();
 		}
@@ -286,6 +290,22 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			}
 			return Optional.empty();
 		}
+		List<String> unresolvedServiceClasses = unresolvedServiceEClasses(mapping);
+		if (!unresolvedServiceClasses.isEmpty()) {
+			if (!quiet) {
+				defer(entry, report, String.format("the EClass of service(s) %s is not resolvable yet - is that "
+						+ "model deployed?", unresolvedServiceClasses));
+			}
+			return Optional.empty();
+		}
+		List<String> refusedServices = refusedTypedServices(mapping);
+		if (!refusedServices.isEmpty()) {
+			if (!quiet) {
+				logger.severe(String.format("ProviderMapping '%s' (%s) - skipping: %s", entry.key(),
+						mapping.getMid(), String.join("; ", refusedServices)));
+			}
+			return Optional.empty();
+		}
 		if (!resolveProfile(mapping, !report)) {
 			if (!quiet) {
 				defer(entry, report, "its profile is neither reachable as a document nor registered yet");
@@ -298,14 +318,27 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 		return Optional.of(mapping);
 	}
 
-	/** The mids under {@code <admin>} that are not a resource of sensiNact's admin service. */
+	/**
+	 * The mids under {@code <admin>} that cannot become a resource of the admin service.
+	 * <p>
+	 * Without {@code extendAdmin} that is every mid sensiNact's admin does not already have,
+	 * because the admin's resources are fixed. With it, the engine builds an {@code Admin}
+	 * subclass carrying them, so the only refusals left are a missing mid and one that names a
+	 * feature {@code Admin} already has which is no resource - {@code metadata}, inherited from
+	 * {@code Service} as a reference and filtered out of every resource listing. Declaring an
+	 * attribute of that name on a subclass would shadow it.
+	 */
 	static List<String> unknownAdminResources(ProviderMapping mapping) {
 		if (mapping.getAdmin() == null) {
 			return List.of();
 		}
 		List<String> known = adminResourceNames();
+		boolean extend = mapping.getAdmin().isExtendAdmin();
 		return mapping.getAdmin().getResources().stream().map(r -> r.getMid())
-				.filter(mid -> mid == null || !known.contains(mid)).toList();
+				.filter(mid -> mid == null || !known.contains(mid))
+				.filter(mid -> !extend || mid == null
+						|| ProviderPackage.Literals.ADMIN.getEStructuralFeature(mid) != null)
+				.toList();
 	}
 
 	/**
@@ -317,6 +350,46 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	 */
 	static List<String> adminResourceNames() {
 		return ProviderPackage.Literals.ADMIN.getEAllAttributes().stream().map(a -> a.getName()).toList();
+	}
+
+	/** The mids of the services whose {@code serviceEClass} is still an unresolved proxy. */
+	static List<String> unresolvedServiceEClasses(ProviderMapping mapping) {
+		return mapping.getServices().stream()
+				.filter(service -> service.getServiceEClass() != null && service.getServiceEClass().eIsProxy())
+				.map(ServiceMapping::getMid).toList();
+	}
+
+	/**
+	 * What is wrong with the mapping's typed services, one message each.
+	 * <p>
+	 * A service that names an EClass gets exactly the resources that EClass declares, because
+	 * the twin builds it from the EClass. A resource mapping whose mid is no feature of it is
+	 * therefore refused rather than left to fail per payload - adding the feature to the EClass
+	 * would be the one operation that breaks a generated EClass for the whole runtime.
+	 * <p>
+	 * A {@code referencedResource} is not refused: it is also the path that selects the
+	 * service's source element, which is how one block becomes one service per element. What it
+	 * <em>generates</em> is pruned at registration instead, by
+	 * {@code ProviderModelSensinactMapper}.
+	 */
+	static List<String> refusedTypedServices(ProviderMapping mapping) {
+		List<String> refusals = new ArrayList<>();
+		for (ServiceMapping service : mapping.getServices()) {
+			EClass serviceEClass = service.getServiceEClass();
+			if (serviceEClass == null) {
+				continue;
+			}
+			List<String> unknown = service.getResources().stream().map(ResourceMapping::getMid)
+					.filter(mid -> mid == null || serviceEClass.getEStructuralFeature(mid) == null
+							|| ProviderPackage.Literals.SERVICE__METADATA.getName().equals(mid))
+					.toList();
+			if (!unknown.isEmpty()) {
+				refusals.add(String.format("service '%s' maps resource(s) %s that %s does not declare (it has %s)",
+						service.getMid(), unknown, serviceEClass.getName(),
+						serviceEClass.getEAllAttributes().stream().map(a -> a.getName()).toList()));
+			}
+		}
+		return refusals;
 	}
 
 	/**

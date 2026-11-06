@@ -33,6 +33,12 @@ import org.eclipse.emf.ecore.EReference;
 
 import org.eclipse.emf.ecore.impl.EPackageImpl;
 
+import org.eclipse.sensinact.model.core.provider.ProviderPackage;
+
+import probeadmin.ProbeadminPackage;
+
+import probeadmin.impl.ProbeadminPackageImpl;
+
 /**
  * <!-- begin-user-doc -->
  * An implementation of the model <b>Package</b>.
@@ -100,19 +106,26 @@ public class DraginoPackageImpl extends EPackageImpl implements DraginoPackage {
 
 		isInited = true;
 
+		// Initialize simple dependencies
+		ProviderPackage.eINSTANCE.eClass();
+
 		// Obtain or create and register interdependencies
-		Object registeredPackage = EPackage.Registry.INSTANCE.getEPackage(Em310udlPackage.eNS_URI);
+		Object registeredPackage = EPackage.Registry.INSTANCE.getEPackage(ProbeadminPackage.eNS_URI);
+		ProbeadminPackageImpl theProbeadminPackage = (ProbeadminPackageImpl)(registeredPackage instanceof ProbeadminPackageImpl ? registeredPackage : ProbeadminPackage.eINSTANCE);
+		registeredPackage = EPackage.Registry.INSTANCE.getEPackage(Em310udlPackage.eNS_URI);
 		Em310udlPackageImpl theEm310udlPackage = (Em310udlPackageImpl)(registeredPackage instanceof Em310udlPackageImpl ? registeredPackage : Em310udlPackage.eINSTANCE);
 		registeredPackage = EPackage.Registry.INSTANCE.getEPackage(LorawanPackage.eNS_URI);
 		LorawanPackageImpl theLorawanPackage = (LorawanPackageImpl)(registeredPackage instanceof LorawanPackageImpl ? registeredPackage : LorawanPackage.eINSTANCE);
 
 		// Create package meta-data objects
 		theDraginoPackage.createPackageContents();
+		theProbeadminPackage.createPackageContents();
 		theEm310udlPackage.createPackageContents();
 		theLorawanPackage.createPackageContents();
 
 		// Initialize created meta-data
 		theDraginoPackage.initializePackageContents();
+		theProbeadminPackage.initializePackageContents();
 		theEm310udlPackage.initializePackageContents();
 		theLorawanPackage.initializePackageContents();
 

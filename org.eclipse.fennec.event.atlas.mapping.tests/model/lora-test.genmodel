@@ -4,10 +4,21 @@
     modelDirectory="/org.gecko.emf.sensinact.tests/src" modelPluginID="org.gecko.emf.sensinact.tests"
     modelName="Lora-Test" rootExtendsClass="org.eclipse.emf.ecore.impl.MinimalEObjectImpl$Container"
     importerID="org.eclipse.emf.importer.ecore" complianceLevel="17.0" copyrightFields="false"
-    operationReflection="true" importOrganizing="true" oSGiCompatible="true">
+    usedGenPackages="sensinact/sensinact.genmodel#//provider" operationReflection="true"
+    importOrganizing="true" oSGiCompatible="true">
+  <foreignModel>probe-admin.ecore</foreignModel>
   <foreignModel>dragino-message.ecore</foreignModel>
   <foreignModel>em310udl-message.ecore</foreignModel>
   <foreignModel>lorawan-uplink.ecore</foreignModel>
+  <genPackages prefix="Probeadmin" resource="XMI" disposableProviderFactory="true"
+      ecorePackage="probe-admin.ecore#/">
+    <genClasses ecoreClass="probe-admin.ecore#//ProbeAdmin">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute probe-admin.ecore#//ProbeAdmin/viewport"/>
+    </genClasses>
+    <genClasses ecoreClass="probe-admin.ecore#//ProbeProvider">
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference probe-admin.ecore#//ProbeProvider/thermal"/>
+    </genClasses>
+  </genPackages>
   <genPackages prefix="Dragino" resource="XMI" disposableProviderFactory="true" ecorePackage="dragino-message.ecore#/">
     <genClasses ecoreClass="dragino-message.ecore#//DecodedObject">
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute dragino-message.ecore#//DecodedObject/batV"/>

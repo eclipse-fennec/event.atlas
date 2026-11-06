@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TrafiCam - the detections (5g/traficam/<cam>/<class>, windowed).
+  Replaces: TrafiCamDto and the per-class push of TrafiCamListener.flushWindows.
+
+  STATUS 2026-11-06
+    DONE  the provider id, from TrafiCamDetections.camId - the adapter copies it out of the
+          topic. The payload is built in process, so camId sits where it reads best
+    DONE  one service for each object class, from ONE block: the referencedResource path
+          ends on `classes` and the name is produced                         (#91 item 5)
+    DONE  each service typed ObservedObjects, the EClass the adapter used to build, so
+          `objects` and `classificationName` carry its types                 (#91 item 8)
+    DONE  the window's flush time as the timestamp of every value it carries
+    DONE  one provider for both TrafiCam flows, through traficam-profile.xmi (UNIFIED)
+    TODO  the `udp.traficam.detections` ValueFunction, beside ViewportValueFunction. It is
+          the FeatureCollection TrafiCamDto used to carry, built from the objects rather
+          than received ready-made - see the note on the resource below
+
+  WHAT STAYS IN THE ADAPTER, and why none of it is an engine gap:
+    - the 2-second window and the reduction to one entry per object id. That is state
+      between payloads; the engine sees one payload and holds none. What leaves the window
+      is an aggregate the engine can map, which is the point of TrafiCamDetections
+    - `classificationName`. It is read from the classMap of a CamConfig that arrived
+      earlier on another topic - a lookup across messages, so it is resolved before the
+      push and travels in the payload
+    - the binary EMF read. PayloadIngest reads XMI and JSON; the adapter deserializes and
+      calls InstancePusher directly
+
+  ONE PROVIDER, TWO MAPPINGS. This mapping and traficam-config-mapping.xmi both name the
+  provider after the camera, but a mapping's model comes from its own fqMid unless a
+  MappingProfile with providerStrategy=UNIFIED names one - traficam-profile.xmi, which both
+  reference below. Deploy it into the `sensinact-profiles` registry beside the mappings: a
+  mapping whose profile cannot be resolved is skipped entirely.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="traficam-detections"
+    providerTimestamp="true">
+
+  <!-- The camera, which the adapter copies from the third topic segment into the payload.
+       The same value CamConfig.camId carries, so both flows name one provider. -->
+  <name>
+    <featurePath xsi:type="ecore:EAttribute"
+        href="https://jena.de/models/traficam/1.0#//TrafiCamDetections/camId"/>
+  </name>
+
+  <!-- When the window was flushed. An EDate is read as an instant as it stands, so no hint.
+       providerTimestamp="true" makes it the stamp of the whole push, which is what it is:
+       every object in this payload was seen in the window that ended here. -->
+  <timestamp>
+    <featurePath xsi:type="ecore:EAttribute"
+        href="https://jena.de/models/traficam/1.0#//TrafiCamDetections/time"/>
+  </timestamp>
+
+  <!-- Both TrafiCam mappings name this profile, whose providerStrategy is UNIFIED, so both
+       build the same model and their payloads reach ONE provider. The fragment is the
+       profileId, not "/": that is what ProviderMappingRegistryImpl looks up in the profile
+       registry when the document itself is not reachable - which is the normal case for a
+       mapping delivered from a Model Atlas. -->
+  <profile href="traficam-profile.xmi#traficam"/>
+
+  <providerClasses href="https://jena.de/models/traficam/1.0#//TrafiCamDetections"/>
+
+  <!--
+    One service for each object class the window saw.
+
+    The fan-out is the combination item 5 introduced: a referencedResource path that ends on
+    the `classes` collection, plus a name the payload produces. The name is the class id, the
+    fourth topic segment - which is what the old TrafiCamDto used as the service name too.
+    A constant name would select one element instead of expanding.
+
+    serviceEClass names ObservedObjects, the EClass TrafiCamListener used to instantiate. The
+    twin builds the service from it, so `objects` and `classificationName` carry the types
+    de.jena.traficam.sensinact.model declares and the resource blocks only say where their
+    values come from.
+  -->
+  <services mid="class">
+    <name>
+      <featurePath xsi:type="ecore:EAttribute"
+          href="https://jena.de/models/traficam/1.0#//ObservedClass/classId"/>
+    </name>
+    <serviceEClass href="https://model.data.jena.de/sensinact/traficam/1.0#//ObservedObjects"/>
+
+    <!-- Selector only: exclude="false" with no filter generates no resources. It is the path
+         that picks each service's source element, one ObservedClass per service. -->
+    <referencedResource exclude="false">
+      <featurePath xsi:type="ecore:EReference"
+          href="https://jena.de/models/traficam/1.0#//TrafiCamDetections/classes"/>
+    </referencedResource>
+
+    <!--
+      The GeoJSON the twin publishes, built from the objects of this class.
+
+      DetectionWindow used to build the FeatureCollection itself; it now hands over the
+      TrafiCamObjects and this function builds it - the same move the viewport made from
+      TrafiCamListener into ViewportValueFunction. The function must produce what TrafiCamDto
+      carried: one Feature per object, a Point from gpsCoordinates[0] (longitude, latitude)
+      and the properties `id`, `speed` and `heading`. An object without GPS coordinates never
+      reaches it - DetectionWindow drops those.
+
+      The function is handed the `objects` collection itself: a path that ENDS on a collection
+      passes the whole thing, while a filter or a non-zero collectionIndex would select one
+      element from it. So the function takes a List<TrafiCamObject> and needs to know nothing
+      about ObservedClass. Pinned by ValueFunctionMappingTest, collection cases.
+
+      An empty list reaches it too, and that is deliberate: the camera stopped seeing things,
+      the window reports that once, and only the function can decide whether it means an empty
+      FeatureCollection or no value at all. Answering null would leave the previous value
+      standing, which would be the camera still showing what it saw two seconds ago.
+    -->
+    <resources mid="objects">
+      <valueMapping functionId="udp.traficam.detections">
+        <featurePath xsi:type="ecore:EReference"
+            href="https://jena.de/models/traficam/1.0#//ObservedClass/objects"/>
+      </valueMapping>
+    </resources>
+
+    <!-- Resolved by the adapter from the camera's classMap, and it falls back to the class
+         id while no configuration for that camera has arrived. -->
+    <resources mid="classificationName">
+      <valueMapping>
+        <featurePath xsi:type="ecore:EAttribute"
+            href="https://jena.de/models/traficam/1.0#//ObservedClass/classificationName"/>
+      </valueMapping>
+    </resources>
+  </services>
+
+  <!--
+    The admin of this provider is the configuration mapping's business: friendly name,
+    location and viewport all come from a CamConfig. A detection window carries none of
+    them, so this mapping states nothing about the admin and leaves what is there standing.
+  -->
+  <admin mid="admin">
+    <name name="Admin"/>
+  </admin>
+</sensinactMapping:ProviderMapping>

@@ -54,12 +54,16 @@ import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.TimestampMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
+import org.eclipse.sensinact.core.emf.twin.SensinactEMFProvider;
 import org.eclipse.sensinact.core.model.Model;
 import org.eclipse.sensinact.core.model.SensinactModelManager;
 import org.eclipse.sensinact.core.twin.SensinactDigitalTwin;
 import org.eclipse.sensinact.core.twin.SensinactProvider;
 import org.eclipse.sensinact.core.twin.SensinactResource;
 import org.eclipse.sensinact.core.twin.SensinactService;
+import org.eclipse.sensinact.model.core.provider.Admin;
+import org.eclipse.sensinact.model.core.provider.ProviderPackage;
+import org.eclipse.sensinact.model.core.provider.Provider;
 import org.eclipse.sensinact.gateway.geojson.Coordinates;
 import org.eclipse.sensinact.gateway.geojson.GeoJsonObject;
 import org.eclipse.sensinact.gateway.geojson.Point;
@@ -216,6 +220,12 @@ public class ValueMapperImpl implements ValueMapper {
 			SensinactProvider provider = twin.getProvider(providerModel, providerId);
 			if (provider == null) {
 				provider = twin.createProvider(providerModel, providerId, providerTimestamp);
+			}
+			// An admin that carries more than sensiNact's five resources exists only as an
+			// instance of an Admin subclass, so the provider is retyped once, before anything
+			// reads its admin. Re-read afterwards: the update replaces the stored admin.
+			if (extendAdmin(provider, providerId)) {
+				provider = twin.getProvider(providerModel, providerId);
 			}
 
 
@@ -774,6 +784,38 @@ public class ValueMapperImpl implements ValueMapper {
 	}
 
 	/**
+	 * Puts a service of the EClass the mapping names on the provider.
+	 * <p>
+	 * {@code getOrCreateService(name, EClass)} goes to {@code ModelNexus.createServiceInstance},
+	 * which puts a typed service into the provider without touching the model - so a frozen
+	 * model does not stop it, and the service's resources are the ones the EClass declares,
+	 * with their types, units and metadata. It is the same call for a service named by its mid
+	 * and for one named by the payload.
+	 *
+	 * @return the service, or <code>null</code> where this runtime cannot create one, in which
+	 * case the service is skipped and the rest of the payload still lands
+	 */
+	private SensinactService createTypedService(ServiceMapping serviceMapping, SensinactProvider provider,
+			String serviceName) {
+		EClass serviceEClass = serviceMapping.getServiceEClass();
+		if (serviceEClass.eIsProxy()) {
+			logger.warning(String.format("Mapping %s: the EClass of service '%s' is an unresolved proxy (%s)"
+					+ " - the service is skipped", mapping.getMid(), serviceName,
+					EcoreUtil.getURI(serviceEClass)));
+			return null;
+		}
+		if (!(provider instanceof SensinactEMFProvider emfProvider)) {
+			logger.warning(String.format("Mapping %s: service '%s' is typed %s, which needs the EMF twin - the"
+					+ " service is skipped", mapping.getMid(), serviceName, serviceEClass.getName()));
+			return null;
+		}
+		SensinactService service = emfProvider.getOrCreateService(serviceName, serviceEClass);
+		logger.fine(String.format("Mapping %s: service '%s' created on provider '%s' as a %s", mapping.getMid(),
+				serviceName, provider.getName(), serviceEClass.getName()));
+		return service;
+	}
+
+	/**
 	 * Maps all resources for a specific service.
 	 * Handles both explicitly defined resources and automatically generated resources from ReferenceMapping.
 	 *
@@ -790,10 +832,15 @@ public class ValueMapperImpl implements ValueMapper {
 			// mapping and fails the instance, as it always has. A payload-named one cannot
 			// exist before this payload, so it is created here - and where it cannot be, the
 			// service is skipped and the other services of this payload still land.
-			if (!hasProducer(serviceMapping.getName())) {
+			if (serviceMapping.getServiceEClass() != null) {
+				// A typed service is never in the model, so it is missing on the first payload
+				// whether its name is a mid or produced.
+				service = createTypedService(serviceMapping, provider, serviceName);
+			} else if (!hasProducer(serviceMapping.getName())) {
 				throw new ValueMappingException("Service not found: " + serviceName);
+			} else {
+				service = growModel(serviceMapping, provider, serviceName);
 			}
-			service = growModel(serviceMapping, provider, serviceName);
 			if (service == null) {
 				return;
 			}
@@ -910,8 +957,12 @@ public class ValueMapperImpl implements ValueMapper {
 			throws ValueMappingException {
 
 		SensinactResource resource = service.getResources().get(resourceMapping.getMid());
-		
-		
+		if (resource == null) {
+			// A resource that only the stored instance carries - an extra admin resource - is
+			// not in that map, which is built from what the service DECLARES. The twin's own
+			// lookup resolves the service EClass from the instance and finds it.
+			resource = twin.getResource(providerId, serviceName, resourceMapping.getMid());
+		}
 		if (resource == null) {
 			throw new ValueMappingException("Resource not found: " + resourceMapping.getMid());
 		}
@@ -947,6 +998,73 @@ public class ValueMapperImpl implements ValueMapper {
 
 
 	/**
+	 * Gives the provider's admin the resources the mapping declares beyond sensiNact's five,
+	 * by replacing the admin instance with one of an {@code Admin} subclass that declares them.
+	 * <p>
+	 * It runs on every push and does its work once: the guard is the twin's own instance-based
+	 * lookup, so a provider whose admin already carries them costs three map reads. The gateway
+	 * keeps the subclass and copies the old admin's values onto it
+	 * ({@code EMFCompareUtil.copyOldService}), so friendly name, location and the timestamps
+	 * survive the exchange.
+	 *
+	 * @param provider the provider to retype
+	 * @param providerId its id, for the twin lookups and the log
+	 * @return <code>true</code> when the admin was replaced, i.e. the caller must read the
+	 * provider again
+	 */
+	private boolean extendAdmin(SensinactProvider provider, String providerId) {
+		List<ResourceMapping> extras = AdminEClassBuilder.extraResources(mapping.getAdmin());
+		if (extras.isEmpty()) {
+			return false;
+		}
+		if (extras.stream().allMatch(extra -> carriesExtraAdminResource(providerId, extra.getMid()))) {
+			return false;
+		}
+		if (!(provider instanceof SensinactEMFProvider emfProvider)) {
+			logger.warning(String.format("Mapping '%s': the admin resources %s need the EMF twin, which this "
+					+ "runtime does not provide - skipped", mapping.getMid(), midsOf(extras)));
+			return false;
+		}
+		Provider stored = emfProvider.getEMFProvider();
+		Admin admin = stored.getAdmin();
+		if (admin != null && admin.eClass() != ProviderPackage.Literals.ADMIN) {
+			// The gateway retypes an admin upward only, so a provider whose admin is already a
+			// subclass cannot take a different one. This is the edited-mapping case.
+			logger.warning(String.format("Mapping '%s': provider '%s' already has a %s admin, so the admin "
+					+ "resources %s cannot be added to it - delete the provider to pick up the new admin",
+					mapping.getMid(), providerId, admin.eClass().getName(), midsOf(extras)));
+			return false;
+		}
+		EClass adminEClass = AdminEClassBuilder.adminEClass(mapping.getMid(), extras);
+		Admin extended = (Admin) EcoreUtil.create(adminEClass);
+		if (admin != null) {
+			// Every value the current admin holds, metadata included: the update merges the
+			// instance it is given, so an unset friendlyName would read as a change to null.
+			admin.eClass().getEAllStructuralFeatures().forEach(feature -> extended.eSet(feature, admin.eGet(feature)));
+		}
+		stored.setAdmin(extended);
+		// Not waited on: this runs on the gateway thread, where the update is applied before the
+		// next read. The one failure it can have - an admin that is already a subclass - is
+		// refused above instead.
+		emfProvider.update(stored);
+		logger.fine(String.format("Mapping '%s': provider '%s' admin is now a %s, carrying %s", mapping.getMid(),
+				providerId, adminEClass.getName(), midsOf(extras)));
+		return true;
+	}
+
+	/**
+	 * Whether the stored admin instance carries this resource. The declared {@code Admin} never
+	 * does, so this asks the twin, whose lookup goes through the instance.
+	 */
+	private boolean carriesExtraAdminResource(String providerId, String mid) {
+		return mid != null && twin.getResource(providerId, ADMIN_SERVICE, mid) != null;
+	}
+
+	private static List<String> midsOf(List<ResourceMapping> resources) {
+		return resources.stream().map(ResourceMapping::getMid).toList();
+	}
+
+	/**
 	 * Maps admin service values.
 	 */
 	private void mapAdminService(EObject sourceInstance, AdminMapping adminMapping, 
@@ -972,7 +1090,8 @@ public class ValueMapperImpl implements ValueMapper {
 	private void mapAdminResources(EObject sourceInstance, AdminMapping adminMapping,
 			SensinactService adminService, Instant timestamp, String providerId) throws ValueMappingException {
 		for (ResourceMapping resourceMapping : adminMapping.getResources()) {
-			if (adminService.getResources().get(resourceMapping.getMid()) == null) {
+			if (adminService.getResources().get(resourceMapping.getMid()) == null
+					&& !carriesExtraAdminResource(providerId, resourceMapping.getMid())) {
 				logger.warning(String.format("Mapping '%s': the admin service has no resource '%s' (it has %s) - skipped",
 						mapping.getMid(), resourceMapping.getMid(), adminService.getResources().keySet()));
 				continue;
@@ -1518,7 +1637,7 @@ public class ValueMapperImpl implements ValueMapper {
 			if (!hasPath) {
 				return applyFunction(functionId, source);
 			}
-			Optional<Object> pathValue = followPath(source, featureMapping, featurePath);
+			Optional<Object> pathValue = followPathForFunction(source, featureMapping, featurePath);
 			return pathValue.isEmpty() ? Optional.empty() : applyFunction(functionId, pathValue.get());
 		}
 
@@ -1526,6 +1645,50 @@ public class ValueMapperImpl implements ValueMapper {
 			return Optional.empty();
 		}
 		return followPath(source, featureMapping, featurePath);
+	}
+
+	/**
+	 * The input of a function: what its feature path found, including a collection.
+	 * <p>
+	 * A path that <em>passes</em> a collection has to select one element to carry on from, and
+	 * {@link #followPath} does that - by filter, else by {@code collectionIndex}. A path that
+	 * <em>ends</em> on one is a different question: a function is a producer, and the thing its
+	 * path found is the collection itself. Handing it the first element instead would truncate
+	 * the input silently, which is the one failure a mapping author cannot see in the result.
+	 * <p>
+	 * So the collection is passed whole unless the mapping narrows it, and "narrows" is the
+	 * rule {@code ForEachServiceTest} already pins for a service name: a {@code collectionFilter}
+	 * or a <b>non-zero</b> {@code collectionIndex} selects one element, while an explicit
+	 * {@code collectionIndex="0"} cannot - EMF generates {@code eIsSet} as "differs from the
+	 * default" and the default is 0, so it is indistinguishable from an unset one. Use a filter
+	 * to select the first element beside a function.
+	 * <p>
+	 * An <b>empty</b> collection is passed on as an empty list rather than swallowed. For a
+	 * value that would mean "no value", but for a producer over a collection it is a statement:
+	 * the camera saw nothing in this window, and the function decides whether that is an empty
+	 * FeatureCollection or no value at all.
+	 *
+	 * @return what to apply the function to, or an empty optional where the path found nothing
+	 */
+	private Optional<Object> followPathForFunction(EObject source, FeatureMapping featureMapping,
+			List<EStructuralFeature> featurePath) {
+
+		EStructuralFeature last = featurePath.get(featurePath.size() - 1);
+		if (!last.isMany() || narrowsACollection(featureMapping)) {
+			return followPath(source, featureMapping, featurePath);
+		}
+		Optional<Object> owner = featurePath.size() == 1 ? Optional.of(source)
+				: followPath(source, featureMapping, featurePath.subList(0, featurePath.size() - 1));
+		if (owner.isEmpty() || !(owner.get() instanceof EObject eo)) {
+			return Optional.empty();
+		}
+		return Optional.ofNullable(eo.eGet(last));
+	}
+
+	/** Whether the mapping selects one element of a collection. See {@link #followPathForFunction}. */
+	private static boolean narrowsACollection(FeatureMapping featureMapping) {
+		String filter = featureMapping.getCollectionFilter();
+		return featureMapping.getCollectionIndex() != 0 || (filter != null && !filter.isBlank());
 	}
 
 	/**

@@ -712,6 +712,16 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
+	public EReference getServiceMapping_ServiceEClass() {
+		return (EReference)serviceMappingEClass.getEStructuralFeatures().get(3);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public EClass getResourceMapping() {
 		return resourceMappingEClass;
 	}
@@ -974,6 +984,16 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	@Override
 	public EReference getAdminMapping_ElevationMapping() {
 		return (EReference)adminMappingEClass.getEStructuralFeatures().get(12);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getAdminMapping_ExtendAdmin() {
+		return (EAttribute)adminMappingEClass.getEStructuralFeatures().get(13);
 	}
 
 	/**
@@ -1736,6 +1756,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEReference(serviceMappingEClass, SERVICE_MAPPING__RESOURCES);
 		createEReference(serviceMappingEClass, SERVICE_MAPPING__REFERENCED_RESOURCE);
 		createEReference(serviceMappingEClass, SERVICE_MAPPING__TEMPORARY_RESOURCES);
+		createEReference(serviceMappingEClass, SERVICE_MAPPING__SERVICE_ECLASS);
 
 		resourceMappingEClass = createEClass(RESOURCE_MAPPING);
 		createEAttribute(resourceMappingEClass, RESOURCE_MAPPING__UNIT);
@@ -1765,6 +1786,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEReference(adminMappingEClass, ADMIN_MAPPING__LATITUDE_MAPPING);
 		createEReference(adminMappingEClass, ADMIN_MAPPING__LONGITUDE_MAPPING);
 		createEReference(adminMappingEClass, ADMIN_MAPPING__ELEVATION_MAPPING);
+		createEAttribute(adminMappingEClass, ADMIN_MAPPING__EXTEND_ADMIN);
 
 		metadataMappingEClass = createEClass(METADATA_MAPPING);
 		createEAttribute(metadataMappingEClass, METADATA_MAPPING__KEY);
@@ -1944,6 +1966,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getServiceMapping_Resources(), this.getResourceMapping(), null, "resources", null, 0, -1, ServiceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getServiceMapping_ReferencedResource(), this.getReferenceMapping(), null, "referencedResource", null, 0, 1, ServiceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getServiceMapping_TemporaryResources(), this.getResourceMapping(), null, "temporaryResources", null, 0, -1, ServiceMapping.class, IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getServiceMapping_ServiceEClass(), ecorePackage.getEClass(), null, "serviceEClass", null, 0, 1, ServiceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(resourceMappingEClass, ResourceMapping.class, "ResourceMapping", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 		initEAttribute(getResourceMapping_Unit(), ecorePackage.getEString(), "unit", null, 0, 1, ResourceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
@@ -1976,6 +1999,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getAdminMapping_LatitudeMapping(), this.getFeatureMapping(), null, "latitudeMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getAdminMapping_LongitudeMapping(), this.getFeatureMapping(), null, "longitudeMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getAdminMapping_ElevationMapping(), this.getFeatureMapping(), null, "elevationMapping", null, 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getAdminMapping_ExtendAdmin(), ecorePackage.getEBoolean(), "extendAdmin", "false", 0, 1, AdminMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(metadataMappingEClass, MetadataMapping.class, "MetadataMapping", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 		initEAttribute(getMetadataMapping_Key(), ecorePackage.getEString(), "key", null, 1, 1, MetadataMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);

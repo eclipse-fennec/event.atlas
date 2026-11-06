@@ -51,6 +51,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ValueMapping;
 import org.eclipse.sensinact.core.emf.model.EMFModel;
 import org.eclipse.sensinact.core.emf.model.SensinactEMFModelManager;
+import org.eclipse.sensinact.model.core.provider.ProviderPackage;
 import org.eclipse.sensinact.core.emf.twin.SensinactEMFDigitalTwin;
 import org.eclipse.sensinact.core.model.Model;
 import org.eclipse.sensinact.core.model.Resource;
@@ -125,6 +126,7 @@ public class ProviderModelSensinactMapper {
 		// registered against an existing provider used to end up with no generated resources
 		// at all, and pushes through it mapped nothing for those services.
 		generateReferencedResources(providerMapping);
+		dropGeneratedResourcesATypedServiceCannotHold(providerMapping);
 
 		// Validate against profile if one is referenced
 		if (nonNull(providerMapping.getProfile()) && nonNull(profileRegistry)) {
@@ -247,6 +249,7 @@ public class ProviderModelSensinactMapper {
 			if (isNull(model)) {
 				model = modelManager.createModel(actualProviderId).build();
 			}
+			makeDynamicIfTyped(providerMapping, model);
 //			mapService(model, adminMapping);
 //			mapAdminService(model, adminMapping);
 
@@ -315,11 +318,97 @@ public class ProviderModelSensinactMapper {
 	}
 
 	/**
+	 * Keeps a typed service to the resources its EClass declares.
+	 * <p>
+	 * A {@code referencedResource} is two things at once: the path that selects the service's
+	 * source element, which a typed service needs as much as any other, and a generator for
+	 * resources. Only the second one conflicts with a named EClass, and only when it actually
+	 * generates something - a selector ({@code exclude="false"} with no filter) generates
+	 * nothing. What it does generate comes from the referenced payload type, which has no
+	 * reason to match the service type, so anything the EClass does not declare is dropped here
+	 * rather than failing a payload with "Resource not found".
+	 */
+	private void dropGeneratedResourcesATypedServiceCannotHold(ProviderMapping providerMapping) {
+		for (ServiceMapping serviceMapping : providerMapping.getServices()) {
+			EClass serviceEClass = serviceMapping.getServiceEClass();
+			if (serviceEClass == null || serviceMapping.getTemporaryResources().isEmpty()) {
+				continue;
+			}
+			List<String> dropped = new ArrayList<>();
+			serviceMapping.getTemporaryResources().removeIf(resource -> {
+				boolean unknown = resource.getMid() == null
+						|| serviceEClass.getEStructuralFeature(resource.getMid()) == null;
+				if (unknown) {
+					dropped.add(resource.getMid());
+				}
+				return unknown;
+			});
+			if (!dropped.isEmpty()) {
+				logger.warning(String.format("Mapping '%s': service '%s' is typed %s, which does not declare the"
+						+ " generated resource(s) %s - they are dropped", providerMapping.getMid(),
+						serviceMapping.getMid(), serviceEClass.getName(), dropped));
+			}
+		}
+	}
+
+	/**
+	 * Makes the model's EClass a {@code DynamicProvider} when any of its services names an
+	 * EClass, because only such a provider can carry a service the model does not declare.
+	 * <p>
+	 * {@code ModelNexus.createServiceInstance} puts a typed service into the provider's
+	 * services map, and that map is what {@code DynamicProvider} adds; for a plain
+	 * {@code Provider} it refuses with "No Service with name … exists". The model manager
+	 * builds every model on {@code Provider}, so the supertype is exchanged here - while the
+	 * EClass is still dynamic and before the first provider is instantiated from it.
+	 *
+	 * @param providerMapping the mapping being registered
+	 * @param model the model just created or found for it
+	 */
+	private void makeDynamicIfTyped(ProviderMapping providerMapping, EMFModel model) {
+		boolean typed = providerMapping.getServices().stream()
+				.anyMatch(service -> service.getServiceEClass() != null);
+		if (!typed) {
+			return;
+		}
+		EClass modelEClass = model.getModelEClass();
+		if (ProviderPackage.Literals.DYNAMIC_PROVIDER.isSuperTypeOf(modelEClass)) {
+			return;
+		}
+		modelEClass.getESuperTypes().remove(ProviderPackage.Literals.PROVIDER);
+		modelEClass.getESuperTypes().add(ProviderPackage.Literals.DYNAMIC_PROVIDER);
+		logger.fine(String.format("Model '%s' carries a typed service, so it is a DynamicProvider",
+				modelEClass.getName()));
+	}
+
+	/**
 	 * Maps into a sensinact {@link Service}
 	 * @param model the {@link Model}
 	 * @param serviceMapping the {@link ServiceMapping}
 	 */
 	private Service mapService(Model model, ServiceMapping serviceMapping) {
+		if (serviceMapping.getServiceEClass() != null) {
+			// A service whose EClass the mapping names is not built from resource mappings and
+			// does not belong to the model: it is put on each provider with
+			// getOrCreateService(name, EClass), which the push path does. Adding it here would
+			// create a second, untyped service of the same name - and a frozen model would
+			// refuse it anyway.
+			logger.fine(String.format("Service '%s' carries the EClass %s, so it is created on the provider",
+					serviceMapping.getMid(), serviceMapping.getServiceEClass().getName()));
+			// name, unit and extraMetadata are written into the model resource at registration,
+			// and a typed service has no model resource: its metadata is what the EClass's own
+			// Metadata annotations carry. Said once, because a silent loss is worse than a line.
+			List<String> withModelMetadata = serviceMapping.getResources().stream()
+					.filter(resource -> !resource.getExtraMetadata().isEmpty() || resource.getUnit() != null
+							|| resource.getName() != null)
+					.map(ResourceMapping::getMid).toList();
+			if (!withModelMetadata.isEmpty()) {
+				logger.warning(String.format("Service '%s' is typed %s, so the name, unit and extraMetadata of"
+						+ " resource(s) %s are not written - a typed service takes them from the Metadata"
+						+ " annotations of its EClass", serviceMapping.getMid(),
+						serviceMapping.getServiceEClass().getName(), withModelMetadata));
+			}
+			return null;
+		}
 		return createServiceOn(model, serviceMapping, serviceMapping.getMid());
 	}
 

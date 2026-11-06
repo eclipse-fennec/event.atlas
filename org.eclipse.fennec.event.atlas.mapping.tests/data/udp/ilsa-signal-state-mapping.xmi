@@ -3,11 +3,14 @@
   ILSA - a signal state update (topic 5g/ilsa/<intersection>/.../<signal>).
   Replaces: IlsaListener.updateSignal + TrafficLightDto.
 
-  STATUS 2026-11-04
-    DONE  the service is named by the payload, and created on the model when the first
-          state for that signal arrives                                      (#91 item 5)
+  STATUS 2026-11-06
+    DONE  the service is named by the payload, and typed Signal - the same EClass the
+          configuration mapping names, which is what keeps the two flows on one service
+                                                               (#91 items 5 and 8)
     DONE  the '/' -> '_' rewrite the adapter does in Java, as OCL replaceAll (#91 item 2)
-    DONE  the color value, the payload timestamp, the unit metadata
+    DONE  one provider for both ILSA flows, through ilsa-profile.xmi (UNIFIED)
+    DONE  the color value and the payload timestamp. The unit metadata now comes from
+          Signal.color's own annotation, not from this mapping                (#91 item 8)
     OPEN  the provider id. The intersection is in the MQTT topic, not in the payload.
           Not an event.atlas change: it needs a transient `intersectionId` on
           TLSignalState, added LAST in the EClass. The mapping below assumes it.
@@ -30,27 +33,39 @@
         href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/intersectionId"/>
   </name>
 
+  <!-- Both ILSA mappings name this profile, whose providerStrategy is UNIFIED, so both
+       build the same model and their payloads reach ONE provider. The fragment is the
+       profileId, not "/": that is what ProviderMappingRegistryImpl looks up in the profile
+       registry when the document itself is not reachable - which is the normal case for a
+       mapping delivered from a Model Atlas. -->
+  <profile href="ilsa-profile.xmi#ilsa"/>
+
   <providerClasses href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState"/>
 
   <!-- The payload decides the service: signalState.id with '/' replaced, exactly as
        IlsaListener.updateSignal does it in Java. A producer on the name is what makes the
-       engine read it, and the service is created on the model the first time it appears. -->
+       engine read it, and the service is created on the provider the first time it appears.
+
+       serviceEClass names the same Signal EClass the configuration mapping uses. Both flows
+       then write the same service of the same type, which is what the adapter does - and the
+       two must still share one provider, through the UNIFIED profile that is still to write. -->
   <services mid="signal">
     <name expression="self.id.replaceAll('/', '_')"/>
+    <serviceEClass href="https://model.data.jena.de/sensinact/ilsa/1.0#//Signal"/>
 
     <timestamp>
       <featurePath xsi:type="ecore:EAttribute"
           href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/timestamp"/>
     </timestamp>
 
-    <resources name="color" mid="color">
-      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <!-- The Ilsa package carries the type and the `sensorthings.unit.name` annotation on
+         Signal.color, and a typed service takes both from there - so this block only says
+         where the value comes from. -->
+    <resources mid="color">
       <valueMapping>
         <featurePath xsi:type="ecore:EAttribute"
             href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/state"/>
       </valueMapping>
-      <!-- The Ilsa package carries this as a model annotation; a mapping states it. -->
-      <extraMetadata key="sensorthings.unit.name" value="Farbe"/>
     </resources>
   </services>
 

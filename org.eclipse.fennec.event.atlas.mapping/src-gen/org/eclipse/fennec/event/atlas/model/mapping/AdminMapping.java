@@ -42,6 +42,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLatitudeMapping <em>Latitude Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getLongitudeMapping <em>Longitude Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#getElevationMapping <em>Elevation Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#isExtendAdmin <em>Extend Admin</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping()
@@ -319,5 +320,31 @@ public interface AdminMapping extends ServiceMapping {
 	 * @generated
 	 */
 	void setElevationMapping(FeatureMapping value);
+
+	/**
+	 * Returns the value of the '<em><b>Extend Admin</b></em>' attribute.
+	 * The default value is <code>"false"</code>.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * Allows resource mappings whose mid is no resource of the admin service. The engine then builds an    Admin subclass carrying them and retypes the provider's admin once. Such a value is readable as a resource and travels on the event bus,    but it is invisible to the snapshot consumers - SensorThings, the provider description and filters. Off by default, so a wrong mid stays a    warning instead of becoming a new admin resource.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Extend Admin</em>' attribute.
+	 * @see #setExtendAdmin(boolean)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getAdminMapping_ExtendAdmin()
+	 * @model default="false"
+	 * @generated
+	 */
+	boolean isExtendAdmin();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#isExtendAdmin <em>Extend Admin</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Extend Admin</em>' attribute.
+	 * @see #isExtendAdmin()
+	 * @generated
+	 */
+	void setExtendAdmin(boolean value);
 
 } // AdminMapping

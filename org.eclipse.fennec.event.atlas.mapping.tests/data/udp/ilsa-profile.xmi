@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The ILSA profile. Its one job is to put both ILSA mappings on ONE provider.
+
+  The adapter pushes the intersection configuration and every signal state into one `Ilsa`
+  provider named after the intersection. A mapping's model comes from its own fqMid, so
+  ilsa-configuration and ilsa-signal-state would build two models for that one provider name.
+  providerStrategy="UNIFIED" makes the model name this profile's providerId, which both
+  mappings then share; the provider id stays what each mapping's <name> produces.
+
+  WHAT IT CAN AND CANNOT REQUIRE. The profile is validated against EACH mapping on its own, and
+  a failed requirement throws at registration. The configuration mapping carries the admin and
+  describes the signals; a signal-state payload carries one colour and nothing else. So the
+  friendly name and the location cannot be required here, although the configuration provides
+  both - the state mapping would be refused.
+
+  Both mappings DO carry a service block called `signal`, and both type it `Signal`. That is
+  the one thing this profile can hold the pair to, and it is the one that matters: the two
+  flows must write the same service.
+-->
+<sensinactMapping:MappingProfile
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    profileId="ilsa"
+    name="ILSA intersection"
+    description="One intersection, two flows: its configuration and the state of its signals. The profile unifies their provider model."
+    version="1.0"
+    providerStrategy="UNIFIED">
+
+  <!-- The model name both mappings use. The provider is still named after the intersection. -->
+  <provider providerId="ilsa">
+
+    <admin serviceId="admin" serviceName="Admin" required="true"
+           requiresFriendlyName="false" requiresLocation="false"/>
+
+    <!--
+      The signal block both mappings carry. The services themselves are named by the payload -
+      one per TLSignal - which a profile cannot express: conformance is matched against the
+      mapping's own service mid, and cardinality is not part of it.
+
+      `color` is required: the configuration declares it to carry the type and signalGroup
+      metadata, the state mapping fills it, and a mapping of this pair without it would be
+      writing to a service the other half does not recognise. `observedArea` belongs to the
+      configuration alone.
+    -->
+    <services serviceId="signal" serviceName="Signal" required="true">
+      <resources resourceId="color" resourceName="Colour" required="true"/>
+      <resources resourceId="observedArea" resourceName="Observed area" required="false"/>
+    </services>
+  </provider>
+</sensinactMapping:MappingProfile>

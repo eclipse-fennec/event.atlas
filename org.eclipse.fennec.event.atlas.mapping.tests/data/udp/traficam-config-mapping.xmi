@@ -3,17 +3,22 @@
   TrafiCam - the camera configuration (5g/config/traficam/<cam>, and the retained copy).
   Replaces: TrafiCamListener.updateConfig.
 
-  STATUS 2026-11-04
-    DONE  the observedArea service: the four scene corners as a GeometryCollection, through
-          a ValueFunction - a computation over a whole EObject               (#91 item 3)
+  STATUS 2026-11-06
+    DONE  the observedArea service, typed ObservedObjects - the service the adapter builds,
+          with the resources that EClass declares                            (#91 item 8)
+    DONE  its `objects` value: the four scene corners as a GeometryCollection, through a
+          ValueFunction - a computation over a whole EObject                 (#91 item 3)
     DONE  the admin location. Two plain attributes (location -> latitude/longitude), which
           the bare *Ref paths already read - TrafiCam needs no item 7 for this, unlike ILSA
     DONE  the admin friendly name, 'Camera ' + camId                         (#91 item 7)
-    OPEN  the provider id. The camera is in the MQTT topic. Needs a transient `camId` on
-          CamConfig, added LAST in the EClass - TrafiCam uses binary EMF, and
-          BinaryResourceImpl identifies a feature by its position
-    OPEN  the admin viewport. It belongs to TraficamAdmin, which extends Admin, and a
-          mapping cannot add a resource to the admin service                 (#91 item 8)
+    DONE  the admin viewport, through extendAdmin                            (#91 item 8)
+    DONE  the provider id. `CamConfig.camId` exists now - transient, and LAST in the
+          EClass, because TrafiCam uses binary EMF and BinaryResourceImpl identifies a
+          feature by its position. The adapter copies it out of the topic
+
+    DONE  one provider for both TrafiCam flows, through traficam-profile.xmi (UNIFIED)
+
+  This mapping is complete. See traficam-detections-mapping.xmi for the other flow.
 
   NOT A MAPPING, and not planned to be:
     - the detections. TrafiCamListener windows them for 2 seconds and reduces them per
@@ -32,36 +37,60 @@
     mid="traficam-config"
     providerTimestamp="true">
 
-  <!-- The camera, which the adapter copies from the topic into the payload.
-       TODO(gap 1): needs CamConfig.camId, transient, added LAST in the EClass - TrafiCam uses
-       binary EMF, and BinaryResourceImpl identifies a feature by its position. -->
+  <!-- The camera, which the adapter copies from the topic into the payload. The same value
+       TrafiCamDetections.camId carries, so both flows name one provider. -->
   <name>
     <featurePath xsi:type="ecore:EAttribute"
         href="https://jena.de/models/traficam/1.0#//CamConfig/camId"/>
   </name>
 
+  <!-- Both TrafiCam mappings name this profile, whose providerStrategy is UNIFIED, so both
+       build the same model and their payloads reach ONE provider. The fragment is the
+       profileId, not "/": that is what ProviderMappingRegistryImpl looks up in the profile
+       registry when the document itself is not reachable - which is the normal case for a
+       mapping delivered from a Model Atlas. -->
+  <profile href="traficam-profile.xmi#traficam"/>
+
   <providerClasses href="https://jena.de/models/traficam/1.0#//CamConfig"/>
 
   <!--
     provider.getServices().put("observedArea", observedArea) with objects := viewport(scene).
-    The four corner points become a GeometryCollection, which is a computation over the whole
-    Scene - so a ValueFunction, the producer form. The function whiteboard is in place; the
-    UDP side publishes `udp.traficam.viewport` and the mapping names it.
+
+    serviceEClass names the very EClass the adapter instantiates, so the twin builds the
+    service from it: `objects` and `classificationName` with the types de.jena.traficam
+    declares, and no eType in the mapping. The block below only says where the value comes
+    from. The four corner points become a GeometryCollection, which is a computation over the
+    whole Scene - so a ValueFunction, the producer form; the UDP side publishes
+    `udp.traficam.viewport` and the mapping names it.
+
+    NOTE. A typed service takes its metadata from the Metadata annotations of its EClass, so
+    `sensorthings.observedArea` is no longer written by this mapping - and ObservedObjects
+    carries no such annotation, while TraficamAdmin.viewport does. One line in traficam.ecore
+    fixes that for the adapter and for this mapping at the same time:
+
+      <eStructuralFeatures xsi:type="ecore:EAttribute" name="objects" eType="...EGeoJsonObject">
+        <eAnnotations source="Metadata">
+          <details key="sensorthings.observedArea" value="true"/>
+        </eAnnotations>
+      </eStructuralFeatures>
+
+    Until then drop the serviceEClass line and restate eType plus extraMetadata here, which is
+    what this mapping did before 2026-11-06.
   -->
   <services mid="observedArea">
     <name name="Observed area"/>
+    <serviceEClass href="https://model.data.jena.de/sensinact/traficam/1.0#//ObservedObjects"/>
     <resources name="objects" mid="objects">
-      <eType xsi:type="ecore:EDataType"
-          href="https://eclipse.org/sensinact/core/provider/1.0#//EGeoJsonObject"/>
       <valueMapping functionId="udp.traficam.viewport">
         <featurePath xsi:type="ecore:EReference"
             href="https://jena.de/models/traficam/1.0#//CamConfig/scene"/>
       </valueMapping>
-      <extraMetadata key="sensorthings.observedArea" value="true"/>
     </resources>
   </services>
 
-  <admin mid="admin">
+  <!-- extendAdmin: the viewport below is no resource of sensiNact's Admin, so the engine
+       builds an Admin subclass carrying it and retypes this provider's admin once. -->
+  <admin mid="admin" extendAdmin="true">
     <name name="Admin"/>
 
     <!--
@@ -85,13 +114,27 @@
     <friendlyNameMapping expression="'Camera ' + self.camId"/>
 
     <!--
-      TODO(gap 5, issue #91 item 8): admin.setViewport(viewport).
-      `viewport` is an attribute of TraficamAdmin, which EXTENDS Admin. A mapping cannot add a
-      resource to the admin service - ProviderMappingRegistryImpl refuses an admin mid that is
-      no attribute of sensiNact's Admin, and createResource on a live admin service throws a
-      StackOverflowError on the gateway thread. The subclass route is what TrafiCam already
-      uses, and AdminMapping.providerPackage is the dead slot for naming it.
-      The value itself is no gap: the same `udp.traficam.viewport` function as above.
+      admin.setViewport(viewport(scene)) - the same function as the observedArea service.
+
+      `viewport` is an attribute of TraficamAdmin, which EXTENDS Admin. The mapping does not
+      name that EClass: with extendAdmin the engine builds its own Admin subclass from these
+      resource mappings, one EAttribute per mid, typed by the eType below.
+
+      KNOW THE LIMIT. sensiNact's `admin` reference is declared by Provider and typed Admin,
+      so this value lives on the instance, not in the model. A direct resource read answers
+      and the history provider sees it; the provider description, filters and SensorThings do
+      not, because they build from snapshots. The TraficamAdmin.viewport annotation
+      `sensorthings.observedArea` therefore cannot have an effect either. The observedArea
+      service above publishes the same geometry and is visible everywhere, which is why it is
+      the one to read northbound.
     -->
+    <resources name="viewport" mid="viewport">
+      <eType xsi:type="ecore:EDataType"
+          href="https://eclipse.org/sensinact/core/provider/1.0#//EGeoJsonObject"/>
+      <valueMapping functionId="udp.traficam.viewport">
+        <featurePath xsi:type="ecore:EReference"
+            href="https://jena.de/models/traficam/1.0#//CamConfig/scene"/>
+      </valueMapping>
+    </resources>
   </admin>
 </sensinactMapping:ProviderMapping>

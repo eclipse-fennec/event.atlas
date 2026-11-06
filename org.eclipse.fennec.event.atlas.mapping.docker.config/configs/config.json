@@ -58,9 +58,14 @@
     "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000;type=Long]"
   },
 
+  /* The directory is a placeholder so a workspace launch can point it at a seed folder in the
+   * source tree instead of the container mount - env first, then a -D system property, then the
+   * mount, which is what the image uses. Point it at the directory that holds the MAPPINGS, not
+   * at its parent: a location is walked RECURSIVELY, so a parent would also sweep up the
+   * profiles beside them, and a MappingProfile has no `mid` for this provider to key on. */
   "FileEObjectProvider~mappings": {
     "emf.eobject.provider.name": "mapping-files",
-    "locations": ["/opt/eventatlas/runtime/mappings"],
+    "locations": ["$[env:EVENTATLAS_MAPPING_DIR;default=$[prop:EVENTATLAS_MAPPING_DIR;default=/opt/eventatlas/runtime/mappings]]"],
     "key.feature": "mid"
   },
 
@@ -144,9 +149,13 @@
     "refresh.interval.ms": "$[env:EVENTATLAS_DEPLOYMENT_REFRESH_INTERVAL_MS;default=60000;type=Long]"
   },
 
+  /* Profiles, same placeholder treatment as the mappings above. A profile cannot live in the
+   * mappings registry - `sensinactmapping` pins root.eclass.uri to ProviderMapping - and a
+   * mapping whose profile resolves to nothing is skipped at registration, so a runtime that
+   * deploys a UNIFIED profile has to set this one too. */
   "FileEObjectProvider~profiles": {
     "emf.eobject.provider.name": "profile-files",
-    "locations": ["/opt/eventatlas/runtime/profiles"],
+    "locations": ["$[env:EVENTATLAS_PROFILE_DIR;default=$[prop:EVENTATLAS_PROFILE_DIR;default=/opt/eventatlas/runtime/profiles]]"],
     "key.feature": "profileId"
   },
 

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The TrafiCam profile. Its one job is to put both TrafiCam mappings on ONE provider.
+
+  A mapping's model comes from its own fqMid, so traficam-config and traficam-detections would
+  build two models for the one provider name the camera gives them. With
+  providerStrategy="UNIFIED" the model name comes from this profile's providerId instead, and
+  both mappings answer the same model. The provider id itself is unaffected: it is still what
+  each mapping's <name> produces, i.e. the camera.
+
+  WHAT IT CAN AND CANNOT REQUIRE. The profile is validated against EACH mapping on its own, and
+  a failed requirement throws at registration. The two mappings deliberately split the provider
+  between them - the configuration carries the admin and the observed area, a detection window
+  carries the object classes - so anything only one of them has must be optional here. What is
+  left to require is what both carry: an admin service.
+
+  That is the limit of a profile as a contract for a split provider, and it is worth knowing
+  before adding `required="true"` anywhere below: it would refuse the other half of the pair.
+-->
+<sensinactMapping:MappingProfile
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    profileId="traficam"
+    name="TrafiCam"
+    description="One camera, two flows: its configuration and its detection windows. The profile unifies their provider model."
+    version="1.0"
+    providerStrategy="UNIFIED">
+
+  <!-- The model name both mappings use. The provider is still named after the camera. -->
+  <provider providerId="traficam">
+
+    <!-- Both mappings carry an <admin>; only the configuration fills it, so neither the
+         friendly name nor the location may be required here. -->
+    <admin serviceId="admin" serviceName="Admin" required="true"
+           requiresFriendlyName="false" requiresLocation="false"/>
+
+    <!-- The configuration's service: the camera's field of view. -->
+    <services serviceId="observedArea" serviceName="Observed area" required="false">
+      <resources resourceId="objects" resourceName="Viewport" required="false"/>
+    </services>
+
+    <!--
+      The detections' service block. One block, one service per object class, so the serviceId
+      here is the block's mid - what a profile can name. The services the payload names are
+      beyond it: conformance is matched against the mapping, and the mapping has one block.
+    -->
+    <services serviceId="class" serviceName="Observed objects" required="false">
+      <resources resourceId="objects" resourceName="Detected objects" required="false"/>
+      <resources resourceId="classificationName" resourceName="Class name" required="false"/>
+    </services>
+  </provider>
+</sensinactMapping:MappingProfile>

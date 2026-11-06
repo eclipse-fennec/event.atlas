@@ -34,6 +34,9 @@ import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 import org.junit.jupiter.api.DisplayName;
+import java.util.List;
+import org.eclipse.emf.ecore.EcorePackage;
+import org.eclipse.fennec.event.atlas.model.mapping.FeatureMapping;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -198,6 +201,79 @@ public class MappingProfileValidationTest {
 
 		admin.setLongitude(8.53);
 		assertTrue(new MappingProfileRegistryImpl().validateMapping(mapping).isValid());
+	}
+
+	@Test
+	@DisplayName("A computed admin value satisfies the profile, as a path or a constant does")
+	void adminFeatureMappings_satisfyTheRequirements() {
+		MappingFactory f = MappingFactory.eINSTANCE;
+		ProfileAdmin profileAdmin = f.createProfileAdmin();
+		profileAdmin.setServiceId("admin");
+		profileAdmin.setRequiresFriendlyName(true);
+		profileAdmin.setRequiresLocation(true);
+		ProfileProvider provider = f.createProfileProvider();
+		provider.setProviderId("p");
+		provider.setAdmin(profileAdmin);
+		MappingProfile profile = f.createMappingProfile();
+		profile.setProfileId("computed-admin");
+		profile.setProvider(provider);
+
+		AdminMapping admin = f.createAdminMapping();
+		admin.setMid("admin");
+		ProviderMapping mapping = mapping();
+		mapping.setAdmin(admin);
+		mapping.setProfile(profile);
+
+		ValidationResult nothing = new MappingProfileRegistryImpl().validateMapping(mapping);
+		assertEquals(3, nothing.getErrors().size(),
+				() -> "friendly name and both coordinates are missing: " + nothing.getErrors());
+
+		// What both UDP mappings do: the value is computed, not pointed at.
+		admin.setFriendlyNameMapping(expression("'Camera ' + self.camId"));
+		admin.setLatitudeMapping(expression("self.geoJson.bbox.at(2)"));
+		admin.setLongitudeMapping(expression("self.geoJson.bbox.at(1)"));
+
+		ValidationResult computed = new MappingProfileRegistryImpl().validateMapping(mapping);
+		assertTrue(computed.isValid(), () -> "a computed admin value is a value: " + computed.getErrors());
+	}
+
+	@Test
+	@DisplayName("A resource of a typed service states no type, so there is nothing to compare")
+	void resourceWithoutAType_isNoTypeMismatch() {
+		MappingFactory f = MappingFactory.eINSTANCE;
+		ProfileResource expected = f.createProfileResource();
+		expected.setResourceId("objects");
+		expected.setExpectedType(EcorePackage.Literals.ESTRING);
+		ProfileService service = f.createProfileService();
+		service.setServiceId("class");
+		service.getResources().add(expected);
+		ProfileProvider provider = f.createProfileProvider();
+		provider.setProviderId("p");
+		provider.getServices().add(service);
+		MappingProfile profile = f.createMappingProfile();
+		profile.setProfileId("typed-service");
+		profile.setProvider(provider);
+
+		ResourceMapping objects = f.createResourceMapping();
+		objects.setMid("objects");
+		ServiceMapping serviceMapping = f.createServiceMapping();
+		serviceMapping.setMid("class");
+		serviceMapping.getResources().add(objects);
+		ProviderMapping mapping = mapping();
+		mapping.getServices().add(serviceMapping);
+		mapping.setProfile(profile);
+
+		ValidationResult result = new MappingProfileRegistryImpl().validateMapping(mapping);
+		assertTrue(result.isValid(), () -> result.getErrors().toString());
+		assertEquals(List.of(), result.getWarnings(),
+				() -> "the EClass carries the type, so the profile has nothing to object to: "
+						+ result.getWarnings());
+	}
+
+	private static FeatureMapping expression(String expression) {
+		FeatureMapping featureMapping = MappingFactory.eINSTANCE.createFeatureMapping();
+		featureMapping.setExpression(expression);
+		return featureMapping;
 	}
 
 	private static ValidationResult validateAgainstProfileExpecting(String expectedUnit, ResourceMapping resource) {

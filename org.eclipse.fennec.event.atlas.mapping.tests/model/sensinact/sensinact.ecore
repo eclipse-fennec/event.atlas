@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ecore:EPackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore" name="provider" nsURI="https://eclipse.org/sensinact/core/provider/1.0"
+    nsPrefix="sensinactProvider">
+  <eAnnotations source="http://www.eclipse.org/OCL/Import">
+    <details key="ecore" value="http://www.eclipse.org/emf/2002/Ecore"/>
+  </eAnnotations>
+  <eClassifiers xsi:type="ecore:EClass" name="Provider">
+    <eOperations name="getService" eType="#//Service">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="body" value="EStructuralFeature serviceFeature = eClass().getEStructuralFeature(serviceName);&#xA;if (serviceFeature instanceof &lt;%org.eclipse.emf.ecore.EReference%>) {&#xA;&#x9;EClass refEClass = ((EReference) serviceFeature).getEReferenceType();&#xA;&#x9;return ProviderPackage.Literals.SERVICE.isSuperTypeOf(refEClass) ? (Service) eGet(serviceFeature) : null;&#xA;}&#xA;return null;"/>
+      </eAnnotations>
+      <eParameters name="serviceName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    </eOperations>
+    <eOperations name="getServiceEClass" eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EClass">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="body" value="&lt;%org.eclipse.emf.ecore.EStructuralFeature%>  serviceFeature = eClass().getEStructuralFeature(serviceName);&#xA;if (serviceFeature instanceof &lt;%org.eclipse.emf.ecore.EReference%>) {&#xA;    Object service = eGet(serviceFeature);&#xA;    &lt;%org.eclipse.emf.ecore.EClass%> refEClass;&#xA;    if (service instanceof &lt;%org.eclipse.emf.ecore.EObject%>) {&#xA;        refEClass = ((EObject) service).eClass();&#xA;    } else {&#xA;        refEClass = ((EReference) serviceFeature).getEReferenceType();&#xA;    }&#xA;    return ProviderPackage.Literals.SERVICE.isSuperTypeOf(refEClass) ? refEClass : null;&#xA;}&#xA;return null;&#xA;"/>
+      </eAnnotations>
+      <eParameters name="serviceName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    </eOperations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="id" lowerBound="1" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
+        unsettable="true" iD="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="admin" eType="#//Admin"
+        unsettable="true" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="linkedProviders" upperBound="-1"
+        eType="#//Provider" unsettable="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EDataType" name="EGeoJsonObject" instanceClassName="org.eclipse.sensinact.gateway.geojson.GeoJsonObject"/>
+  <eClassifiers xsi:type="ecore:EClass" name="Admin" eSuperTypes="#//Service">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="friendlyName" lowerBound="1"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" unsettable="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="description" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="location" eType="#//EGeoJsonObject"
+        unsettable="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="modelPackageUri" lowerBound="1"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" unsettable="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="model" lowerBound="1" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
+        unsettable="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Service">
+    <eOperations name="eIsSet" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean">
+      <eParameters name="feature" eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EStructuralFeature"/>
+    </eOperations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="metadata" upperBound="-1"
+        eType="#//FeatureMetadata" containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="Metadata" abstract="true">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="extra" upperBound="-1"
+        eType="#//MetadataValueMap" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="timestamp" eType="#//EInstant"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="FeatureMetadata" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="key" eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//ETypedElement"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//ResourceValueMetadata"
+        containment="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EDataType" name="EInstant" instanceClassName="java.time.Instant"/>
+  <eClassifiers xsi:type="ecore:EClass" name="MetadataValue">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="timestamp" eType="#//EInstant"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EJavaObject"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="ResourceType">
+    <eLiterals name="ACTION"/>
+    <eLiterals name="PROPERTY" value="1"/>
+    <eLiterals name="SENSOR" value="2"/>
+    <eLiterals name="STATE_VARIABLE" value="3"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EEnum" name="ValueType">
+    <eLiterals name="FIXED"/>
+    <eLiterals name="OBSERVABLE" value="1"/>
+    <eLiterals name="MODIFIABLE" value="2"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ServiceMap" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//Service"
+        containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="key" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="DynamicProvider" eSuperTypes="#//Provider">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="To achieve a good Model, concrete EClasses that inherit from Provider should &#xA;use References for predefined Services.&#xA;Sometimes however you can't know how many Services a Provider can have. &#xA;In such a case, this Map can be used in addtion to directly Referenced Services.&#xA;&#xA;As an example: Such a Provider can be a Camera that can detect Objects like cars, &#xA;bikes or pedestriance in configureable zones. Each zone can in this case be a &#xA;Service with defined Resources. How may zones exist however, depdends on the &#xA;configuration. Thus our camera model can benefit from service map in addition&#xA;some predefined fix services it might have.&#xA;&#xA;Service names must still be unique and must not collide with existing References.&#xA;"/>
+    </eAnnotations>
+    <eOperations name="getService" eType="#//Service">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="body" value="Service service = super.getService(serviceName);&#xA;return service != null ? service : getServices().get(serviceName);"/>
+      </eAnnotations>
+      <eParameters name="serviceName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    </eOperations>
+    <eOperations name="getServiceEClass" eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EClass">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="body" value="EClass serviceType = super.getServiceEClass(serviceName);&#xA;if (serviceType != null) {&#xA;    return serviceType;&#xA;} else {&#xA;    Service service = getServices().get(serviceName);&#xA;    return service != null ? service.eClass() : null;&#xA;}"/>
+      </eAnnotations>
+      <eParameters name="serviceName" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    </eOperations>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="services" upperBound="-1"
+        eType="#//ServiceMap" containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="To achieve a good Model, concrete EClasses that inherit from Provider should &#xA;use References for predefined Services.&#xA;Sometimes however you can't know how many Services a Provider can have. &#xA;In such a case, this Map can be used in addtion to directly Referenced Services.&#xA;&#xA;As an example: Such a Provider can be a Camera that can detect Objects like cars, &#xA;bikes or pedestriance in configureable zones. Each zone can in this case be a &#xA;Service with defined Resources. How may zones exist however, depdends on the &#xA;configuration. Thus our camera model can benefit from service map in addition&#xA;some predefined fix services it might have.&#xA;&#xA;Service names must still be unique and must not collide with existing References.&#xA;"/>
+      </eAnnotations>
+    </eStructuralFeatures>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="NexusMetadata" abstract="true" eSuperTypes="#//Metadata">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="locked" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
+        defaultValueLiteral="false" unsettable="true"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="originalName" lowerBound="1"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" unsettable="true"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ModelMetadata" eSuperTypes="#//NexusMetadata"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ResourceMetadata" eSuperTypes="#//NexusMetadata">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="resourceType" eType="#//ResourceType"
+        defaultValueLiteral="SENSOR"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="valueType" eType="#//ValueType"
+        defaultValueLiteral="MODIFIABLE"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="externalGet" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="externalGetCacheMs" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//ELong"
+        defaultValueLiteral="0"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="externalSet" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="stale" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Indicator when an external get needs to be triggered and the internal data chache becomes stale. Negative values are never stale, 0 is always stale and postive values indicate the number milliseconds till the last get."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="type" eType="#//ResourceType"/>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="ServiceReferenceMetadata" eSuperTypes="#//NexusMetadata"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionParameterMetadata" eSuperTypes="#//NexusMetadata"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ActionMetadata" eSuperTypes="#//NexusMetadata"/>
+  <eClassifiers xsi:type="ecore:EClass" name="ResourceValueMetadata" eSuperTypes="#//Metadata"/>
+  <eClassifiers xsi:type="ecore:EClass" name="MetadataValueMap" instanceClassName="java.util.Map$Entry">
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="key" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="value" eType="#//MetadataValue"
+        containment="true"/>
+  </eClassifiers>
+</ecore:EPackage>

@@ -181,6 +181,14 @@
         containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="temporaryResources" upperBound="-1"
         eType="#//ResourceMapping" transient="true" containment="true"/>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="serviceEClass"
+      eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EClass">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="The EClass of the service in the twin. The service is then created with getOrCreateService(name, 
+  eClass), so it carries the resources, types and units the EClass declares, and a frozen model does not stop it. Every resource mapping 
+  under this service must name a feature of this EClass. Without it the service is built from the resource mappings, as before."/>
+    </eAnnotations>
+  </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ResourceMapping" eSuperTypes="http://www.eclipse.org/emf/2002/Ecore#//EAttribute">
     <eOperations name="mapUnit">
@@ -272,6 +280,16 @@
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
       <details key="documentation" value="The richer source of the admin location's elevation, winning over elevationRef when both are set. See latitudeMapping.&#xA;&#xA;The
   elevation attribute stays the constant."/>
+    </eAnnotations>
+  </eStructuralFeatures>
+  <eStructuralFeatures xsi:type="ecore:EAttribute" name="extendAdmin"
+      eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
+      defaultValueLiteral="false">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="Allows resource mappings whose mid is no resource of the admin service. The engine then builds an 
+  Admin subclass carrying them and retypes the provider's admin once. Such a value is readable as a resource and travels on the event bus, 
+  but it is invisible to the snapshot consumers - SensorThings, the provider description and filters. Off by default, so a wrong mid stays a 
+  warning instead of becoming a new admin resource."/>
     </eAnnotations>
   </eStructuralFeatures>
   </eClassifiers>

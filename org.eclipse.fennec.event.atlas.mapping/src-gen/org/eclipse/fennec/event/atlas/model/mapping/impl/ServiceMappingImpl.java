@@ -44,6 +44,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ServiceMappingImpl#getResources <em>Resources</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ServiceMappingImpl#getReferencedResource <em>Referenced Resource</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ServiceMappingImpl#getTemporaryResources <em>Temporary Resources</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ServiceMappingImpl#getServiceEClass <em>Service EClass</em>}</li>
  * </ul>
  *
  * @generated
@@ -78,6 +79,16 @@ public class ServiceMappingImpl extends MappingImpl implements ServiceMapping {
 	 * @ordered
 	 */
 	protected EList<ResourceMapping> temporaryResources;
+
+	/**
+	 * The cached value of the '{@link #getServiceEClass() <em>Service EClass</em>}' reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getServiceEClass()
+	 * @generated
+	 * @ordered
+	 */
+	protected EClass serviceEClass;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -175,6 +186,46 @@ public class ServiceMappingImpl extends MappingImpl implements ServiceMapping {
 	 * @generated
 	 */
 	@Override
+	public EClass getServiceEClass() {
+		if (serviceEClass != null && serviceEClass.eIsProxy()) {
+			InternalEObject oldServiceEClass = (InternalEObject)serviceEClass;
+			serviceEClass = (EClass)eResolveProxy(oldServiceEClass);
+			if (serviceEClass != oldServiceEClass) {
+				if (eNotificationRequired())
+					eNotify(new ENotificationImpl(this, Notification.RESOLVE, MappingPackage.SERVICE_MAPPING__SERVICE_ECLASS, oldServiceEClass, serviceEClass));
+			}
+		}
+		return serviceEClass;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public EClass basicGetServiceEClass() {
+		return serviceEClass;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setServiceEClass(EClass newServiceEClass) {
+		EClass oldServiceEClass = serviceEClass;
+		serviceEClass = newServiceEClass;
+		if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.SERVICE_MAPPING__SERVICE_ECLASS, oldServiceEClass, serviceEClass));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs) {
 		switch (featureID) {
 			case MappingPackage.SERVICE_MAPPING__RESOURCES:
@@ -201,6 +252,9 @@ public class ServiceMappingImpl extends MappingImpl implements ServiceMapping {
 				return getReferencedResource();
 			case MappingPackage.SERVICE_MAPPING__TEMPORARY_RESOURCES:
 				return getTemporaryResources();
+			case MappingPackage.SERVICE_MAPPING__SERVICE_ECLASS:
+				if (resolve) return getServiceEClass();
+				return basicGetServiceEClass();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -225,6 +279,9 @@ public class ServiceMappingImpl extends MappingImpl implements ServiceMapping {
 				getTemporaryResources().clear();
 				getTemporaryResources().addAll((Collection<? extends ResourceMapping>)newValue);
 				return;
+			case MappingPackage.SERVICE_MAPPING__SERVICE_ECLASS:
+				setServiceEClass((EClass)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -246,6 +303,9 @@ public class ServiceMappingImpl extends MappingImpl implements ServiceMapping {
 			case MappingPackage.SERVICE_MAPPING__TEMPORARY_RESOURCES:
 				getTemporaryResources().clear();
 				return;
+			case MappingPackage.SERVICE_MAPPING__SERVICE_ECLASS:
+				setServiceEClass((EClass)null);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -264,6 +324,8 @@ public class ServiceMappingImpl extends MappingImpl implements ServiceMapping {
 				return referencedResource != null;
 			case MappingPackage.SERVICE_MAPPING__TEMPORARY_RESOURCES:
 				return temporaryResources != null && !temporaryResources.isEmpty();
+			case MappingPackage.SERVICE_MAPPING__SERVICE_ECLASS:
+				return serviceEClass != null;
 		}
 		return super.eIsSet(featureID);
 	}

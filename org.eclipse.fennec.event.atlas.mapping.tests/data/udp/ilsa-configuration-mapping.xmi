@@ -3,7 +3,9 @@
   ILSA - the intersection configuration (topic .../config/retained).
   Replaces: ilsa.qvto + IlsaListener.updateConfig.
 
-  STATUS 2026-11-04
+  STATUS 2026-11-06
+    DONE  each service typed Signal, the EClass de.jena.ilsa.sensinact.model declares, so
+          `color` and `observedArea` carry its types and its Metadata annotations (#91 item 8)
     DONE  one service for each TLSignal, from ONE block. The signals sit three nested
           collections deep (subcircles -> serialPorts -> modules -> signals), which the
           qvto walks with collect().collect().collect()                      (#91 item 5)
@@ -16,13 +18,20 @@
     DONE  observedArea through a ValueConverter, replacing the qvto black box (#91 item 1)
     DONE  the `type` and `signalGroup` metadata on the color resource, read from the
           signal on every push                                               (#91 item 6)
-    OPEN  nothing in this mapping. But see the note below: this mapping and the signal-state
-          one must reach the SAME provider, which needs a shared MappingProfile.
+    DONE  one provider for both ILSA flows, through ilsa-profile.xmi (UNIFIED)
+    OPEN  nothing in this mapping.
+
+    NOT HERE. `Ilsa.thermal` is typed Thermal, which extends Admin, and a typed service may
+    be an Admin subclass - item 8 covers it. It is not in this mapping because the thermal
+    topic carries a bare number and no EObject, so the engine never sees that flow. When the
+    adapter wraps it, one <services mid="thermal"> with
+    serviceEClass=.../sensinact/ilsa/1.0#//Thermal expresses it.
 
   TWO MAPPINGS, ONE PROVIDER. The adapter pushes both flows into one `Ilsa` provider named
   after the intersection. A mapping's provider model comes from its own `fqMid` unless a
-  MappingProfile with providerStrategy=UNIFIED names one, so as written these two build two
-  providers. The pair needs that profile before it is deployed.
+  MappingProfile with providerStrategy=UNIFIED names one - ilsa-profile.xmi, which both
+  mappings reference below. Deploy it into the `sensinact-profiles` registry beside them: a
+  mapping whose profile cannot be resolved is skipped entirely.
 -->
 <sensinactMapping:ProviderMapping
     xmi:version="2.0"
@@ -39,6 +48,13 @@
         href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration/intersectionId"/>
   </name>
 
+  <!-- Both ILSA mappings name this profile, whose providerStrategy is UNIFIED, so both
+       build the same model and their payloads reach ONE provider. The fragment is the
+       profileId, not "/": that is what ProviderMappingRegistryImpl looks up in the profile
+       registry when the document itself is not reachable - which is the normal case for a
+       mapping delivered from a Model Atlas. -->
+  <profile href="ilsa-profile.xmi#ilsa"/>
+
   <providerClasses href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration"/>
 
   <!--
@@ -50,7 +66,20 @@
   <services mid="signal">
     <name expression="self.id.replaceAll('/', '_')"/>
 
-    <!-- selector only: exclude="false" with no filter generates no resources -->
+    <!--
+      The service the adapter builds: Signal, from de.jena.ilsa.sensinact.model. The twin
+      builds the service from this EClass, so `color` and `observedArea` carry the types AND
+      the Metadata annotations it declares - which is why neither eType nor extraMetadata is
+      restated below any more. A typed service takes its metadata from the EClass; a
+      <metadata> block is unaffected, because it is written per push.
+
+      A serviceEClass and a produced name combine: one block, one Signal-typed service for
+      each element the path below reaches.
+    -->
+    <serviceEClass href="https://model.data.jena.de/sensinact/ilsa/1.0#//Signal"/>
+
+    <!-- selector only: exclude="false" with no filter generates no resources. It stays: a
+         referencedResource is also the path that picks each service's source element. -->
     <referencedResource exclude="false">
       <featurePath xsi:type="ecore:EReference"
           href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration/subcircles"/>
@@ -67,14 +96,11 @@
       The black box becomes a ValueConverter the UDP side publishes under this id. The
       converter whiteboard is in place; only the converter itself has to be written.
     -->
-    <resources name="observedArea" mid="observedArea">
-      <eType xsi:type="ecore:EDataType"
-          href="https://eclipse.org/sensinact/core/provider/1.0#//EGeoJsonObject"/>
+    <resources mid="observedArea">
       <valueMapping converterId="udp.geojson.featurecollection">
         <featurePath xsi:type="ecore:EReference"
             href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/observedArea"/>
       </valueMapping>
-      <extraMetadata key="sensorthings.observedArea" value="true"/>
     </resources>
 
     <!--
@@ -84,11 +110,10 @@
 
       The resource carries no value here: the configuration describes the signal, and the
       signal-state mapping fills the colour. Declaring it is what gives the metadata somewhere
-      to live, the way the Ilsa package's Signal.color does for the adapter.
+      to live - and with serviceEClass the Signal EClass declares it anyway, including its
+      `sensorthings.unit.name` annotation.
     -->
-    <resources name="color" mid="color">
-      <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
-      <extraMetadata key="sensorthings.unit.name" value="Farbe"/>
+    <resources mid="color">
       <metadata key="type">
         <featurePath xsi:type="ecore:EAttribute"
             href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/signalType"/>

@@ -57,6 +57,17 @@ public class AdminResourceGateTest {
 				"a mapping without an admin section has nothing to report");
 	}
 
+	@Test
+	@DisplayName("With extendAdmin only what cannot become a resource is still refused")
+	void extendAdmin_allowsTheExtraMids() {
+		ProviderMapping mapping = adminMapping("icon", "description", "metadata");
+		mapping.getAdmin().setExtendAdmin(true);
+
+		assertEquals(List.of("metadata"), ProviderMappingRegistryImpl.unknownAdminResources(mapping),
+				"icon becomes a resource of the Admin subclass; metadata names a feature Admin already"
+						+ " has, which an attribute of the subclass would shadow");
+	}
+
 	private static ProviderMapping adminMapping(String... mids) {
 		AdminMapping admin = MappingFactory.eINSTANCE.createAdminMapping();
 		admin.setMid("admin");

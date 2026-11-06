@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:5f232a2e8a37c324f3a484a36bb45633a27fad28f04604f0137cfc3ffd91c00c", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:ac1749bf03c6c9e9e4b6d7dca24d0b3151a4b8e698cc40ecc4ae869a70460358", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -717,13 +717,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int SERVICE_MAPPING__TEMPORARY_RESOURCES = MAPPING_FEATURE_COUNT + 2;
 
 	/**
+	 * The feature id for the '<em><b>Service EClass</b></em>' reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int SERVICE_MAPPING__SERVICE_ECLASS = MAPPING_FEATURE_COUNT + 3;
+
+	/**
 	 * The number of structural features of the '<em>Service Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int SERVICE_MAPPING_FEATURE_COUNT = MAPPING_FEATURE_COUNT + 3;
+	int SERVICE_MAPPING_FEATURE_COUNT = MAPPING_FEATURE_COUNT + 4;
 
 	/**
 	 * The operation id for the '<em>Map Id</em>' operation.
@@ -1169,6 +1178,15 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int ADMIN_MAPPING__TEMPORARY_RESOURCES = SERVICE_MAPPING__TEMPORARY_RESOURCES;
 
 	/**
+	 * The feature id for the '<em><b>Service EClass</b></em>' reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int ADMIN_MAPPING__SERVICE_ECLASS = SERVICE_MAPPING__SERVICE_ECLASS;
+
+	/**
 	 * The feature id for the '<em><b>Friendly Name</b></em>' attribute.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -1286,13 +1304,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int ADMIN_MAPPING__ELEVATION_MAPPING = SERVICE_MAPPING_FEATURE_COUNT + 12;
 
 	/**
+	 * The feature id for the '<em><b>Extend Admin</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int ADMIN_MAPPING__EXTEND_ADMIN = SERVICE_MAPPING_FEATURE_COUNT + 13;
+
+	/**
 	 * The number of structural features of the '<em>Admin Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int ADMIN_MAPPING_FEATURE_COUNT = SERVICE_MAPPING_FEATURE_COUNT + 13;
+	int ADMIN_MAPPING_FEATURE_COUNT = SERVICE_MAPPING_FEATURE_COUNT + 14;
 
 	/**
 	 * The operation id for the '<em>Map Id</em>' operation.
@@ -3002,6 +3029,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EReference getServiceMapping_TemporaryResources();
 
 	/**
+	 * Returns the meta object for the reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getServiceEClass <em>Service EClass</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the reference '<em>Service EClass</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getServiceEClass()
+	 * @see #getServiceMapping()
+	 * @generated
+	 */
+	EReference getServiceMapping_ServiceEClass();
+
+	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping <em>Resource Mapping</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -3294,6 +3332,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 */
 	EReference getAdminMapping_ElevationMapping();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#isExtendAdmin <em>Extend Admin</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Extend Admin</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.AdminMapping#isExtendAdmin()
+	 * @see #getAdminMapping()
+	 * @generated
+	 */
+	EAttribute getAdminMapping_ExtendAdmin();
 
 	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping <em>Metadata Mapping</em>}'.
@@ -4357,6 +4406,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		EReference SERVICE_MAPPING__TEMPORARY_RESOURCES = eINSTANCE.getServiceMapping_TemporaryResources();
 
 		/**
+		 * The meta object literal for the '<em><b>Service EClass</b></em>' reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference SERVICE_MAPPING__SERVICE_ECLASS = eINSTANCE.getServiceMapping_ServiceEClass();
+
+		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ResourceMappingImpl <em>Resource Mapping</em>}' class.
 		 * <!-- begin-user-doc -->
 		 * <!-- end-user-doc -->
@@ -4575,6 +4632,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EReference ADMIN_MAPPING__ELEVATION_MAPPING = eINSTANCE.getAdminMapping_ElevationMapping();
+
+		/**
+		 * The meta object literal for the '<em><b>Extend Admin</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute ADMIN_MAPPING__EXTEND_ADMIN = eINSTANCE.getAdminMapping_ExtendAdmin();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MetadataMappingImpl <em>Metadata Mapping</em>}' class.

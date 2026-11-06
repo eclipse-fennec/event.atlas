@@ -54,6 +54,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getLatitudeMapping <em>Latitude Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getLongitudeMapping <em>Longitude Mapping</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#getElevationMapping <em>Elevation Mapping</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.AdminMappingImpl#isExtendAdmin <em>Extend Admin</em>}</li>
  * </ul>
  *
  * @generated
@@ -228,6 +229,26 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 	 * @ordered
 	 */
 	protected FeatureMapping elevationMapping;
+
+	/**
+	 * The default value of the '{@link #isExtendAdmin() <em>Extend Admin</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #isExtendAdmin()
+	 * @generated
+	 * @ordered
+	 */
+	protected static final boolean EXTEND_ADMIN_EDEFAULT = false;
+
+	/**
+	 * The cached value of the '{@link #isExtendAdmin() <em>Extend Admin</em>}' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #isExtendAdmin()
+	 * @generated
+	 * @ordered
+	 */
+	protected boolean extendAdmin = EXTEND_ADMIN_EDEFAULT;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -618,6 +639,29 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 	 * @generated
 	 */
 	@Override
+	public boolean isExtendAdmin() {
+		return extendAdmin;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setExtendAdmin(boolean newExtendAdmin) {
+		boolean oldExtendAdmin = extendAdmin;
+		extendAdmin = newExtendAdmin;
+		if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.ADMIN_MAPPING__EXTEND_ADMIN, oldExtendAdmin, extendAdmin));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs) {
 		switch (featureID) {
 			case MappingPackage.ADMIN_MAPPING__FRIENDLY_NAME_MAPPING:
@@ -667,6 +711,8 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 				return getLongitudeMapping();
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
 				return getElevationMapping();
+			case MappingPackage.ADMIN_MAPPING__EXTEND_ADMIN:
+				return isExtendAdmin();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -723,6 +769,9 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
 				setElevationMapping((FeatureMapping)newValue);
 				return;
+			case MappingPackage.ADMIN_MAPPING__EXTEND_ADMIN:
+				setExtendAdmin((Boolean)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -774,6 +823,9 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
 				setElevationMapping((FeatureMapping)null);
 				return;
+			case MappingPackage.ADMIN_MAPPING__EXTEND_ADMIN:
+				setExtendAdmin(EXTEND_ADMIN_EDEFAULT);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -812,6 +864,8 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 				return longitudeMapping != null;
 			case MappingPackage.ADMIN_MAPPING__ELEVATION_MAPPING:
 				return elevationMapping != null;
+			case MappingPackage.ADMIN_MAPPING__EXTEND_ADMIN:
+				return extendAdmin != EXTEND_ADMIN_EDEFAULT;
 		}
 		return super.eIsSet(featureID);
 	}
@@ -834,6 +888,8 @@ public class AdminMappingImpl extends ServiceMappingImpl implements AdminMapping
 		result.append(longitude);
 		result.append(", elevation: ");
 		result.append(elevation);
+		result.append(", extendAdmin: ");
+		result.append(extendAdmin);
 		result.append(')');
 		return result.toString();
 	}

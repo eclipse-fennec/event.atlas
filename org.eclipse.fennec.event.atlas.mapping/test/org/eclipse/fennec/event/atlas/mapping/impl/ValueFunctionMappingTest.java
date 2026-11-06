@@ -15,19 +15,26 @@ package org.eclipse.fennec.event.atlas.mapping.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EDataType;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EPackage;
+import org.eclipse.emf.ecore.EReference;
+import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.EcoreFactory;
 import org.eclipse.emf.ecore.EcorePackage;
 import org.eclipse.emf.ecore.util.EcoreUtil;
@@ -61,6 +68,14 @@ public class ValueFunctionMappingTest {
 	private final EAttribute tempA = attribute("tempA", EcorePackage.Literals.EINT);
 	private final EAttribute tempB = attribute("tempB", EcorePackage.Literals.EINT);
 	private final EAttribute device = attribute("device", EcorePackage.Literals.ESTRING);
+	/** A collection to navigate: Reading.samples, each sample with a key and a value. */
+	private final EClass sample = EcoreFactory.eINSTANCE.createEClass();
+	private final EAttribute sampleKey = attribute("key", EcorePackage.Literals.ESTRING);
+	private final EAttribute sampleValue = attribute("value", EcorePackage.Literals.EINT);
+	private final EReference samples = EcoreFactory.eINSTANCE.createEReference();
+
+	/** What the last function call was handed. The collection cases are about exactly this. */
+	private final AtomicReference<Object> seen = new AtomicReference<>();
 
 	private final ValueFunctionRegistryImpl functions = new ValueFunctionRegistryImpl();
 	private final ValueConverterRegistryImpl converters = new ValueConverterRegistryImpl();
@@ -73,7 +88,16 @@ public class ValueFunctionMappingTest {
 		reading.getEStructuralFeatures().add(tempA);
 		reading.getEStructuralFeatures().add(tempB);
 		reading.getEStructuralFeatures().add(device);
+		sample.setName("Sample");
+		sample.getEStructuralFeatures().add(sampleKey);
+		sample.getEStructuralFeatures().add(sampleValue);
+		samples.setName("samples");
+		samples.setEType(sample);
+		samples.setContainment(true);
+		samples.setUpperBound(-1);
+		reading.getEStructuralFeatures().add(samples);
 		ePackage.getEClassifiers().add(reading);
+		ePackage.getEClassifiers().add(sample);
 
 		// A producer: it is handed the whole source object and reads two features itself.
 		functions.addFunction(input -> {
@@ -89,6 +113,16 @@ public class ValueFunctionMappingTest {
 				Map.of(ValueFunction.FUNCTION_ID, "deviceName"));
 
 		converters.addConverter(value -> "converted:" + value, Map.of(ValueConverter.CONVERTER_ID, "mark"));
+
+		// Records what it was handed, so a test can assert on the input rather than infer it
+		// from the output. It answers with the sample's value where it was given a sample.
+		functions.addFunction(input -> {
+			seen.set(input);
+			if (input instanceof List<?> list) {
+				return list.stream().mapToInt(element -> (Integer) ((EObject) element).eGet(sampleValue)).sum();
+			}
+			return input instanceof EObject eo && eo.eClass() == sample ? eo.eGet(sampleValue) : input;
+		}, Map.of(ValueFunction.FUNCTION_ID, "record"));
 	}
 
 	@Test
@@ -153,6 +187,103 @@ public class ValueFunctionMappingTest {
 		assertEquals("cam-cam-1", id.getValue());
 	}
 
+	// ---------------------------------------------------------------------------------------
+	// A feature path that meets a collection. A path that PASSES one must select an element to
+	// carry on from - by filter, else by collectionIndex. A path that ENDS on one hands the
+	// whole collection to the function, because that is what the path found; narrowing it with
+	// a filter or a non-zero index selects a single element instead.
+	// ---------------------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("A path that ends on a collection hands the function the whole collection")
+	void collectionPath_handsTheFunctionTheCollection() {
+		Map<String, Object> values = map(collectionMapping(0, null, samples));
+
+		List<?> handed = assertInstanceOf(List.class, seen.get(),
+				() -> "a producer over a collection must see all of it, not " + seen.get());
+		assertEquals(3, handed.size(), "every element, in payload order");
+		assertEquals("a", ((EObject) handed.get(0)).eGet(sampleKey));
+		assertEquals("c", ((EObject) handed.get(2)).eGet(sampleKey));
+		assertEquals(36, values.get("data.value"), "11 + 12 + 13");
+	}
+
+	@Test
+	@DisplayName("An explicit collectionIndex of 0 cannot narrow it - use a filter")
+	void zeroCollectionIndex_doesNotNarrow() {
+		map(collectionMapping(0, null, samples));
+
+		assertInstanceOf(List.class, seen.get(),
+				"EMF cannot tell an explicit 0 from an unset index, so 0 is not a selection");
+	}
+
+	@Test
+	@DisplayName("A collectionIndex chooses which element the function is handed")
+	void collectionIndex_choosesTheElement() {
+		Map<String, Object> values = map(collectionMapping(2, null, samples));
+
+		assertFalse(seen.get() instanceof List, () -> "a non-zero index selects one: " + seen.get());
+		assertEquals("c", ((EObject) seen.get()).eGet(sampleKey));
+		assertEquals(13, values.get("data.value"));
+	}
+
+	@Test
+	@DisplayName("A collectionFilter chooses it too, and beats the index")
+	void collectionFilter_choosesTheElement() {
+		Map<String, Object> values = map(collectionMapping(2, "key=b", samples));
+
+		assertFalse(seen.get() instanceof List, () -> "a filter selects one: " + seen.get());
+		assertEquals("b", ((EObject) seen.get()).eGet(sampleKey), "the filter wins over the index");
+		assertEquals(12, values.get("data.value"));
+	}
+
+	@Test
+	@DisplayName("A path may continue past the collection, and the function gets what it ends on")
+	void pathPastACollection_handsTheFunctionTheValueBeyondIt() {
+		Map<String, Object> values = map(collectionMapping(1, null, samples, sampleValue));
+
+		assertEquals(12, seen.get(), "the attribute of the selected element, not the element");
+		assertEquals(12, values.get("data.value"));
+	}
+
+	@Test
+	@DisplayName("An empty collection reaches the function, which decides what nothing means")
+	void emptyCollection_reachesTheFunction() {
+		EObject instance = instance();
+		instance.eUnset(samples);
+
+		Map<String, Object> values = map(collectionMapping(0, null, samples), instance);
+
+		assertEquals(List.of(), seen.get(),
+				"'the camera saw nothing' is a statement, and only the function can read it");
+		assertEquals(0, values.get("data.value"), "the sum of no samples");
+	}
+
+	@Test
+	@DisplayName("A path that finds nothing still produces nothing, and the constant answers")
+	void unsetPath_leavesTheConstant() {
+		EObject instance = instance();
+		instance.eUnset(samples);
+
+		ValueMapping valueMapping = collectionMapping(1, null, samples, sampleValue);
+		valueMapping.setValue("99");
+		Map<String, Object> values = map(valueMapping, instance);
+
+		assertNull(seen.get(), "the path passes the collection, and an empty one has no element");
+		assertEquals(99, values.get("data.value"), "so the mapping's own constant answers");
+	}
+
+	private ValueMapping collectionMapping(int collectionIndex, String collectionFilter,
+			EStructuralFeature... path) {
+		ValueMapping valueMapping = MappingFactory.eINSTANCE.createValueMapping();
+		valueMapping.setFunctionId("record");
+		valueMapping.setCollectionIndex(collectionIndex);
+		valueMapping.setCollectionFilter(collectionFilter);
+		for (EStructuralFeature feature : path) {
+			valueMapping.getFeaturePath().add(feature);
+		}
+		return valueMapping;
+	}
+
 	private ValueMapping valueMapping(String functionId, EAttribute path, String converterId, String constant) {
 		ValueMapping valueMapping = MappingFactory.eINSTANCE.createValueMapping();
 		valueMapping.setFunctionId(functionId);
@@ -165,10 +296,14 @@ public class ValueFunctionMappingTest {
 	}
 
 	private Map<String, Object> map(ValueMapping valueMapping) {
+		return map(valueMapping, instance());
+	}
+
+	private Map<String, Object> map(ValueMapping valueMapping, EObject instance) {
 		NameMapping name = MappingFactory.eINSTANCE.createNameMapping();
 		name.setName("reading");
 		return new ValueMapperImpl(mock(SensinactDigitalTwin.class), mapping(valueMapping, name), null,
-				converters, functions).mapResourceValues(instance());
+				converters, functions).mapResourceValues(instance);
 	}
 
 	private ProviderMapping mapping(ValueMapping valueMapping, NameMapping name) {
@@ -199,7 +334,18 @@ public class ValueFunctionMappingTest {
 		instance.eSet(tempA, 20);
 		instance.eSet(tempB, 30);
 		instance.eSet(device, "cam-1");
+		addSample(instance, "a", 11);
+		addSample(instance, "b", 12);
+		addSample(instance, "c", 13);
 		return instance;
+	}
+
+	@SuppressWarnings("unchecked")
+	private void addSample(EObject instance, String key, int value) {
+		EObject element = EcoreUtil.create(sample);
+		element.eSet(sampleKey, key);
+		element.eSet(sampleValue, value);
+		((List<EObject>) instance.eGet(samples)).add(element);
 	}
 
 	private static EAttribute attribute(String name, EDataType type) {

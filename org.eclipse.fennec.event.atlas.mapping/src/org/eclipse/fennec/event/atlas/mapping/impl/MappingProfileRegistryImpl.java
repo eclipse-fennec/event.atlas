@@ -200,20 +200,17 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
         
         // Check location requirement
         if (profileAdmin.isRequiresLocation()) {
-            if (mapping.getAdmin().getLatitude() == null && 
-                (mapping.getAdmin().getLatitudeRef() == null || mapping.getAdmin().getLatitudeRef().isEmpty())) {
+            if (!declaresLatitude(mapping.getAdmin())) {
                 result.addError("Admin service requires location but latitude is not configured");
             }
-            if (mapping.getAdmin().getLongitude() == null && 
-                (mapping.getAdmin().getLongitudeRef() == null || mapping.getAdmin().getLongitudeRef().isEmpty())) {
+            if (!declaresLongitude(mapping.getAdmin())) {
                 result.addError("Admin service requires location but longitude is not configured");
             }
         }
         
         // Check friendly name requirement
         if (profileAdmin.isRequiresFriendlyName()) {
-            if (mapping.getAdmin().getFriendlyName() == null && 
-                (mapping.getAdmin().getFriendlyNameFeature() == null || mapping.getAdmin().getFriendlyNameFeature().isEmpty())) {
+            if (!declaresFriendlyName(mapping.getAdmin())) {
                 result.addError("Admin service requires friendly name but it is not configured");
             }
         }
@@ -233,9 +230,8 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
         for (ProfileResource profileResource : profileAdmin.getResources()) {
             String id = profileResource.getResourceId();
             boolean dedicated = switch (id) {
-                case "friendlyName" -> admin.getFriendlyName() != null || !admin.getFriendlyNameFeature().isEmpty();
-                case "location" -> (admin.getLatitude() != null || !admin.getLatitudeRef().isEmpty())
-                        && (admin.getLongitude() != null || !admin.getLongitudeRef().isEmpty());
+                case "friendlyName" -> declaresFriendlyName(admin);
+                case "location" -> declaresLatitude(admin) && declaresLongitude(admin);
                 default -> false;
             };
             if (dedicated) {
@@ -250,6 +246,28 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
             }
             validateResourceAgainstProfile(mappingResource, profileResource, result);
         }
+    }
+
+    /*
+     * An admin value has three sources, and a profile requirement is satisfied by any of them:
+     * the FeatureMapping slot of #91 item 7, which computes it, the bare *Ref feature path, and
+     * the constant. Asking only the last two reported every expression-fed admin as missing -
+     * which is how both UDP mappings read their friendly name.
+     */
+
+    private static boolean declaresFriendlyName(AdminMapping admin) {
+        return admin.getFriendlyNameMapping() != null || admin.getFriendlyName() != null
+                || !admin.getFriendlyNameFeature().isEmpty();
+    }
+
+    private static boolean declaresLatitude(AdminMapping admin) {
+        return admin.getLatitudeMapping() != null || admin.getLatitude() != null
+                || !admin.getLatitudeRef().isEmpty();
+    }
+
+    private static boolean declaresLongitude(AdminMapping admin) {
+        return admin.getLongitudeMapping() != null || admin.getLongitude() != null
+                || !admin.getLongitudeRef().isEmpty();
     }
 
     private void validateServices(ProviderMapping mapping, ProfileProvider profileProvider, ValidationResultImpl result) {
@@ -310,7 +328,10 @@ public class MappingProfileRegistryImpl implements MappingProfileRegistry, EObje
     private void validateResourceAgainstProfile(ResourceMapping mappingResource, ProfileResource profileResource,
             ValidationResultImpl result) {
         // Validate resource type compatibility
-        if (profileResource.getExpectedType() != null) {
+        // A resource of a service that names its EClass states no type - the EClass carries it -
+        // so there is nothing to compare rather than a mismatch. Reading the name of a null type
+        // would also have thrown here.
+        if (profileResource.getExpectedType() != null && mappingResource.getEAttributeType() != null) {
             if (!profileResource.getExpectedType().equals(mappingResource.getEAttributeType())) {
                 result.addWarning("Resource '" + profileResource.getResourceId() + 
                                 "' has type '" + mappingResource.getEAttributeType().getName() + 

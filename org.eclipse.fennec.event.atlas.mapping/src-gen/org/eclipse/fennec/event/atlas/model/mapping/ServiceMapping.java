@@ -15,6 +15,8 @@ package org.eclipse.fennec.event.atlas.model.mapping;
 
 import org.eclipse.emf.common.util.EList;
 
+import org.eclipse.emf.ecore.EClass;
+
 import org.osgi.annotation.versioning.ProviderType;
 
 /**
@@ -29,6 +31,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getResources <em>Resources</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getReferencedResource <em>Referenced Resource</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getTemporaryResources <em>Temporary Resources</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getServiceEClass <em>Service EClass</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getServiceMapping()
@@ -82,5 +85,30 @@ public interface ServiceMapping extends Mapping {
 	 * @generated
 	 */
 	EList<ResourceMapping> getTemporaryResources();
+
+	/**
+	 * Returns the value of the '<em><b>Service EClass</b></em>' reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The EClass of the service in the twin. The service is then created with getOrCreateService(name,    eClass), so it carries the resources, types and units the EClass declares, and a frozen model does not stop it. Every resource mapping    under this service must name a feature of this EClass. Without it the service is built from the resource mappings, as before.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Service EClass</em>' reference.
+	 * @see #setServiceEClass(EClass)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getServiceMapping_ServiceEClass()
+	 * @model
+	 * @generated
+	 */
+	EClass getServiceEClass();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping#getServiceEClass <em>Service EClass</em>}' reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Service EClass</em>' reference.
+	 * @see #getServiceEClass()
+	 * @generated
+	 */
+	void setServiceEClass(EClass value);
 
 } // ServiceMapping

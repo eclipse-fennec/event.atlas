@@ -248,9 +248,54 @@ A `ServiceMapping` (the `services` child) groups resources. It inherits `mid`, `
 | `timestamp` | Service-level timestamp (optional). |
 | `resources` (0..\*) | Explicit [resource mappings](#resource-mapping). |
 | `referencedResource` | A [ReferenceMapping](#automatic-resource-generation) that auto-generates resources. |
+| `serviceEClass` | The EClass of the service in the twin. The service then carries the resources that EClass declares, with their types - see below. |
 
 You can mix explicit `resources` and an auto-generating `referencedResource` in the same
 service.
+
+### A service of a type you already model: `serviceEClass`
+
+Where the service already exists as an EClass - a `Service` subclass in a deployed `.ecore` -
+name it and the twin builds the service from it:
+
+```xml
+<services mid="thermal">
+  <name name="Thermal"/>
+  <serviceEClass href="ilsa.ecore#//Thermal"/>
+  <resources name="temperature" mid="temperature">
+    <valueFeature xsi:type="ecore:EAttribute" href="p.ecore#//Payload/temp"/>
+  </resources>
+</services>
+```
+
+The service's resources, their types, units and metadata then come from the EClass rather than
+from the resource mappings, and each `<resources>` block only says where its value comes from.
+It works on a model that is already frozen, because the service is put on the provider itself
+(`getOrCreateService`), not into the model - which also means it appears with the first
+payload, not at registration.
+
+It combines with a produced `name`: one `<services>` block with a `serviceEClass` and a name
+read from the payload gives one service of that type for each element, all with the same
+resources.
+
+A `<resources>` whose `mid` is no feature of that EClass is refused at registration, with a
+message naming the service: the service cannot carry it, and adding it to the EClass is the one
+operation that breaks a generated EClass for the whole runtime. While the EClass is still an
+unresolved proxy - its model is not deployed yet - the mapping waits, exactly as it does for an
+unresolved `providerClasses`.
+
+A `referencedResource` is still allowed, and for most mappings it is needed: it is also the path
+that **selects the service's source element**, which is how one block becomes one service per
+element. What it *generates* comes from the referenced payload type, so anything the service
+EClass does not declare is dropped at registration with a warning naming it. A selector
+(`exclude="false"` with no filter) generates nothing, so nothing is dropped.
+
+> **Metadata comes from the EClass.** `name`, `unit` and `extraMetadata` are written into the
+> model resource at registration, and a typed service has no model resource. Its metadata is
+> what the `Metadata` annotations on the EClass's own features carry - which is where a
+> hand-written provider model already keeps `sensorthings.observedArea` and the like. The
+> engine warns once, naming the resources whose model-side metadata it did not write. A
+> `<metadata>` block is unaffected: it is written per push, through the resource itself.
 
 ### Resource mapping
 
@@ -624,6 +669,45 @@ what the SensorThings northbound shows as the Thing's description (without it a 
 refused at registration with a message naming it; one that bypasses the registry has that
 resource skipped with a warning.
 
+### An admin resource of your own: `extendAdmin`
+
+Set `extendAdmin="true"` on `<admin>` and a `mid` the admin does not have becomes a resource of
+its own instead of a refusal:
+
+```xml
+<admin mid="admin" extendAdmin="true">
+  <name name="Admin"/>
+  <resources name="viewport" mid="viewport">
+    <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <valueFeature xsi:type="ecore:EAttribute" href="c.ecore#//CamConfig/viewport"/>
+  </resources>
+</admin>
+```
+
+The engine then builds an `Admin` subclass carrying those resources - their type is the
+`eType` of the resource mapping, `EString` where none is given - and replaces the provider's
+admin with an instance of it, once, on the first payload. Everything else is unchanged:
+change rules, timestamps, metadata and converters work as they do on any other resource, and
+the five sensiNact resources keep their values.
+
+**Know the limit before you use it.** sensiNact's `admin` reference is declared by `Provider`
+and typed `Admin`, so the extra resource exists on the *instance*, not in the model. The two
+lookups disagree, and that decides who sees it:
+
+| reader | sees it? |
+|---|---|
+| a direct resource read - `twin.getResource(provider, "admin", name)`, a `ResourceCommand`, the Gogo shell | yes |
+| the typed-event bus, and so the history provider | yes |
+| the northbound provider description, filters, SensorThings | **no** |
+
+The reason is that the last group builds from *snapshots*, which are made from what the model
+declares. If the value has to be visible northbound, put it in an ordinary service instead -
+that is what the TrafiCam adapter does with `observedArea` beside the admin `viewport`.
+
+A wrong `mid` is no longer caught, which is why this is off by default: with `extendAdmin` a
+typo becomes a new admin resource rather than a refusal. Two things are still refused - a
+resource with no `mid`, and `metadata`, which names a feature `Admin` already has.
+
 > **Timestamps on the admin service.** sensiNact keeps the newer value, and the admin
 > resources are stamped with the provider's creation instant (the provider timestamp of the
 > first mapped payload). An admin update older than that would be dropped silently, with
@@ -837,6 +921,8 @@ public class MeanTemperature implements ValueFunction {
 |---|---|
 | `functionId` only | the whole source EObject, and it reads what it needs |
 | `functionId` **and** a `featurePath` | the value that path produced |
+| a `featurePath` that **ends on a collection** | the whole collection, as a `List` |
+| …and a `collectionFilter` or a non-zero `collectionIndex` | the one element it selects |
 
 ```xml
 <!-- a producer: it reads the source object itself -->
@@ -847,6 +933,26 @@ public class MeanTemperature implements ValueFunction {
   <featurePath xsi:type="ecore:EAttribute" href="m.ecore#//Reading/tempA"/>
 </valueMapping>
 ```
+
+```xml
+<!-- a producer over a collection: it is handed every ObservedClass/objects element -->
+<valueMapping functionId="udp.traficam.detections">
+  <featurePath xsi:type="ecore:EReference" href="t.ecore#//ObservedClass/objects"/>
+</valueMapping>
+```
+
+A path that *passes* a collection still selects one element to carry on from, by filter or by
+index - it has to, because there is more path to walk. A path that *ends* on one is different:
+what it found is the collection, and truncating it to the first element would be an error the
+result does not show. Two consequences worth knowing:
+
+- **An explicit `collectionIndex="0"` does not select anything.** EMF cannot tell it from an
+  unset index, so use a `collectionFilter` to pick the first element beside a function. This is
+  the same rule that decides when one service block becomes one service per element.
+- **An empty collection reaches the function as an empty list**, where a plain value path would
+  simply produce nothing. For a producer, "there was nothing" is a statement: the function
+  decides whether it means an empty result or no value, and returning nothing leaves the
+  resource at the value it had.
 
 `functionId` lives on `FeatureMapping`, so it works for a `ValueMapping`, a `NameMapping` and a
 `TimestampMapping` alike. A provider id computed from several fields is a `NameMapping` with a
