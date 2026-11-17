@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The dragino battery mapping with one extra service, used by CloudEventIngestTest.
+
+  `envelope/source` names the ValueFunction `test.envelope.probe` (see the <valueMapping>
+  below) and gives it no feature path, so the engine hands the function the whole source
+  EObject - the payload. CloudEventIngestTest registers a function under that id in its
+  @BeforeEach; it walks from the payload to its eContainer, which is the CloudEvents
+  envelope the southbound ingest built, and reports what it found.
+
+  Nothing is deployed for it: the id is matched between this file and that test, and
+  nowhere else.
+
+  Reaching the envelope from a PAYLOAD-rooted mapping this way is not a contract - it is a
+  consequence of the envelope being the payload's container, and it is how this test reads
+  the envelope at all. A mapping that means to read the envelope declares ce::CloudEvent as
+  its root instead; envelope-rooted-mapping.xmi is that one.
+-->
+<mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    xsi:schemaLocation="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="dragino-envelope">
+  <timestamp>
+    <featurePath
+        xsi:type="ecore:EReference"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/rxInfo"/>
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//RxInfo/time"/>
+  </timestamp>
+  <name name="Dragino LSE01 Envelope Probe">
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/deduplicationId"/>
+  </name>
+  <providerClasses
+      href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink"/>
+  <services
+      mid="battery">
+    <name name="Battery"/>
+    <resources
+        name="Battery Level"
+        unit="V"
+        timestamp="//@timestamp"
+        mid="level">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink/object"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DecodedObject/batV"/>
+    </resources>
+  </services>
+  <services
+      mid="envelope">
+    <name name="Envelope"/>
+    <resources
+        name="source"
+        mid="source">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <valueMapping functionId="test.envelope.probe"/>
+    </resources>
+  </services>
+  <admin mid="admin">
+    <name name="Admin"/>
+    <providerPackage
+        href="https://eclipse.org/fennec/lorawan/dragino#/"/>
+  </admin>
+</mapping:ProviderMapping>

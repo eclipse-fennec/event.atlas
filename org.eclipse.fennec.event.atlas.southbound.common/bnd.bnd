@@ -10,6 +10,7 @@ Bundle-Description: Transport-agnostic ingress shared by the southbound adapters
 
 -buildpath: \
 	org.eclipse.emf.ecore.xmi;version=latest,\
+	io.cloudevents.model;version=latest,\
 	org.eclipse.fennec.emf.osgi.api;version=latest,\
 	org.eclipse.fennec.event.atlas.mapping;version=snapshot
 

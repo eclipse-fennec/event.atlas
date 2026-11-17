@@ -13,11 +13,16 @@
  */
 package org.eclipse.fennec.event.atlas.rest.southbound.adapter;
 
+import java.util.Map;
 import java.util.logging.Logger;
 
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.TransportContext;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
+import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ServiceScope;
 import org.osgi.service.jakartars.whiteboard.annotations.RequireJakartarsWhiteboard;
@@ -70,17 +75,51 @@ import jakarta.ws.rs.core.Response.Status;
 @JakartarsResource
 @JakartarsName("event-atlas-ingest-resource")
 @JakartarsApplicationSelect("(osgi.jakartars.name=" + PayloadIngestApplication.NAME + ")")
-@Component(service = PayloadIngestResource.class, scope = ServiceScope.PROTOTYPE)
+@Component(service = PayloadIngestResource.class, scope = ServiceScope.PROTOTYPE,
+		configurationPid = "event.atlas.southbound.rest", configurationPolicy = ConfigurationPolicy.OPTIONAL)
 @Path("/")
 public class PayloadIngestResource {
+
+	/**
+	 * Configuration of the ingest endpoint. It shares the pid of
+	 * {@link PayloadIngestApplication}, which is where a deployment already retargets this
+	 * endpoint.
+	 */
+	public @interface Config {
+
+		/**
+		 * The CloudEvents {@code type} stamped on every payload posted here.
+		 * <p>
+		 * A POST carries no notion of an event type either, so the value is a deployment
+		 * choice. The key is spelled as the MQTT adapter's is, but the default names this
+		 * adapter: a payload posted to the ingest endpoint and one published to a topic are
+		 * not the same occurrence, and a selector should be able to say so without parsing
+		 * the source.
+		 */
+		String cloudEvents_type() default DEFAULT_EVENT_TYPE;
+	}
+
+	/** The event type of a payload posted here, unless a deployment names one. */
+	public static final String DEFAULT_EVENT_TYPE = "org.eclipse.fennec.event.atlas.rest.message";
 
 	private static final Logger logger = Logger.getLogger(PayloadIngestResource.class.getName());
 
 	/** RFC 9110 422; {@code Status.UNPROCESSABLE_ENTITY} is not in the Jakarta RS 3.1 enum. */
 	private static final int UNPROCESSABLE_CONTENT = 422;
 
+	/** Envelope extension naming the ingest channel - the path segment the payload was posted to. */
+	static final String EXTENSION_CHANNEL = "rest.channel";
+
 	@Reference
 	private PayloadIngest payloadIngest;
+
+	private volatile String eventType = DEFAULT_EVENT_TYPE;
+
+	@Activate
+	@Modified
+	void activate(Config config) {
+		eventType = config.cloudEvents_type();
+	}
 
 	/**
 	 * Ingests one payload.
@@ -101,7 +140,10 @@ public class PayloadIngestResource {
 			return Response.status(Status.BAD_REQUEST).entity("Empty payload").build();
 		}
 
-		IngestResult result = payloadIngest.ingest(payload, contentType, "rest/" + channel);
+		// "rest/<channel>" is the source, here as in the log messages and in the envelope: one
+		// field answers "where did this come from" for every transport.
+		IngestResult result = payloadIngest.ingest(payload, contentType, "rest/" + channel,
+				new TransportContext(eventType, Map.of(EXTENSION_CHANNEL, channel == null ? "" : channel)));
 		// PayloadIngest already logged every drop reason; here we only translate it.
 		return Response.status(statusOf(result)).entity(describe(result)).build();
 	}

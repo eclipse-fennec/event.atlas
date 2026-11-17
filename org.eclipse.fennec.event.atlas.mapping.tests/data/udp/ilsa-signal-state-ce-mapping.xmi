@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ILSA - a signal state update, ENVELOPE-ROOTED (topic 5g/ilsa/<intersection>/.../<signal>).
+
+  The CloudEvent twin of ilsa-signal-state-mapping.xmi. Same flow, same provider, same
+  profile - the only difference is where the provider id comes from:
+
+    payload-rooted  providerClasses = TLSignalState, id from TLSignalState.intersectionId,
+                    a TRANSIENT attribute the adapter has to copy out of the topic
+    envelope-rooted providerClasses = ce::CloudEvent, id from the topic itself
+
+  So this version needs no model change on the Jena side. That is the whole point of it.
+
+  DEPLOY ONE OR THE OTHER, NEVER BOTH. Both name ilsa-profile.xmi (UNIFIED), so both build
+  the same model and answer the same provider id. Deployed together they both match every
+  message - one through the payload lookup, one through the envelope lookup - and both write
+  `color` on the same service. Which value survives is then registration order. To run them
+  side by side for comparison, give this one a provider id of its own:
+
+    <name expression="self.source.tokenize('/')->at(3) + '-ce'"/>
+
+  and a profile of its own, since a provider id cannot live in two models.
+
+  WHAT IT NEEDS FROM THE RUNTIME
+    - the message must arrive through PayloadIngest, or the adapter must build a CloudEvent
+      and call InstancePusher.pushInstance(CloudEvent). A bare pushInstance(EObject) builds
+      no envelope, and this mapping is then never applied - by design
+    - io.cloudevents.model deployed (it is, in all three bndruns here)
+    - the OCL evaluator, for the three expressions below
+
+  CHECK THE SEGMENT INDEX. `at(3)` reads the third topic segment of
+  5g/ilsa/<intersection>/..., which is the topic this flow's own header documents. tokenize
+  skips empty segments, and OCL collections are 1-based.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="ilsa-signal-state-ce"
+    providerTimestamp="false">
+
+  <!-- The intersection, straight out of the topic. No transient attribute, no adapter copy.
+       `source` is a flat EString, so a feature path would reach the whole topic - one
+       segment needs an expression. -->
+  <name expression="self.source.tokenize('/')->at(3)"/>
+
+  <profile href="ilsa-profile.xmi#ilsa"/>
+
+  <!-- The root is the envelope. Every feature path below starts at CloudEvent. -->
+  <providerClasses href="https://cloudevents.io/1.0.2#//CloudEvent"/>
+
+  <!--
+    An envelope-rooted mapping claims every message in the runtime, of every model, so a
+    selector is what makes it specific - and registration warns when one is missing.
+
+    `dataschema` is what keeps the two ILSA flows apart: both publish under 5g/ilsa/, and
+    this mapping is for the signal state only. The ingest fills dataschema with
+    <nsURI>#//<EClass> of the class it read the payload as, so it is the payload type that
+    providerClasses can no longer state.
+  -->
+  <selector
+      source="5g/ilsa/#"
+      dataschema="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState"/>
+
+  <!--
+    This service has no referencedResource, so its source is the root - the ENVELOPE. Hence
+    `self.data.` on the name and a CloudEvent/data first step on every path.
+
+    `data` is typed EObject, so there is no declared feature below it for a path to name -
+    but `data` itself is a feature of CloudEvent, so a path crosses it by naming it, and
+    navigation is a dynamic eGet loop from there. For the expression, m2x leaves a property
+    it cannot resolve statically to the evaluator, which looks it up on the runtime type: no
+    oclAsType cast is needed. Both are pinned by CloudEventIngestTest.
+  -->
+  <services mid="signal">
+    <name expression="self.data.id.replaceAll('/', '_')"/>
+    <serviceEClass href="https://model.data.jena.de/sensinact/ilsa/1.0#//Signal"/>
+
+    <timestamp>
+      <featurePath xsi:type="ecore:EReference"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+      <featurePath xsi:type="ecore:EAttribute"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/timestamp"/>
+    </timestamp>
+
+    <resources mid="color">
+      <valueMapping>
+        <featurePath xsi:type="ecore:EReference"
+            href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+        <featurePath xsi:type="ecore:EAttribute"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalState/state"/>
+      </valueMapping>
+    </resources>
+  </services>
+
+  <admin mid="admin">
+    <name name="Admin"/>
+  </admin>
+</sensinactMapping:ProviderMapping>

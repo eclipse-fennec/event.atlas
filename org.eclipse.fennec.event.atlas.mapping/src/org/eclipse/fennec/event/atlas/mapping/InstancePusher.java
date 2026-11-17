@@ -16,6 +16,8 @@ package org.eclipse.fennec.event.atlas.mapping;
 import org.eclipse.emf.ecore.EObject;
 import org.osgi.annotation.versioning.ProviderType;
 
+import io.cloudevents.model.ce.CloudEvent;
+
 /**
  * Ingress for domain model instances: looks up the {@link ProviderMappingRegistry} for
  * mappings matching the instance's EClass and pushes the instance into the sensinact
@@ -35,6 +37,10 @@ public interface InstancePusher {
 	 * {@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping}s whose provider
 	 * classes match the instance's EClass. Mappings that fail to apply are logged and
 	 * skipped; the push is executed synchronously on the sensinact gateway thread.
+	 * <p>
+	 * No envelope is built here. A programmatic push has no message behind it, so there is no
+	 * source to report and nothing an envelope could honestly carry; a caller that has one
+	 * uses {@link #pushInstance(io.cloudevents.model.ce.CloudEvent)} instead.
 	 * @param instance the instance to push. Parameter must not be <code>null</code>
 	 * @return the number of mappings successfully applied; 0 if no mapping is registered
 	 * for the instance's EClass
@@ -42,5 +48,25 @@ public interface InstancePusher {
 	 * @throws IllegalStateException if the gateway execution fails as a whole
 	 */
 	int pushInstance(EObject instance);
+	
+	/**
+	 * Overloaded method that directly takes a CloudEvent object
+	 * <p>
+	 * The mappings applied are the ones registered for the EClass of the envelope's
+	 * {@code data}: the envelope is carried so that a mapping can be selected and read by it,
+	 * and until that exists an enveloped push applies exactly what a bare push of the same
+	 * payload would.
+	 * <p>
+	 * A {@link io.cloudevents.model.ce.CloudEvent} passed to {@link #pushInstance(EObject)} -
+	 * which is what happens whenever the caller's variable is typed {@code EObject}, because
+	 * Java picks an overload statically - is delegated here, so one object behaves the same
+	 * however it is held.
+	 * @param cloudEvent the CloudEvent containing the object to push and additional information needed in the mapping
+	 * @return the number of mappings successfully applied; 0 if no mapping is registered
+	 * for that CloudEvent data
+	 * @throws NullPointerException if the instance parameter is <code>null</code>
+	 * @throws IllegalStateException if the gateway execution fails as a whole
+	 */
+	int pushInstance(CloudEvent cloudEvent);
 
 }

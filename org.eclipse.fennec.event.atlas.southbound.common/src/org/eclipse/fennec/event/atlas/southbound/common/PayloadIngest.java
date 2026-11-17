@@ -68,8 +68,22 @@ public interface PayloadIngest {
 	String FORMAT_AUTO = "auto";
 
 	/**
+	 * The CloudEvents {@code type} stamped on a payload that arrives with no transport
+	 * context at all - a direct call rather than a message from an adapter.
+	 * <p>
+	 * It names no transport, because there is none to name. Every adapter carries a default
+	 * of its own that says which transport a message came in on, so a selector can tell an
+	 * MQTT message from a posted one without parsing the source.
+	 */
+	String DEFAULT_EVENT_TYPE = "org.eclipse.fennec.event.atlas.message";
+
+	/**
 	 * Deserializes a payload and pushes every resulting root object into the digital twin
 	 * through all provider mappings registered for its EClass.
+	 * <p>
+	 * Equivalent to {@link #ingest(byte[], String, String, TransportContext)} with no
+	 * transport context: the envelope is still built, and carries
+	 * {@link #DEFAULT_EVENT_TYPE} and no extension attributes.
 	 * @param payload the raw payload bytes. Parameter must not be <code>null</code>
 	 * @param formatHint the payload format: either a bare EMF file extension
 	 * ({@link #FORMAT_XMI}, {@link #FORMAT_JSON}) or a media type such as
@@ -81,5 +95,34 @@ public interface PayloadIngest {
 	 * @throws NullPointerException if the payload parameter is <code>null</code>
 	 */
 	IngestResult ingest(byte[] payload, String formatHint, String source);
+
+	/**
+	 * Deserializes a payload, wraps every resulting root object in a CloudEvents envelope and
+	 * pushes it into the digital twin through all provider mappings registered for the
+	 * payload's EClass.
+	 * <p>
+	 * Each root gets an envelope of its own - a CloudEvent describes one occurrence - so a
+	 * payload holding several roots yields several envelopes with the same {@code source} and
+	 * different {@code eventId}s. The envelope joins the resource the payload was read from,
+	 * which keeps {@code eResource()} answering and an {@code href} inside the payload
+	 * resolvable even though the root is now contained by the envelope rather than by the
+	 * resource.
+	 * <p>
+	 * The envelope is plumbing at this point: the mappings applied are still the ones
+	 * registered for the payload's own EClass, and nothing in the engine reads the envelope
+	 * yet.
+	 * @param payload the raw payload bytes. Parameter must not be <code>null</code>
+	 * @param formatHint the payload format, as in
+	 * {@link #ingest(byte[], String, String)}
+	 * @param source where the message came from - an MQTT topic, {@code rest/<channel>}. It
+	 * is both what the log messages name and what the envelope's {@code source} carries, so
+	 * an adapter reports it exactly as it would be written in a topic filter. May be
+	 * <code>null</code>
+	 * @param transport what only the adapter knows: the event type and the extension
+	 * attributes. May be <code>null</code>, which is the same as an empty context
+	 * @return what happened. Never <code>null</code>
+	 * @throws NullPointerException if the payload parameter is <code>null</code>
+	 */
+	IngestResult ingest(byte[] payload, String formatHint, String source, TransportContext transport);
 
 }

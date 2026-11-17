@@ -16,11 +16,13 @@ package org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;
 import java.util.Arrays;
 import java.util.Dictionary;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.TransportContext;
 import org.eclipse.sensinact.gateway.southbound.mqtt.api.IMqttMessage;
 import org.eclipse.sensinact.gateway.southbound.mqtt.api.IMqttMessageListener;
 import org.osgi.framework.BundleContext;
@@ -85,7 +87,37 @@ public class MqttPayloadListener implements IMqttMessageListener {
 
 		/** A name for this channel, used in the service registration and in logs. */
 		String name() default "event-atlas-mqtt";
+
+		/**
+		 * The CloudEvents {@code type} stamped on every message of this channel.
+		 * <p>
+		 * An MQTT topic carries no notion of an event type, so this runtime has nothing to
+		 * derive one from and the value is a deployment choice. The default names this
+		 * adapter, so a message says which transport it came in on even when no deployment
+		 * configured a type.
+		 * <p>
+		 * The key is spelled the way a CloudEvents-aware messaging layer spells it
+		 * ({@code cloudEvents.type} in {@code org.gecko.messaging}, for instance), so a
+		 * deployment that ever meets one does not have to learn a second name. The
+		 * <em>default</em> is this adapter's own, and a runtime whose transport brings a
+		 * default of its own should set the key explicitly rather than inherit either.
+		 */
+		String cloudEvents_type() default DEFAULT_EVENT_TYPE;
 	}
+
+	/** The event type of a message this adapter received, unless a deployment names one. */
+	public static final String DEFAULT_EVENT_TYPE = "org.eclipse.fennec.event.atlas.mqtt.message";
+
+	/**
+	 * Envelope extension naming the broker client a message was delivered by - the {@code id}
+	 * of the {@code sensinact.southbound.mqtt} configuration, which is what tells two brokers
+	 * carrying the same topic apart. Taken from the message rather than from
+	 * {@code mqtt.handler.id}, which may be the empty "any broker" filter.
+	 */
+	static final String EXTENSION_BROKER = "mqtt.broker";
+
+	/** Envelope extension naming the ingest channel - this adapter's configured name. */
+	static final String EXTENSION_CHANNEL = "mqtt.channel";
 
 	@Reference
 	private PayloadIngest payloadIngest;
@@ -94,6 +126,7 @@ public class MqttPayloadListener implements IMqttMessageListener {
 	private String handlerId;
 	private String format;
 	private String name;
+	private String eventType;
 
 	@Activate
 	void activate(BundleContext context, Config config) {
@@ -108,6 +141,7 @@ public class MqttPayloadListener implements IMqttMessageListener {
 		handlerId = config.mqtt_handler_id() == null ? "" : config.mqtt_handler_id().trim();
 		format = config.format();
 		name = config.name();
+		eventType = config.cloudEvents_type();
 
 		Dictionary<String, Object> properties = new Hashtable<>();
 		properties.put(IMqttMessageListener.MQTT_TOPICS_FILTERS, topics);
@@ -132,11 +166,11 @@ public class MqttPayloadListener implements IMqttMessageListener {
 	 * @see org.eclipse.sensinact.gateway.southbound.mqtt.api.IMqttMessageListener#onMqttMessage(java.lang.String, java.lang.String, org.eclipse.sensinact.gateway.southbound.mqtt.api.IMqttMessage)
 	 */
 	@Override
-	public void onMqttMessage(String handlerId, String topic, IMqttMessage message) {
+	public void onMqttMessage(String messageHandlerId, String topic, IMqttMessage message) {
 		// Nothing may escape from here: this runs on the MQTT client's dispatch thread, and
 		// one bad payload must never cost us the broker connection.
 		try {
-			if (!accepts(handlerId)) {
+			if (!accepts(messageHandlerId)) {
 				return;
 			}
 			byte[] payload = message.getPayload();
@@ -145,8 +179,14 @@ public class MqttPayloadListener implements IMqttMessageListener {
 				return;
 			}
 			logger.fine(String.format("MQTT message received on topic '%s' (%s bytes)", topic, payload.length));
+			// The topic is the source: it is what a mapping reads to tell two devices of one
+			// family apart, and it is reported exactly as it would be written in a topic
+			// filter. The broker and the channel are what only this adapter knows.
+			TransportContext transport = new TransportContext(eventType,
+					Map.of(EXTENSION_BROKER, messageHandlerId == null ? "" : messageHandlerId,
+							EXTENSION_CHANNEL, name));
 			// The ingest logs every outcome itself, so nothing more is needed here.
-			payloadIngest.ingest(payload, format, topic);
+			payloadIngest.ingest(payload, format, topic, transport);
 		} catch (Throwable e) {
 			logger.log(Level.SEVERE, "Error handling MQTT message on topic '" + topic + "'", e);
 		}

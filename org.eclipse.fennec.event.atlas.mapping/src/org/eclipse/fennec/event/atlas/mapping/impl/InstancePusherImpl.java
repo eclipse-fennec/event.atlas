@@ -17,6 +17,7 @@ import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
@@ -29,6 +30,7 @@ import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueConverterRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueFunctionRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapperFactory;
+import org.eclipse.fennec.event.atlas.model.mapping.MappingSelector;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.sensinact.core.command.AbstractSensinactCommand;
 import org.eclipse.sensinact.core.command.GatewayThread;
@@ -40,6 +42,8 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
+
+import io.cloudevents.model.ce.CloudEvent;
 
 /**
  * Default {@link InstancePusher}: resolves mappings via the {@link ProviderMappingRegistry}
@@ -121,22 +125,55 @@ public class InstancePusherImpl implements InstancePusher {
 	@Override
 	public int pushInstance(EObject instance) {
 		requireNonNull(instance, "Instance must not be null");
-		List<ProviderMapping> mappings = List.copyOf(mappingRegistry.getProviderMapping(instance.eClass()));
-		if (mappings.isEmpty()) {
-			logger.fine(String.format("No provider mapping registered for EClass '%s' - instance is dropped", instance.eClass().getName()));
+		// Java picks an overload from the static type of the argument, so a CloudEvent held in
+		// an EObject variable would land here and be mapped as a payload of its own EClass.
+		// Delegating keeps one object behaving the same however the caller holds it.
+		if (instance instanceof CloudEvent cloudEvent) {
+			return pushInstance(cloudEvent);
+		}
+		List<ProviderMapping> registered = List.copyOf(mappingRegistry.getProviderMapping(instance.eClass()));
+		List<RootedMapping> applications = rootedAt(select(registered, null), instance);
+		if (applications.isEmpty()) {
+			logNothingToApply(registered.size(), instance.eClass().getName(), null);
 			return 0;
 		}
+		return apply(applications, instance.eClass().getName());
+	}
+
+	/**
+	 * A mapping and the object it is applied to - the root it declared with its
+	 * {@code providerClasses}.
+	 * <p>
+	 * The pair exists because one message can feed both kinds at once: a payload-rooted
+	 * mapping navigates from the payload, an envelope-rooted one from the envelope, and they
+	 * are applied together in one pass over the gateway.
+	 */
+	private record RootedMapping(ProviderMapping mapping, EObject root) {
+	}
+
+	private static List<RootedMapping> rootedAt(List<ProviderMapping> mappings, EObject root) {
+		return mappings.stream().map(mapping -> new RootedMapping(mapping, root)).toList();
+	}
+
+	/**
+	 * Applies each mapping to the root it declared, on the gateway thread. The one place that
+	 * talks to the twin; every entry point ends here.
+	 * @param describing what to name in a failure that fails the whole push
+	 */
+	private int apply(List<RootedMapping> applications, String describing) {
 		Promise<Integer> execute = gatewayThread.execute(new AbstractSensinactCommand<Integer>() {
 
 			@Override
 			protected Promise<Integer> call(SensinactDigitalTwin twin, SensinactModelManager modelManager,
 					PromiseFactory pf) {
 				int applied = 0;
-				for (ProviderMapping mapping : mappings) {
+				for (RootedMapping application : applications) {
+					EObject root = application.root();
+					ProviderMapping mapping = application.mapping();
 					try {
 						ValueMapperFactory.createValueMapper(twin, modelManager, mapping, changeRuleFilter.get(),
 								converterRegistry.get(), functionRegistry.get(), expressionEvaluator.get())
-								.mapInstance(instance);
+								.mapInstance(root);
 						applied++;
 					} catch (Throwable e) {
 						// the cause names the resource or feature, the outer message only says that it failed
@@ -144,7 +181,8 @@ public class InstancePusherImpl implements InstancePusher {
 						for (Throwable c = e.getCause(); c != null && c != c.getCause(); c = c.getCause()) {
 							why.append(" <- ").append(c.getMessage());
 						}
-						logger.warning(String.format("Failed pushing instance of '%s' via mapping '%s': %s", instance.eClass().getName(), mapping.getMid(), why));
+						logger.warning(String.format("Failed pushing instance of '%s' via mapping '%s': %s",
+								root.eClass().getName(), mapping.getMid(), why));
 					}
 				}
 				return pf.resolved(applied);
@@ -152,19 +190,119 @@ public class InstancePusherImpl implements InstancePusher {
 		});
 		try {
 			if (nonNull(execute.getFailure())) {
-				throw new IllegalStateException(String.format("Error pushing instance of '%s'",
-						instance.eClass().getName()), execute.getFailure());
+				throw new IllegalStateException(String.format("Error pushing instance of '%s'", describing),
+						execute.getFailure());
 			}
 			return execute.getValue();
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException(String.format(
-					"Error pushing instance of '%s' while waiting for promise to resolve",
-					instance.eClass().getName()));
+					"Error pushing instance of '%s' while waiting for promise to resolve", describing));
 		} catch (InvocationTargetException e) {
-			throw new IllegalStateException(String.format("Error pushing instance of '%s'",
-					instance.eClass().getName()), e.getCause());
+			throw new IllegalStateException(String.format("Error pushing instance of '%s'", describing),
+					e.getCause());
 		}
+	}
+
+	/**
+	 * Says why a push applied nothing. The two cases read alike from the outside and need
+	 * different fixes: deploy the mapping, or widen the selector of one that is already there.
+	 */
+	private void logNothingToApply(int registered, String eClasses, CloudEvent envelope) {
+		if (registered == 0) {
+			logger.fine(() -> String.format("No provider mapping registered for EClass '%s' - instance is dropped",
+					eClasses));
+		} else {
+			logger.fine(() -> String.format(
+					"None of the %s provider mapping(s) registered for EClass '%s' selects %s - instance is dropped",
+					registered, eClasses, describe(envelope)));
+		}
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see org.eclipse.fennec.event.atlas.mapping.InstancePusher#pushInstance(io.cloudevents.model.ce.CloudEvent)
+	 */
+	@Override
+	public int pushInstance(CloudEvent cloudEvent) {
+		requireNonNull(cloudEvent, "CloudEvent must not be null");
+		EObject data = cloudEvent.getData();
+		// Two lookups, because a mapping declares its own root with providerClasses: a domain
+		// EClass means the payload is the root, CloudEvent means the envelope is. Both kinds
+		// apply to one message, each handed the object it asked for, and the selector of each
+		// candidate is matched against the same envelope.
+		List<ProviderMapping> payloadRooted = data == null ? List.of()
+				: List.copyOf(mappingRegistry.getProviderMapping(data.eClass()));
+		List<ProviderMapping> envelopeRooted = List.copyOf(mappingRegistry.getProviderMapping(cloudEvent.eClass()));
+
+		List<RootedMapping> applications = new ArrayList<>(payloadRooted.size() + envelopeRooted.size());
+		applications.addAll(rootedAt(select(payloadRooted, cloudEvent), data));
+		applications.addAll(rootedAt(select(envelopeRooted, cloudEvent), cloudEvent));
+		if (applications.isEmpty()) {
+			// An envelope with no payload is not an error: an envelope-rooted mapping may well
+			// have something to read, and if none applies there was simply nothing to map.
+			logNothingToApply(payloadRooted.size() + envelopeRooted.size(), describeRoots(cloudEvent), cloudEvent);
+			return 0;
+		}
+		return apply(applications, describeRoots(cloudEvent));
+	}
+
+	/**
+	 * @return the EClasses a message offered a mapping - the payload's, and the envelope's
+	 */
+	private static String describeRoots(CloudEvent cloudEvent) {
+		EObject data = cloudEvent.getData();
+		return data == null ? cloudEvent.eClass().getName()
+				: data.eClass().getName() + "/" + cloudEvent.eClass().getName();
+	}
+
+	/**
+	 * Keeps the mappings that apply to this message: every one without a selector, plus every
+	 * one whose selector matches the envelope.
+	 * <p>
+	 * Nothing is ranked. Two mappings that both match both apply, which is what lets them fill
+	 * different services of one provider - the compositional case a {@code UNIFIED} profile
+	 * already builds on. A general mapping that must not apply where a specific one does says
+	 * so with a {@code sourceExcludes}, by name, rather than being outranked by whatever else
+	 * happens to be in the registry.
+	 */
+	private List<ProviderMapping> select(List<ProviderMapping> registered, CloudEvent envelope) {
+		List<ProviderMapping> selected = new ArrayList<>(registered.size());
+		for (ProviderMapping mapping : registered) {
+			MappingSelector selector = mapping.getSelector();
+			if (selector == null) {
+				// no selector means every message of this EClass, deliberately - including a
+				// push that carries no envelope at all
+				selected.add(mapping);
+				continue;
+			}
+			if (envelope == null) {
+				continue;
+			}
+			try {
+				// compiled per push rather than cached: it is a split of one or two short
+				// filters, against a gateway round trip. A cache would have to be invalidated
+				// with the mapping, and the registry is where that would belong
+				if (CompiledSelector.compile(selector).matches(envelope)) {
+					selected.add(mapping);
+				}
+			} catch (IllegalArgumentException e) {
+				// unreachable through the registry, which refuses such a mapping by name at
+				// registration; FINE because the only way here is a programmatic registration,
+				// and a per-payload warning would flood
+				logger.fine(() -> String.format("Mapping '%s' has an unusable selector, so it selects nothing: %s",
+						mapping.getMid(), e.getMessage()));
+			}
+		}
+		return selected;
+	}
+
+	/**
+	 * @return how to name, in a log line, what the mappings were asked to select
+	 */
+	private static String describe(CloudEvent envelope) {
+		return envelope == null ? "a push that carries no envelope"
+				: String.format("source '%s'", envelope.getSource());
 	}
 
 }

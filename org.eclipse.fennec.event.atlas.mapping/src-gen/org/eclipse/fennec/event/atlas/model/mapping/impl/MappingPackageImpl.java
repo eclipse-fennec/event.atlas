@@ -38,6 +38,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.Mapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingFactory;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
+import org.eclipse.fennec.event.atlas.model.mapping.MappingSelector;
 import org.eclipse.fennec.event.atlas.model.mapping.MetadataMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.NameMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.PercentageChangeRule;
@@ -246,6 +247,13 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	private EClass referenceResourceBindingEClass = null;
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	private EClass mappingSelectorEClass = null;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -664,6 +672,16 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	@Override
 	public EReference getProviderMapping_Profile() {
 		return (EReference)providerMappingEClass.getEStructuralFeatures().get(4);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EReference getProviderMapping_Selector() {
+		return (EReference)providerMappingEClass.getEStructuralFeatures().get(5);
 	}
 
 	/**
@@ -1622,6 +1640,56 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 	 * @generated
 	 */
 	@Override
+	public EClass getMappingSelector() {
+		return mappingSelectorEClass;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getMappingSelector_Source() {
+		return (EAttribute)mappingSelectorEClass.getEStructuralFeatures().get(0);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getMappingSelector_SourceExcludes() {
+		return (EAttribute)mappingSelectorEClass.getEStructuralFeatures().get(1);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getMappingSelector_Type() {
+		return (EAttribute)mappingSelectorEClass.getEStructuralFeatures().get(2);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public EAttribute getMappingSelector_Dataschema() {
+		return (EAttribute)mappingSelectorEClass.getEStructuralFeatures().get(3);
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public EEnum getTimestampStrategy() {
 		return timestampStrategyEEnum;
 	}
@@ -1751,6 +1819,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEReference(providerMappingEClass, PROVIDER_MAPPING__ADMIN);
 		createEAttribute(providerMappingEClass, PROVIDER_MAPPING__PROVIDER_TIMESTAMP);
 		createEReference(providerMappingEClass, PROVIDER_MAPPING__PROFILE);
+		createEReference(providerMappingEClass, PROVIDER_MAPPING__SELECTOR);
 
 		serviceMappingEClass = createEClass(SERVICE_MAPPING);
 		createEReference(serviceMappingEClass, SERVICE_MAPPING__RESOURCES);
@@ -1867,6 +1936,12 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		createEAttribute(referenceResourceBindingEClass, REFERENCE_RESOURCE_BINDING__UNIT);
 		createEAttribute(referenceResourceBindingEClass, REFERENCE_RESOURCE_BINDING__CONVERTER_ID);
 
+		mappingSelectorEClass = createEClass(MAPPING_SELECTOR);
+		createEAttribute(mappingSelectorEClass, MAPPING_SELECTOR__SOURCE);
+		createEAttribute(mappingSelectorEClass, MAPPING_SELECTOR__SOURCE_EXCLUDES);
+		createEAttribute(mappingSelectorEClass, MAPPING_SELECTOR__TYPE);
+		createEAttribute(mappingSelectorEClass, MAPPING_SELECTOR__DATASCHEMA);
+
 		// Create enums
 		timestampStrategyEEnum = createEEnum(TIMESTAMP_STRATEGY);
 		providerStrategyEEnum = createEEnum(PROVIDER_STRATEGY);
@@ -1961,6 +2036,7 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getProviderMapping_Admin(), this.getAdminMapping(), null, "admin", null, 0, 1, ProviderMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getProviderMapping_ProviderTimestamp(), ecorePackage.getEBoolean(), "providerTimestamp", "false", 0, 1, ProviderMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEReference(getProviderMapping_Profile(), this.getMappingProfile(), null, "profile", null, 0, 1, ProviderMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_COMPOSITE, IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEReference(getProviderMapping_Selector(), this.getMappingSelector(), null, "selector", null, 0, 1, ProviderMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		initEClass(serviceMappingEClass, ServiceMapping.class, "ServiceMapping", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
 		initEReference(getServiceMapping_Resources(), this.getResourceMapping(), null, "resources", null, 0, -1, ServiceMapping.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
@@ -2085,6 +2161,12 @@ public class MappingPackageImpl extends EPackageImpl implements MappingPackage {
 		initEReference(getReferenceResourceBinding_DeletionRule(), this.getDeletionRule(), null, "deletionRule", null, 0, 1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, IS_COMPOSITE, !IS_RESOLVE_PROXIES, !IS_UNSETTABLE, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getReferenceResourceBinding_Unit(), ecorePackage.getEString(), "unit", null, 0, 1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 		initEAttribute(getReferenceResourceBinding_ConverterId(), ecorePackage.getEString(), "converterId", null, 0, 1, ReferenceResourceBinding.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+
+		initEClass(mappingSelectorEClass, MappingSelector.class, "MappingSelector", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
+		initEAttribute(getMappingSelector_Source(), ecorePackage.getEString(), "source", null, 0, -1, MappingSelector.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getMappingSelector_SourceExcludes(), ecorePackage.getEString(), "sourceExcludes", null, 0, -1, MappingSelector.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getMappingSelector_Type(), ecorePackage.getEString(), "type", null, 0, 1, MappingSelector.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
+		initEAttribute(getMappingSelector_Dataschema(), ecorePackage.getEString(), "dataschema", null, 0, 1, MappingSelector.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
 
 		// Initialize enums and add enum literals
 		initEEnum(timestampStrategyEEnum, TimestampStrategy.class, "TimestampStrategy");

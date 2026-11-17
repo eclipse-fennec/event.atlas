@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TrafiCam - the camera configuration, ENVELOPE-ROOTED (topic 5g/config/traficam/<cam>).
+
+  The CloudEvent twin of traficam-config-mapping.xmi. The camera comes out of the topic
+  instead of out of CamConfig.camId, so the transient attribute - which has to sit LAST in
+  the EClass because TrafiCam reads binary EMF and BinaryResourceImpl identifies a feature
+  by position - is no longer needed by the mapping.
+
+  READ THIS FIRST. TrafiCam does NOT go through PayloadIngest: the adapter reads binary EMF
+  itself and calls InstancePusher directly. pushInstance(EObject) builds no envelope, so
+  this mapping applies to nothing until the adapter builds a CloudEvent and calls
+  pushInstance(CloudEvent) with the topic in `source`. That is the one piece of adapter work
+  this version costs, and it replaces the model change the other version costs.
+
+  DEPLOY ONE SET OR THE OTHER. Both TrafiCam mappings name traficam-profile.xmi (UNIFIED),
+  so the twin and the original answer the same provider id and would both write the same
+  resources - see ilsa-signal-state-ce-mapping.xmi for the side-by-side recipe.
+
+  CHECK THE SEGMENT INDEX. `at(4)` reads the fourth segment of 5g/config/traficam/<cam>,
+  the topic this flow's own header documents. The detections flow publishes under
+  5g/traficam/<cam>/<class>, where the camera is the THIRD - the two are not the same index,
+  which is exactly why each mapping states its own.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="traficam-config-ce"
+    providerTimestamp="true">
+
+  <name expression="self.source.tokenize('/')->at(4)"/>
+
+  <profile href="traficam-profile.xmi#traficam"/>
+
+  <providerClasses href="https://cloudevents.io/1.0.2#//CloudEvent"/>
+
+  <selector
+      source="5g/config/traficam/#"
+      dataschema="https://jena.de/models/traficam/1.0#//CamConfig"/>
+
+  <!-- No referencedResource, so the service source is the root - the envelope. Every path
+       therefore starts with CloudEvent/data. The function still receives a Scene. -->
+  <services mid="observedArea">
+    <name name="Observed area"/>
+    <serviceEClass href="https://model.data.jena.de/sensinact/traficam/1.0#//ObservedObjects"/>
+    <resources name="objects" mid="objects">
+      <valueMapping functionId="udp.traficam.viewport">
+        <featurePath xsi:type="ecore:EReference"
+            href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+        <featurePath xsi:type="ecore:EReference"
+            href="https://jena.de/models/traficam/1.0#//CamConfig/scene"/>
+      </valueMapping>
+    </resources>
+  </services>
+
+  <admin mid="admin" extendAdmin="true">
+    <name name="Admin"/>
+
+    <!-- Two plain attributes, as in the original - the bare *Ref paths read them, and they
+         gain the same CloudEvent/data first step. -->
+    <latitudeRef xsi:type="ecore:EReference"
+        href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+    <latitudeRef xsi:type="ecore:EReference"
+        href="https://jena.de/models/traficam/1.0#//CamConfig/location"/>
+    <latitudeRef xsi:type="ecore:EAttribute"
+        href="https://jena.de/models/traficam/1.0#//GpsCoordinates/latitude"/>
+    <longitudeRef xsi:type="ecore:EReference"
+        href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+    <longitudeRef xsi:type="ecore:EReference"
+        href="https://jena.de/models/traficam/1.0#//CamConfig/location"/>
+    <longitudeRef xsi:type="ecore:EAttribute"
+        href="https://jena.de/models/traficam/1.0#//GpsCoordinates/longitude"/>
+
+    <!-- 'Camera ' + the camera, which is now the topic segment rather than self.camId -
+         the same string, from the place that always had it. -->
+    <friendlyNameMapping expression="'Camera ' + self.source.tokenize('/')->at(4)"/>
+
+    <!-- extendAdmin, and the same limits as the original: readable through the resource API
+         and the history provider, invisible to the snapshot consumers. -->
+    <resources name="viewport" mid="viewport">
+      <eType xsi:type="ecore:EDataType"
+          href="https://eclipse.org/sensinact/core/provider/1.0#//EGeoJsonObject"/>
+      <valueMapping functionId="udp.traficam.viewport">
+        <featurePath xsi:type="ecore:EReference"
+            href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+        <featurePath xsi:type="ecore:EReference"
+            href="https://jena.de/models/traficam/1.0#//CamConfig/scene"/>
+      </valueMapping>
+    </resources>
+  </admin>
+</sensinactMapping:ProviderMapping>

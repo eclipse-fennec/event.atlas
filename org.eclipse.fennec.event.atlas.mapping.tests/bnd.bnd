@@ -21,6 +21,7 @@ src=${^src},src-gen
 # sets the usually required buildpath using the bnd library, you can extend it with the normal -buildpath to your liking
 -buildpath: \
 	org.osgi.framework;version=latest,\
+	io.cloudevents.model;version=latest,\
 	org.osgi.util.promise;version=latest,\
 	org.osgi.service.typedevent;version=latest,\
 	org.eclipse.sensinact.gateway.core.annotation;version=latest,\

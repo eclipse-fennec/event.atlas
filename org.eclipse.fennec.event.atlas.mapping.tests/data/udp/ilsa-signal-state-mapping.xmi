@@ -11,11 +11,15 @@
     DONE  one provider for both ILSA flows, through ilsa-profile.xmi (UNIFIED)
     DONE  the color value and the payload timestamp. The unit metadata now comes from
           Signal.color's own annotation, not from this mapping                (#91 item 8)
-    OPEN  the provider id. The intersection is in the MQTT topic, not in the payload.
-          Not an event.atlas change: it needs a transient `intersectionId` on
-          TLSignalState, added LAST in the EClass. The mapping below assumes it.
+    OPEN  the provider id, in THIS version. The intersection is in the MQTT topic, not in
+          the payload, so the mapping below assumes a transient `intersectionId` on
+          TLSignalState - Jena's model change.
 
-  This mapping is complete except for that one attribute.
+          There is now a second version that needs no model change:
+          ilsa-signal-state-ce-mapping.xmi, rooted at the CloudEvent envelope, which reads
+          the intersection straight out of the topic. Deploy ONE of the two, never both -
+          they share a profile, so they answer the same provider id and would both write
+          `color`. See that file's header, and the README.
 -->
 <sensinactMapping:ProviderMapping
     xmi:version="2.0"

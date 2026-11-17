@@ -173,6 +173,12 @@
         <details key="documentation" value="Optional reference to a mapping profile that defines the target provider structure.&#xA;When set, this mapping must conform to the profile's defined structure.&#xA;Multiple mappings can reference the same profile to ensure consistent target structures."/>
       </eAnnotations>
     </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="selector" eType="#//MappingSelector"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The MappingSelector for this provider. When the object to be pushed is a CloudEvent and this field is set, then the mapping is selected based on this selector."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ServiceMapping" eSuperTypes="#//Mapping">
     <eStructuralFeatures xsi:type="ecore:EReference" name="resources" upperBound="-1"
@@ -181,14 +187,11 @@
         containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="temporaryResources" upperBound="-1"
         eType="#//ResourceMapping" transient="true" containment="true"/>
-    <eStructuralFeatures xsi:type="ecore:EReference" name="serviceEClass"
-      eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EClass">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The EClass of the service in the twin. The service is then created with getOrCreateService(name, 
-  eClass), so it carries the resources, types and units the EClass declares, and a frozen model does not stop it. Every resource mapping 
-  under this service must name a feature of this EClass. Without it the service is built from the resource mappings, as before."/>
-    </eAnnotations>
-  </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="serviceEClass" eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EClass">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The EClass of the service in the twin. The service is then created with getOrCreateService(name,    eClass), so it carries the resources, types and units the EClass declares, and a frozen model does not stop it. Every resource mapping    under this service must name a feature of this EClass. Without it the service is built from the resource mappings, as before."/>
+      </eAnnotations>
+    </eStructuralFeatures>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ResourceMapping" eSuperTypes="http://www.eclipse.org/emf/2002/Ecore#//EAttribute">
     <eOperations name="mapUnit">
@@ -210,12 +213,11 @@
     <eStructuralFeatures xsi:type="ecore:EReference" name="extraMetadata" upperBound="-1"
         eType="#//StringToStringMap" containment="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="metadata" upperBound="-1"
-      eType="#//MetadataMapping" containment="true">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The metadata entries this resource takes from the payload, beside the constant ones in extraMetadata.&#xA;&#xA;ILSA is the case: it
-  writes 'type' and 'signalGroup' on its color resource, and both values come from the signal that the payload carries."/>
-    </eAnnotations>
-  </eStructuralFeatures>
+        eType="#//MetadataMapping" containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The metadata entries this resource takes from the payload, beside the constant ones in extraMetadata.&#xA;&#xA;ILSA is the case: it   writes 'type' and 'signalGroup' on its color resource, and both values come from the signal that the payload carries."/>
+      </eAnnotations>
+    </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EReference" name="descriptionMapping" eType="#//NameMapping"
         derived="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="changeRule" eType="#//ChangeRule"
@@ -251,60 +253,44 @@
         eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EStructuralFeature"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="elevationRef" upperBound="-1"
         eType="ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EStructuralFeature"/>
-    <eStructuralFeatures xsi:type="ecore:EReference" name="friendlyNameMapping"
-      eType="#//FeatureMapping" containment="true">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The richer source of the admin's friendly name, winning over friendlyNameFeature when both are set.&#xA;&#xA;Carries the producers a
-  feature path alone cannot express - an expression, a function, a collection selection - plus a converterId that post-processes the result. &quot;'ILSA ' +
-  self.intersectionName&quot; is the case it exists for: friendlyNameFeature can name a feature but cannot combine one with anything.&#xA;&#xA;The friendlyName attribute stays
-  the constant: it answers when this mapping produces nothing."/>
-    </eAnnotations>
-  </eStructuralFeatures>
-  <eStructuralFeatures xsi:type="ecore:EReference" name="latitudeMapping"
-      eType="#//FeatureMapping" containment="true">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The richer source of the admin location's latitude, winning over latitudeRef when both are set.&#xA;&#xA;A latitudeRef is a plain path,
-  so it can only read a value that stands alone in the payload. Where two coordinates share one value - a bbox typed as a Double[] - a converter or an expression takes the
-  element, and that needs this slot.&#xA;&#xA;The latitude attribute stays the constant: it answers when this mapping produces nothing."/>
-    </eAnnotations>
-  </eStructuralFeatures>
-  <eStructuralFeatures xsi:type="ecore:EReference" name="longitudeMapping"
-      eType="#//FeatureMapping" containment="true">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The richer source of the admin location's longitude, winning over longitudeRef when both are set. See latitudeMapping.&#xA;&#xA;The
-  longitude attribute stays the constant."/>
-    </eAnnotations>
-  </eStructuralFeatures>
-  <eStructuralFeatures xsi:type="ecore:EReference" name="elevationMapping"
-      eType="#//FeatureMapping" containment="true">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="The richer source of the admin location's elevation, winning over elevationRef when both are set. See latitudeMapping.&#xA;&#xA;The
-  elevation attribute stays the constant."/>
-    </eAnnotations>
-  </eStructuralFeatures>
-  <eStructuralFeatures xsi:type="ecore:EAttribute" name="extendAdmin"
-      eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-      defaultValueLiteral="false">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="Allows resource mappings whose mid is no resource of the admin service. The engine then builds an 
-  Admin subclass carrying them and retypes the provider's admin once. Such a value is readable as a resource and travels on the event bus, 
-  but it is invisible to the snapshot consumers - SensorThings, the provider description and filters. Off by default, so a wrong mid stays a 
-  warning instead of becoming a new admin resource."/>
-    </eAnnotations>
-  </eStructuralFeatures>
-  </eClassifiers>
-    <eClassifiers xsi:type="ecore:EClass" name="MetadataMapping" eSuperTypes="#//FeatureMapping">
-    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-      <details key="documentation" value="One metadata entry of a resource, whose value the payload decides.&#xA;&#xA;extraMetadata holds the entries that are the same for every
-  payload. This one is read per push: it inherits featurePath, collectionFilter, functionId, expression and converterId from FeatureMapping, so the value can be read from a
-  sibling feature of the mapped value, or computed.&#xA;&#xA;A producer that yields nothing leaves the entry as it is. A payload that does not carry it is not a reason to delete
-  what an earlier payload wrote."/>
-    </eAnnotations>
-    <eStructuralFeatures xsi:type="ecore:EAttribute" name="key" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+    <eStructuralFeatures xsi:type="ecore:EReference" name="friendlyNameMapping" eType="#//FeatureMapping"
+        containment="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
-        <details key="documentation" value="The name of the metadata entry, as a northbound consumer sees it - the same namespace extraMetadata writes into. Where both name one 
-  key, the produced value overwrites the constant on every push that yields one."/>
+        <details key="documentation" value="The richer source of the admin's friendly name, winning over friendlyNameFeature when both are set.&#xA;&#xA;Carries the producers a   feature path alone cannot express - an expression, a function, a collection selection - plus a converterId that post-processes the result. &quot;'ILSA ' +   self.intersectionName&quot; is the case it exists for: friendlyNameFeature can name a feature but cannot combine one with anything.&#xA;&#xA;The friendlyName attribute stays   the constant: it answers when this mapping produces nothing."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="latitudeMapping" eType="#//FeatureMapping"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The richer source of the admin location's latitude, winning over latitudeRef when both are set.&#xA;&#xA;A latitudeRef is a plain path,   so it can only read a value that stands alone in the payload. Where two coordinates share one value - a bbox typed as a Double[] - a converter or an expression takes the   element, and that needs this slot.&#xA;&#xA;The latitude attribute stays the constant: it answers when this mapping produces nothing."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="longitudeMapping" eType="#//FeatureMapping"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The richer source of the admin location's longitude, winning over longitudeRef when both are set. See latitudeMapping.&#xA;&#xA;The   longitude attribute stays the constant."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EReference" name="elevationMapping" eType="#//FeatureMapping"
+        containment="true">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The richer source of the admin location's elevation, winning over elevationRef when both are set. See latitudeMapping.&#xA;&#xA;The   elevation attribute stays the constant."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="extendAdmin" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
+        defaultValueLiteral="false">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="Allows resource mappings whose mid is no resource of the admin service. The engine then builds an    Admin subclass carrying them and retypes the provider's admin once. Such a value is readable as a resource and travels on the event bus,    but it is invisible to the snapshot consumers - SensorThings, the provider description and filters. Off by default, so a wrong mid stays a    warning instead of becoming a new admin resource."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="MetadataMapping" eSuperTypes="#//FeatureMapping">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="One metadata entry of a resource, whose value the payload decides.&#xA;&#xA;extraMetadata holds the entries that are the same for every   payload. This one is read per push: it inherits featurePath, collectionFilter, functionId, expression and converterId from FeatureMapping, so the value can be read from a   sibling feature of the mapped value, or computed.&#xA;&#xA;A producer that yields nothing leaves the entry as it is. A payload that does not carry it is not a reason to delete   what an earlier payload wrote."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="key" lowerBound="1" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The name of the metadata entry, as a northbound consumer sees it - the same namespace extraMetadata writes into. Where both name one    key, the produced value overwrites the constant on every push that yields one."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>
@@ -551,6 +537,33 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="converterId" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Optional converter for the selected resources, applied as the 'converterId' of the&#xA;valueMapping that each generated resource receives.&#xA;&#xA;A reference mapping generates one resource per attribute of the referenced type, so a&#xA;converter declared on the ReferenceMapping itself applies to all of them - rarely what is&#xA;wanted, since a Fahrenheit-to-Celsius converter would also be handed the humidity. Name the&#xA;attributes here to convert only those.&#xA;&#xA;Resolved like every other binding setting: the nearest declaration wins, and a binding with an&#xA;empty 'attributes' list is the default for the whole reference. This is the slot the 'unit'&#xA;documentation above already refers to when it speaks of an attribute annotated 'F' exposed as&#xA;'C' after conversion."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+  </eClassifiers>
+  <eClassifiers xsi:type="ecore:EClass" name="MappingSelector">
+    <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+      <details key="documentation" value="A selector based on source, type and dataschema of a CloudEvent. &#xA;When the root which is passed to the InstancePusher is a CloudEvent, the ProviderMapping can &#xA;be selected using this MappingSelector, based on the attributes of the CloudEvent."/>
+    </eAnnotations>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="source" upperBound="-1"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The CloudEvent sources to allow in the selector."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="sourceExcludes" upperBound="-1"
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The CloudEvent sources to exclude in the selector."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="type" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The CloudEvent type to allow in the selector."/>
+      </eAnnotations>
+    </eStructuralFeatures>
+    <eStructuralFeatures xsi:type="ecore:EAttribute" name="dataschema" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString">
+      <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
+        <details key="documentation" value="The CloudEvent dataschema to allow in the selector."/>
       </eAnnotations>
     </eStructuralFeatures>
   </eClassifiers>

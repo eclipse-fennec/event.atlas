@@ -64,6 +64,7 @@
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/admin"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ProviderMapping/providerTimestamp"/>
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/profile"/>
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ProviderMapping/selector"/>
     </genClasses>
     <genClasses ecoreClass="event-atlas-mapping.ecore#//ServiceMapping">
       <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ServiceMapping/resources"/>
@@ -190,6 +191,12 @@
       <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference event-atlas-mapping.ecore#//ReferenceResourceBinding/deletionRule"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceResourceBinding/unit"/>
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//ReferenceResourceBinding/converterId"/>
+    </genClasses>
+    <genClasses ecoreClass="event-atlas-mapping.ecore#//MappingSelector">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingSelector/source"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingSelector/sourceExcludes"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingSelector/type"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute event-atlas-mapping.ecore#//MappingSelector/dataschema"/>
     </genClasses>
   </genPackages>
 </genmodel:GenModel>

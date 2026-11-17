@@ -26,10 +26,12 @@ import java.nio.charset.StandardCharsets;
 
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.TransportContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -60,7 +62,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("A payload that reaches the twin answers 200")
 	void ingest_applied_answersOk() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.applied(1, 2));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.applied(1, 2));
 
 		Response response = resource.ingest("weather", "application/xml", PAYLOAD);
 
@@ -71,7 +73,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("A payload nobody maps answers 202, not 200 - it was understood but dropped")
 	void ingest_noMapping_answersAccepted() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.noMapping(1, "Sensor"));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.noMapping(1, "Sensor"));
 
 		Response response = resource.ingest("weather", "application/xml", PAYLOAD);
 
@@ -82,7 +84,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("An unresolvable model answers 422 and names the nsURI")
 	void ingest_modelUnknown_answersUnprocessable() {
-		when(payloadIngest.ingest(any(), any(), any()))
+		when(payloadIngest.ingest(any(), any(), any(), any()))
 				.thenReturn(IngestResult.modelUnknown("http://example.org/nowhere/1.0"));
 
 		Response response = resource.ingest("weather", "application/xml", PAYLOAD);
@@ -94,7 +96,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("An unparseable payload answers 400")
 	void ingest_parseError_answersBadRequest() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.parseError("unexpected token"));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.parseError("unexpected token"));
 
 		assertEquals(400, resource.ingest("weather", "application/json", PAYLOAD).getStatus());
 	}
@@ -102,7 +104,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("A payload with no objects answers 400")
 	void ingest_empty_answersBadRequest() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.empty());
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.empty());
 
 		assertEquals(400, resource.ingest("weather", "application/xml", PAYLOAD).getStatus());
 	}
@@ -110,7 +112,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("A format this runtime has no codec for answers 501, not 400 - the request was fine")
 	void ingest_formatUnsupported_answersNotImplemented() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.formatUnsupported("json"));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.formatUnsupported("json"));
 
 		Response response = resource.ingest("weather", "application/json", PAYLOAD);
 
@@ -121,7 +123,7 @@ public class PayloadIngestResourceTest {
 	@Test
 	@DisplayName("A twin write failure answers 503, so the sender knows to retry")
 	void ingest_pushFailed_answersServiceUnavailable() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.pushFailed(1, "gateway down"));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.pushFailed(1, "gateway down"));
 
 		assertEquals(503, resource.ingest("weather", "application/xml", PAYLOAD).getStatus());
 	}
@@ -131,17 +133,22 @@ public class PayloadIngestResourceTest {
 	void ingest_emptyBody_answersBadRequestWithoutIngesting() {
 		assertEquals(400, resource.ingest("weather", "application/xml", new byte[0]).getStatus());
 		assertEquals(400, resource.ingest("weather", "application/xml", null).getStatus());
-		verify(payloadIngest, never()).ingest(any(), any(), any());
+		verify(payloadIngest, never()).ingest(any(), any(), any(), any());
 	}
 
 	@Test
 	@DisplayName("The content type is passed through as the format hint and the channel as the source")
 	void ingest_passesContentTypeAndChannel() {
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.applied(1, 1));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.applied(1, 1));
 
 		resource.ingest("weather", "application/json", PAYLOAD);
 
-		verify(payloadIngest).ingest(any(byte[].class), eq("application/json"), eq("rest/weather"));
+		ArgumentCaptor<TransportContext> transport = ArgumentCaptor.forClass(TransportContext.class);
+		verify(payloadIngest).ingest(any(byte[].class), eq("application/json"), eq("rest/weather"),
+				transport.capture());
+		assertEquals("weather", transport.getValue().extensions().get(PayloadIngestResource.EXTENSION_CHANNEL));
+		assertEquals(PayloadIngestResource.DEFAULT_EVENT_TYPE, transport.getValue().type(),
+				"a posted payload and a published message are not the same occurrence");
 	}
 
 	private static void inject(Object target, String fieldName, Object value) {

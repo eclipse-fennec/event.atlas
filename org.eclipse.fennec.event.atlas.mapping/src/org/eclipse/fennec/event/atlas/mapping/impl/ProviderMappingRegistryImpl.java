@@ -45,6 +45,7 @@ import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.MappingProfileRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
+import org.eclipse.fennec.event.atlas.model.mapping.MappingSelector;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ResourceMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
@@ -63,6 +64,8 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.PromiseFactory;
+
+import io.cloudevents.model.ce.CloudEventsPackage;
 
 /**
  * Collects {@link ProviderMapping}s from the named EObject registry
@@ -298,6 +301,21 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			}
 			return Optional.empty();
 		}
+		String refusedSelector = refusedSelector(mapping);
+		if (refusedSelector != null) {
+			if (!quiet) {
+				logger.severe(String.format("ProviderMapping '%s' (%s) has an unusable selector - skipping: %s",
+						entry.key(), mapping.getMid(), refusedSelector));
+			}
+			return Optional.empty();
+		}
+		if (!quiet && isEnvelopeRooted(mapping) && mapping.getSelector() == null) {
+			logger.warning(String.format(
+					"ProviderMapping '%s' (%s) is rooted at the envelope and carries no selector, so it claims "
+							+ "every message in this runtime, of every model. Add a selector naming the sources, "
+							+ "the type or the dataschema it is for.",
+					entry.key(), mapping.getMid()));
+		}
 		List<String> refusedServices = refusedTypedServices(mapping);
 		if (!refusedServices.isEmpty()) {
 			if (!quiet) {
@@ -316,6 +334,43 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			undefer(entry);
 		}
 		return Optional.of(mapping);
+	}
+
+	/**
+	 * Whether this mapping declares the <em>envelope</em> as its root rather than a payload.
+	 * <p>
+	 * A mapping says which it is with {@code providerClasses}: a domain EClass roots it at the
+	 * payload, {@code ce::CloudEvent} roots it at the envelope. Compared by nsURI and name
+	 * rather than by EClass identity, because the question here is what the author wrote - a
+	 * mapping whose CloudEvent resolved to another copy of the package is envelope-rooted too,
+	 * even though the push-time lookup, which keys on identity, would then miss it.
+	 */
+	static boolean isEnvelopeRooted(ProviderMapping mapping) {
+		return mapping.getProviderClasses().stream().filter(eClass -> !eClass.eIsProxy())
+				.anyMatch(eClass -> eClass.getEPackage() != null
+						&& CloudEventsPackage.eNS_URI.equals(eClass.getEPackage().getNsURI())
+						&& CloudEventsPackage.Literals.CLOUD_EVENT.getName().equals(eClass.getName()));
+	}
+
+	/**
+	 * Why this mapping's selector cannot be used, or <code>null</code> if it can.
+	 * <p>
+	 * Refused rather than ignored, and refused for the whole mapping: a selector that does not
+	 * compile selects nothing, so keeping the mapping would leave it registered and silently
+	 * out of service - the failure mode a selector exists to prevent. A mapping without a
+	 * selector is always fine; it matches every message of its EClass, deliberately.
+	 */
+	static String refusedSelector(ProviderMapping mapping) {
+		MappingSelector selector = mapping.getSelector();
+		if (selector == null) {
+			return null;
+		}
+		try {
+			CompiledSelector.compile(selector);
+			return null;
+		} catch (IllegalArgumentException e) {
+			return e.getMessage();
+		}
 	}
 
 	/**
@@ -567,6 +622,15 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 	 */
 	@Override
 	public void registerModelMapping(ProviderMapping mapping) {
+		// The registry sources are filtered by validMapping before they get here; this is the
+		// programmatic caller, which has no entry to name and would otherwise register a
+		// mapping that can never select anything.
+		String refusedSelector = refusedSelector(mapping);
+		if (refusedSelector != null) {
+			logger.severe(String.format("ProviderMapping '%s' has an unusable selector - not registered: %s",
+					mapping.getMid(), refusedSelector));
+			return;
+		}
 		mapping.getProviderClasses().forEach(ec->{
 			logger.info(String.format("Registering provider mapping for '%s' into registry", mapping.getMid()));
 			registry.computeIfAbsent(ec, e->new ArrayList<>()).add(mapping);

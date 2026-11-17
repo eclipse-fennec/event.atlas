@@ -58,10 +58,65 @@ of a profile as a contract for a split provider, and it is written into both fil
 | what | where | kind |
 |---|---|---|
 | the `udp.traficam.detections` function | beside `ViewportValueFunction`; builds the FeatureCollection the `TrafiCamDto` used to carry | Jena's code, no engine gap |
-| the id from the MQTT topic | `TLSignalState.intersectionId` only - `CamConfig.camId` is in place | a transient attribute, Jena's change |
+| the id from the MQTT topic | `TLSignalState.intersectionId` only - `CamConfig.camId` is in place | a transient attribute, Jena's change **or** an envelope-rooted mapping, see below |
 | binary EMF on ingress | TrafiCam only | southbound, not the engine |
 | a `Metadata` annotation on `ObservedObjects.objects` | `traficam.ecore`, one line | Jena's change, see the mapping's note |
 | the ILSA thermal flow | the topic carries a bare number, not an EObject | the adapter wraps it; then `serviceEClass=Thermal` expresses it |
+
+### The topic is readable now, and that changes the id question
+
+Since 2026-11-17 (#96/#97) every southbound message arrives in a CloudEvents envelope carrying
+the topic it was published to, and a mapping that declares `ce::CloudEvent` as its root reads it
+with one feature path - see *Mapping the envelope itself* in the
+[user guide](../../../docs/sensinact-mapping-user-guide.md). So the engine no longer forces a
+transient id attribute onto the Jena models.
+
+**Both versions of all four flows are here now**, so each can be tried against the real
+adapters:
+
+| flow | payload-rooted | envelope-rooted |
+|---|---|---|
+| ILSA signal state | `ilsa-signal-state-mapping.xmi` | `ilsa-signal-state-ce-mapping.xmi` |
+| ILSA configuration | `ilsa-configuration-mapping.xmi` | `ilsa-configuration-ce-mapping.xmi` |
+| TrafiCam configuration | `traficam-config-mapping.xmi` | `traficam-config-ce-mapping.xmi` |
+| TrafiCam detections | `traficam-detections-mapping.xmi` | `traficam-detections-ce-mapping.xmi` |
+
+**Deploy one set or the other, never both.** Each pair shares its `UNIFIED` profile, so a twin
+and its original answer the same provider id and build the same model. Deployed together both
+match every message - one through the payload lookup, one through the envelope lookup - and both
+write the same resources, with registration order deciding which value survives. Each twin's
+header carries the two-line recipe for running them side by side instead.
+
+The conversion turned out to be mechanical, and two things the plan feared are not true:
+
+- **A feature path crosses `data`.** It is typed `EObject` and declares no payload features, but
+  `data` is itself a feature of `CloudEvent` - so a path names it as its first step and navigates
+  on, including a `referencedResource` path. One block still makes one service per element.
+- **An expression needs no `oclAsType`.** m2x hands a statically unresolvable property to the
+  evaluator, which looks it up on the runtime type, so `self.data.intersectionName` works.
+
+So the real edits per mapping are: `providerClasses` → `ce::CloudEvent`, a selector, the provider
+name from the topic, a `CloudEvent/data` first step on every path **rooted at the message**, and
+a `data.` segment on every expression rooted there. Paths and expressions below a
+`referencedResource` are unchanged, because their source is the element, not the root.
+
+Three things still to check before deploying a twin:
+
+- **The topic segment index.** `source` is flat, so the id is `self.source.tokenize('/')->at(n)`
+  and `n` differs per flow - the TrafiCam camera is the *fourth* segment of
+  `5g/config/traficam/<cam>` and the *third* of `5g/traficam/<cam>/<class>`. Each file states
+  which it uses and why.
+- **TrafiCam has no envelope yet.** It reads binary EMF and calls `InstancePusher` directly;
+  `pushInstance(EObject)` builds no envelope, so those two twins apply to nothing until the
+  adapter builds a `CloudEvent` and calls `pushInstance(CloudEvent)`. That adapter change is what
+  the twin costs instead of the model change.
+- **The attribute names.** The envelope's id is `eventId`, so a carried-over `self.id` stops
+  parsing - and `type`, `subject`, `time` and `source` all parse against the *envelope*, which
+  are plausible payload attribute names too.
+
+Keeping `TLSignalState.intersectionId` stays a valid answer; it is what the payload-rooted set is
+written for. `UdpMappingWellFormedTest` reads every file in this folder, so a typo in either set
+fails the build even though nothing here executes them.
 
 ### Two things that changed with item 8
 

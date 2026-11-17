@@ -147,6 +147,173 @@ All feature paths honour [collection navigation](#collections).
 | `services` (child, 0..\*) | The [service mappings](#service-mapping). |
 | `admin` (child) | The [admin service](#admin-service). |
 | `profile` (ref) | Optional [mapping profile](#mapping-profiles) this mapping conforms to. |
+| `selector` (child) | Optional — which messages this mapping serves, see [Selecting by message](#selecting-by-message). Without one it serves every message of its `providerClasses`. |
+
+### Selecting by message
+
+`providerClasses` says *what* a mapping reads. A selector says *which messages* it reads,
+matching on the envelope every southbound message arrives in — the topic it was published to,
+the event type, the schema the payload was read as.
+
+It exists because one `EClass` is not always one device family. Two intersections can publish
+the same `TLSignalState` on two topics, and without a selector a mapping cannot tell them apart.
+
+**This needs no envelope-rooted mapping.** Both mappings stay payload-rooted and name the same
+`providerClasses`; the EClass lookup returns both, and the selector keeps the one whose topic
+matched. So one message type published per site can have its own provider naming and its own
+target model, from two ordinary mappings that differ only in their selector. Rooting a mapping at
+the envelope is a separate choice, and it is for *reading* envelope values — see
+[Mapping the envelope itself](#mapping-the-envelope-itself).
+
+```xml
+<selector source="5g/ilsa/#" sourceExcludes="5g/ilsa/lobedaer-platz/#"/>
+```
+
+| Attribute | Meaning |
+|---|---|
+| `source` (0..\*) | MQTT topic filters this mapping serves. Any one of them matching is enough. No `source` says nothing about the source. |
+| `sourceExcludes` (0..\*) | Topic filters this mapping does **not** serve. An exclude beats every include. |
+| `type` | The CloudEvents `type`, compared exactly. |
+| `dataschema` | The schema the payload was read as, `<nsURI>#//<EClass>`, compared exactly. |
+
+Every attribute you set must hold; one you leave out is not a condition. A selector that sets
+nothing at all is **refused at registration**, as is one carrying a filter that does not parse —
+a selector that can never match would take the mapping out of service without saying so.
+
+**A source is matched as an MQTT topic filter**: `+` is exactly one level, `#` is the remaining
+levels and must be the last one, and `a/#` matches `a` itself. `*` is an ordinary character.
+The filter is read by the same code that reads a `codec.rootType` entry, so a filter pasted from
+your broker configuration means the same in both places. The source a message carries is its
+topic, or `rest/<channel>` for a payload posted to the ingest endpoint.
+
+#### Every mapping that matches applies
+
+Nothing is ranked. If two mappings match one message, both apply — which is what lets two
+mappings fill different services of one provider. A mapping **without** a selector therefore
+keeps matching every message of its `EClass`, deliberately, even after you add topic-specific
+ones beside it.
+
+That is what `sourceExcludes` is for. Suppose `ilsa-signal-state` serves every intersection, and
+one site gets a controller that reports on another scale, so you add `ilsa-signal-state-lobeda`
+for `5g/ilsa/lobedaer-platz/#`. Both mappings now match that site's messages, both write the same
+resource, and which value survives depends on registration order — a directory listing, which a
+restart can change. A topic filter cannot say "except", because `+` and `#` only ever add topics.
+So the general mapping says it instead:
+
+```xml
+<selector source="5g/ilsa/#" sourceExcludes="5g/ilsa/lobedaer-platz/#"/>
+```
+
+Adding a specific mapping is then a two-file edit. That is the cost, and it is deliberate: it
+scales with the exceptions rather than with the devices, and forgetting the exclude line gives a
+wrong value that names the file to fix — where "the most specific mapping wins" would instead
+drop a composed mapping at one site and tell you nothing.
+
+#### A selector never matches a push without an envelope
+
+`InstancePusher.pushInstance(EObject)` — a programmatic push, with no message behind it — has no
+source, no type and no schema, so no selector can match and no mapping carrying one applies. It
+is an ordinary non-match rather than a special case.
+
+So a mapping that is also pushed programmatically, which includes every mapping exercised by a
+plain `pushInstance`, simply carries no selector. Every example in this guide is of that kind.
+
+### Mapping the envelope itself
+
+`providerClasses` does two jobs. It says which source `EClass`es a mapping applies to, and by
+doing so it **declares the mapping's root** — the object every feature path starts from.
+
+| `providerClasses` names | Root | `self` is | Reaches |
+|---|---|---|---|
+| a domain `EClass` | **payload-rooted** | the payload | the payload directly; not the envelope |
+| `ce::CloudEvent` | **envelope-rooted** | the envelope | `source`, `type`, `time`, `extensions`; the payload below `data` |
+
+Everything in this guide so far is payload-rooted, and nothing about it changes. An
+envelope-rooted mapping is the other choice, and the file says which it is — no rule infers a
+root, and there is one navigation mechanism rather than two.
+
+```xml
+<providerClasses href="https://cloudevents.io/1.0.2#//CloudEvent"/>
+<selector source="5g/ilsa/#"/>
+<services mid="message">
+  <name name="Message"/>
+  <resources name="source" mid="source">
+    <eType xsi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    <valueFeature xsi:type="ecore:EAttribute" href="https://cloudevents.io/1.0.2#//CloudEvent/source"/>
+  </resources>
+</services>
+```
+
+The topic is **one feature path step**, `CloudEvent/source`. That is the point: a payload-rooted
+mapping cannot see the topic at all, which is why an adapter otherwise has to copy a topic
+segment into a transient attribute of the model first.
+
+An extension is `CloudEvent/extensions` with a `collectionFilter="key=mqtt.broker"` continuing to
+`value` — an EMF map, read exactly like the one in
+[the iotraffic example](iotraffic-counter-example.md).
+
+#### An envelope-rooted mapping should carry a selector
+
+It names `CloudEvent`, so it claims **every message in the runtime, of every model** — and it
+says nothing about the payload type, because `providerClasses` is spent on the envelope.
+`dataschema` in the selector is the only place left to say what the mapping is for.
+
+One without a selector is **warned about at registration**, naming the mid. It is not refused: a
+runtime serving one device family may legitimately want the catch-all. The degradation is noise
+rather than corruption — a payload of another EClass simply fails in the feature path and is
+logged per message — but the warning is what tells you which file is doing it.
+
+#### Reading into the payload: name `data`, and no cast
+
+`data` is typed `EObject`, so it declares no payload features — but `data` itself is a feature of
+`CloudEvent`, and that is all a path needs. **A feature path crosses it by naming it as its first
+step**, and from there navigates the payload's own EClass, because path navigation is a dynamic
+`eGet` loop that never consults a static type:
+
+```xml
+<valueFeature xsi:type="ecore:EReference" href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+<valueFeature xsi:type="ecore:EAttribute" href="…/trafficlight/1.1.1#//TLSignalState/state"/>
+```
+
+The same goes for a `referencedResource` path, so **one block still makes one service per
+collection element** below `data`.
+
+An expression needs no cast either:
+
+```
+self.data.intersectionName
+```
+
+m2x leaves a property it cannot resolve statically to the evaluator, which looks it up on the
+**runtime** type. `self.data.oclAsType(ilsa::TLSignalState).intersectionName` also works and is
+the explicit form, but it is not required — and it costs you the package name of a model you may
+not own.
+
+Both are pinned by `CloudEventIngestTest`.
+
+What *is* weaker below `data` is registration-time validation. A payload-rooted mapping has a
+known class to check its feature paths against; an envelope-rooted one does not past the first
+step, so a wrong feature name there appears at push time instead of at registration.
+
+#### Converting a mapping to an envelope root is not a copy
+
+The envelope has attributes whose names a payload plausibly has too, and an expression that names
+one resolves quietly against the wrong object.
+
+The envelope carries `eventId`, `source`, `specVersion`, `type`, `datacontenttype`, `dataschema`,
+`subject`, `time`, `extensions` and `data`. Note **`eventId`, not `id`** — so an expression like
+`self.id.replaceAll('/', '_')`, carried over from a payload-rooted mapping, fails to parse and
+the mapping falls back to its literal: degraded, and logged once.
+
+The dangerous ones are `type`, `subject`, `time` and `source`. Those parse against the envelope
+and return the envelope's value, silently, where the author meant the payload's. Check every
+expression against the list above when you change a mapping's root.
+
+#### One thing a feature path cannot do
+
+`source` is a flat `EString`, so a feature path reaches the **whole** topic and not a single
+segment of it. A mapping that needs the third segment of `5g/ilsa/<intersection>/state` needs OCL
+string operations or a `ValueFunction`; the engine has no segment index.
 
 ### Name mapping
 

@@ -44,7 +44,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * @generated
  */
 @ProviderType
-@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:ac1749bf03c6c9e9e4b6d7dca24d0b3151a4b8e698cc40ecc4ae869a70460358", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
+@EPackage(uri = MappingPackage.eNS_URI, fingerprint = "fp1:2a2fbfabeb85ac28432a6afe2357617f8f8e1093bc245a2296131bb196e77940", genModel = "/model/event-atlas-mapping.genmodel", genModelSourceLocations = {"model/event-atlas-mapping.genmodel","org.eclipse.fennec.event.atlas.mapping/model/event-atlas-mapping.genmodel"}, ecore = "/model/event-atlas-mapping.ecore", ecoreSourceLocations = "/model/event-atlas-mapping.ecore")
 public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	/**
 	 * The package name.
@@ -608,13 +608,22 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int PROVIDER_MAPPING__PROFILE = MAPPING_FEATURE_COUNT + 4;
 
 	/**
+	 * The feature id for the '<em><b>Selector</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int PROVIDER_MAPPING__SELECTOR = MAPPING_FEATURE_COUNT + 5;
+
+	/**
 	 * The number of structural features of the '<em>Provider Mapping</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int PROVIDER_MAPPING_FEATURE_COUNT = MAPPING_FEATURE_COUNT + 5;
+	int PROVIDER_MAPPING_FEATURE_COUNT = MAPPING_FEATURE_COUNT + 6;
 
 	/**
 	 * The operation id for the '<em>Map Id</em>' operation.
@@ -2580,6 +2589,70 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	int REFERENCE_RESOURCE_BINDING_OPERATION_COUNT = 0;
 
 	/**
+	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MappingSelectorImpl <em>Selector</em>}' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingSelectorImpl
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getMappingSelector()
+	 * @generated
+	 */
+	int MAPPING_SELECTOR = 26;
+
+	/**
+	 * The feature id for the '<em><b>Source</b></em>' attribute list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int MAPPING_SELECTOR__SOURCE = 0;
+
+	/**
+	 * The feature id for the '<em><b>Source Excludes</b></em>' attribute list.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int MAPPING_SELECTOR__SOURCE_EXCLUDES = 1;
+
+	/**
+	 * The feature id for the '<em><b>Type</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int MAPPING_SELECTOR__TYPE = 2;
+
+	/**
+	 * The feature id for the '<em><b>Dataschema</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int MAPPING_SELECTOR__DATASCHEMA = 3;
+
+	/**
+	 * The number of structural features of the '<em>Selector</em>' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int MAPPING_SELECTOR_FEATURE_COUNT = 4;
+
+	/**
+	 * The number of operations of the '<em>Selector</em>' class.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int MAPPING_SELECTOR_OPERATION_COUNT = 0;
+
+	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}' enum.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -2587,7 +2660,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getTimestampStrategy()
 	 * @generated
 	 */
-	int TIMESTAMP_STRATEGY = 26;
+	int TIMESTAMP_STRATEGY = 27;
 
 	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderStrategy <em>Provider Strategy</em>}' enum.
@@ -2597,7 +2670,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getProviderStrategy()
 	 * @generated
 	 */
-	int PROVIDER_STRATEGY = 27;
+	int PROVIDER_STRATEGY = 28;
 
 	/**
 	 * The meta object id for the '{@link org.eclipse.fennec.event.atlas.model.mapping.DurationUnit <em>Duration Unit</em>}' enum.
@@ -2607,7 +2680,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getDurationUnit()
 	 * @generated
 	 */
-	int DURATION_UNIT = 28;
+	int DURATION_UNIT = 29;
 
 	/**
 	 * The meta object id for the '<em>EInstant</em>' data type.
@@ -2617,7 +2690,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getEInstant()
 	 * @generated
 	 */
-	int EINSTANT = 29;
+	int EINSTANT = 30;
 
 	/**
 	 * The meta object id for the '<em>Java String Function</em>' data type.
@@ -2627,7 +2700,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getJavaStringFunction()
 	 * @generated
 	 */
-	int JAVA_STRING_FUNCTION = 30;
+	int JAVA_STRING_FUNCTION = 31;
 
 	/**
 	 * The meta object id for the '<em>Java Instant Function</em>' data type.
@@ -2637,7 +2710,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getJavaInstantFunction()
 	 * @generated
 	 */
-	int JAVA_INSTANT_FUNCTION = 31;
+	int JAVA_INSTANT_FUNCTION = 32;
 
 	/**
 	 * The meta object id for the '<em>Java Object Function</em>' data type.
@@ -2647,7 +2720,7 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getJavaObjectFunction()
 	 * @generated
 	 */
-	int JAVA_OBJECT_FUNCTION = 32;
+	int JAVA_OBJECT_FUNCTION = 33;
 
 
 	/**
@@ -2984,6 +3057,17 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	 * @generated
 	 */
 	EReference getProviderMapping_Profile();
+
+	/**
+	 * Returns the meta object for the containment reference '{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#getSelector <em>Selector</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the containment reference '<em>Selector</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#getSelector()
+	 * @see #getProviderMapping()
+	 * @generated
+	 */
+	EReference getProviderMapping_Selector();
 
 	/**
 	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping <em>Service Mapping</em>}'.
@@ -4010,6 +4094,60 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 	EAttribute getReferenceResourceBinding_ConverterId();
 
 	/**
+	 * Returns the meta object for class '{@link org.eclipse.fennec.event.atlas.model.mapping.MappingSelector <em>Selector</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for class '<em>Selector</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingSelector
+	 * @generated
+	 */
+	EClass getMappingSelector();
+
+	/**
+	 * Returns the meta object for the attribute list '{@link org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getSource <em>Source</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute list '<em>Source</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getSource()
+	 * @see #getMappingSelector()
+	 * @generated
+	 */
+	EAttribute getMappingSelector_Source();
+
+	/**
+	 * Returns the meta object for the attribute list '{@link org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getSourceExcludes <em>Source Excludes</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute list '<em>Source Excludes</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getSourceExcludes()
+	 * @see #getMappingSelector()
+	 * @generated
+	 */
+	EAttribute getMappingSelector_SourceExcludes();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getType <em>Type</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Type</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getType()
+	 * @see #getMappingSelector()
+	 * @generated
+	 */
+	EAttribute getMappingSelector_Type();
+
+	/**
+	 * Returns the meta object for the attribute '{@link org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getDataschema <em>Dataschema</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Dataschema</em>'.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingSelector#getDataschema()
+	 * @see #getMappingSelector()
+	 * @generated
+	 */
+	EAttribute getMappingSelector_Dataschema();
+
+	/**
 	 * Returns the meta object for enum '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}'.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
@@ -4370,6 +4508,14 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EReference PROVIDER_MAPPING__PROFILE = eINSTANCE.getProviderMapping_Profile();
+
+		/**
+		 * The meta object literal for the '<em><b>Selector</b></em>' containment reference feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EReference PROVIDER_MAPPING__SELECTOR = eINSTANCE.getProviderMapping_Selector();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ServiceMappingImpl <em>Service Mapping</em>}' class.
@@ -5170,6 +5316,48 @@ public interface MappingPackage extends org.eclipse.emf.ecore.EPackage {
 		 * @generated
 		 */
 		EAttribute REFERENCE_RESOURCE_BINDING__CONVERTER_ID = eINSTANCE.getReferenceResourceBinding_ConverterId();
+
+		/**
+		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.impl.MappingSelectorImpl <em>Selector</em>}' class.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingSelectorImpl
+		 * @see org.eclipse.fennec.event.atlas.model.mapping.impl.MappingPackageImpl#getMappingSelector()
+		 * @generated
+		 */
+		EClass MAPPING_SELECTOR = eINSTANCE.getMappingSelector();
+
+		/**
+		 * The meta object literal for the '<em><b>Source</b></em>' attribute list feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute MAPPING_SELECTOR__SOURCE = eINSTANCE.getMappingSelector_Source();
+
+		/**
+		 * The meta object literal for the '<em><b>Source Excludes</b></em>' attribute list feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute MAPPING_SELECTOR__SOURCE_EXCLUDES = eINSTANCE.getMappingSelector_SourceExcludes();
+
+		/**
+		 * The meta object literal for the '<em><b>Type</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute MAPPING_SELECTOR__TYPE = eINSTANCE.getMappingSelector_Type();
+
+		/**
+		 * The meta object literal for the '<em><b>Dataschema</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute MAPPING_SELECTOR__DATASCHEMA = eINSTANCE.getMappingSelector_Dataschema();
 
 		/**
 		 * The meta object literal for the '{@link org.eclipse.fennec.event.atlas.model.mapping.TimestampStrategy <em>Timestamp Strategy</em>}' enum.

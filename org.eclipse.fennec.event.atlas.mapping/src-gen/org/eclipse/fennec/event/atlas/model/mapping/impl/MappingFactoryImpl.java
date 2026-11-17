@@ -94,6 +94,7 @@ public class MappingFactoryImpl extends EFactoryImpl implements MappingFactory {
 			case MappingPackage.TIME_THROTTLE_CHANGE_RULE: return createTimeThrottleChangeRule();
 			case MappingPackage.DELETION_RULE: return createDeletionRule();
 			case MappingPackage.REFERENCE_RESOURCE_BINDING: return createReferenceResourceBinding();
+			case MappingPackage.MAPPING_SELECTOR: return createMappingSelector();
 			default:
 				throw new IllegalArgumentException("The class '" + eClass.getName() + "' is not a valid classifier");
 		}
@@ -402,6 +403,17 @@ public class MappingFactoryImpl extends EFactoryImpl implements MappingFactory {
 	public ReferenceResourceBinding createReferenceResourceBinding() {
 		ReferenceResourceBindingImpl referenceResourceBinding = new ReferenceResourceBindingImpl();
 		return referenceResourceBinding;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public MappingSelector createMappingSelector() {
+		MappingSelectorImpl mappingSelector = new MappingSelectorImpl();
+		return mappingSelector;
 	}
 
 	/**

@@ -9,8 +9,13 @@ Bundle-Description: Test-only southbound simulator: periodically renders a Weath
 
 -library: enableEMF
 
+# io.cloudevents.model is needed to COMPILE, not to run: InstancePusher.pushInstance is
+# overloaded on CloudEvent, and javac resolves an overload only when it can see every
+# candidate. The simulator pushes a bare EObject, so nothing of it reaches the bytecode and
+# bnd computes no package import for it.
 -buildpath: \
 	org.eclipse.emf.ecore.xmi;version=latest,\
+	io.cloudevents.model;version=latest,\
 	org.eclipse.fennec.emf.osgi.api;version=latest,\
 	org.eclipse.fennec.event.atlas.mapping;version=snapshot
 

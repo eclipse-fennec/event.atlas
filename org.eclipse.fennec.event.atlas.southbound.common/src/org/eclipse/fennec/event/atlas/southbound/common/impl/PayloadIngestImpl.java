@@ -19,20 +19,22 @@ import java.io.ByteArrayInputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.eclipse.emf.common.util.URI;
@@ -45,20 +47,24 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.xmi.PackageNotFoundException;
 import org.eclipse.fennec.emf.osgi.ResourceSetFactory;
 import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
+import org.eclipse.fennec.event.atlas.mapping.SourceFilter;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.TransportContext;
 import org.eclipse.fennec.event.atlas.southbound.common.UnknownModelHandler;
 import org.eclipse.fennec.event.atlas.southbound.common.UnknownPayload;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Modified;
-import org.osgi.service.component.annotations.ConfigurationPolicy;
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+
+import io.cloudevents.model.ce.CloudEvent;
+import io.cloudevents.model.ce.CloudEventsFactory;
 
 /**
  * Default {@link PayloadIngest}: deserializes through the runtime's {@link ResourceSet} and
@@ -99,11 +105,13 @@ public class PayloadIngestImpl implements PayloadIngest {
 
 		/**
 		 * The root type a channel's payloads are read as, as
-		 * {@code <source pattern>=<nsURI>#//EClass} entries - for example
+		 * {@code <source filter>=<nsURI>#//EClass} entries - for example
 		 * {@code iotraffic/#=https://eclipse.org/fennec/lorawan/iotraffic#//CounterUplink}.
-		 * The pattern is matched against the ingest source ({@code rest/<channel>}, or the
-		 * MQTT topic a listener passes), where {@code *} and {@code #} stand for any text;
-		 * the first entry that matches wins.
+		 * The filter is an MQTT topic filter ({@code +} for one level, {@code #} for the
+		 * rest) matched against the ingest source ({@code rest/<channel>}, or the MQTT topic
+		 * a listener passes); the first entry that matches wins. {@code *} is an ordinary
+		 * character - it used to mean "any text" here and no longer does, so an entry
+		 * carrying one is warned about at activation.
 		 * <p>
 		 * This is what lets device families that do not share one discriminator coexist in a
 		 * runtime. The codec resolves a JSON payload's root type from <em>one</em>
@@ -173,14 +181,31 @@ public class PayloadIngestImpl implements PayloadIngest {
 	private ResourceSetFactory resourceSetFactory;
 	@Reference
 	private InstancePusher instancePusher;
+
 	/**
 	 * Optional so a runtime without one behaves exactly as it did before the hook existed;
 	 * dynamic so deploying or reconfiguring a handler does not tear ingest down and interrupt
-	 * the southbound adapters bound to it.
+	 * the southbound adapters bound to it. Reluctant on purpose: a runtime deploys one
+	 * handler, so rebinding to a better-ranked one is a case that does not arise here.
+	 * <p>
+	 * Initialized here rather than in {@link #activate(Config)}: that method is also the
+	 * {@link Modified} handler, and DS binds a dynamic reference before the first activation
+	 * anyway - a field assigned in activate would be null for the bind that precedes it.
 	 */
-	@Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC, //
-			policyOption = ReferencePolicyOption.GREEDY)
-	private volatile UnknownModelHandler unknownModelHandler;
+	private final AtomicReference<UnknownModelHandler> unknownModelHandler = new AtomicReference<>();
+
+	@Reference(policy = ReferencePolicy.DYNAMIC, cardinality = ReferenceCardinality.OPTIONAL)
+	public void bindUnknownModelHandler(UnknownModelHandler unknownModelHandler) {
+		this.unknownModelHandler.set(unknownModelHandler);
+	}
+
+	/**
+	 * Clears the reference only if the handler going away is the one held, so a replacement
+	 * that has already bound is not dropped by the old one's unbind.
+	 */
+	public void unbindUnknownModelHandler(UnknownModelHandler unknownModelHandler) {
+		this.unknownModelHandler.compareAndSet(unknownModelHandler, null);
+	}
 
 	@Activate
 	@Modified
@@ -204,13 +229,21 @@ public class PayloadIngestImpl implements PayloadIngest {
 	}
 
 	/**
-	 * A configured {@code <source pattern>=<root type>} entry.
+	 * A configured {@code <source filter>=<root type>} entry.
 	 * <p>
-	 * The pattern is matched whole against the ingest source, with {@code *} and {@code #}
-	 * standing for any text - so an MQTT topic filter can be pasted in as it is written in
-	 * the listener's configuration.
+	 * The filter is an MQTT topic filter, read by the runtime's one
+	 * {@link SourceFilter} - the same class a mapping's selector uses - so a filter pasted
+	 * out of the broker configuration means here what it means there.
+	 * <p>
+	 * <b>That changed the dialect.</b> Until 2026-11-17 this was a pattern of its own in
+	 * which {@code *} and {@code #} both stood for "any text" anywhere, so {@code rest/*}
+	 * matched {@code rest/counter} and {@code a/#/c} was accepted. Now {@code +} is exactly
+	 * one level, {@code #} is the remainder and only the last level, and {@code *} is an
+	 * ordinary character. A filter carrying a {@code *} still compiles - it is legal MQTT -
+	 * so it would otherwise silently stop matching; {@link #parse(String[])} warns about
+	 * each one instead.
 	 */
-	private record RootTypeHint(Pattern source, String rootType) {
+	private record RootTypeHint(SourceFilter source, String rootType) {
 
 		private static List<RootTypeHint> parse(String[] entries) {
 			if (entries == null || entries.length == 0) {
@@ -224,33 +257,27 @@ public class PayloadIngestImpl implements PayloadIngest {
 				int equals = entry.indexOf('=');
 				if (equals < 1 || equals == entry.length() - 1) {
 					logger.warning(String.format(
-							"Ignoring root type '%s': expected <source pattern>=<nsURI>#//EClass", entry));
+							"Ignoring root type '%s': expected <source filter>=<nsURI>#//EClass", entry));
 					continue;
 				}
-				hints.add(new RootTypeHint(toPattern(entry.substring(0, equals).trim()),
-						entry.substring(equals + 1).trim()));
+				SourceFilter filter;
+				try {
+					filter = SourceFilter.compile(entry.substring(0, equals).trim());
+				} catch (IllegalArgumentException e) {
+					// ignored rather than refused: one bad entry must not cost a channel its
+					// typing, and the ingest has no way to report a configuration error
+					logger.warning(String.format("Ignoring root type '%s': %s", entry, e.getMessage()));
+					continue;
+				}
+				if (filter.hasStar()) {
+					logger.warning(String.format(
+							"Root type filter '%s' contains '*', which is an ordinary character now and no "
+									+ "longer stands for any text - use '+' for one level or '#' for the rest",
+							filter.filter()));
+				}
+				hints.add(new RootTypeHint(filter, entry.substring(equals + 1).trim()));
 			}
 			return List.copyOf(hints);
-		}
-
-		private static Pattern toPattern(String sourcePattern) {
-			StringBuilder regex = new StringBuilder();
-			StringBuilder literal = new StringBuilder();
-			for (char c : sourcePattern.toCharArray()) {
-				if (c == '*' || c == '#') {
-					if (literal.length() > 0) {
-						regex.append(Pattern.quote(literal.toString()));
-						literal.setLength(0);
-					}
-					regex.append(".*");
-				} else {
-					literal.append(c);
-				}
-			}
-			if (literal.length() > 0) {
-				regex.append(Pattern.quote(literal.toString()));
-			}
-			return Pattern.compile(regex.toString());
 		}
 	}
 
@@ -264,7 +291,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 			return loadOptions;
 		}
 		for (RootTypeHint hint : hints) {
-			if (!hint.source().matcher(source).matches()) {
+			if (!hint.source().matches(source)) {
 				continue;
 			}
 			EClass rootType = resolveRootType(resourceSet, hint.rootType());
@@ -321,6 +348,15 @@ public class PayloadIngestImpl implements PayloadIngest {
 	 */
 	@Override
 	public IngestResult ingest(byte[] payload, String formatHint, String source) {
+		return ingest(payload, formatHint, source, null);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest#ingest(byte[], java.lang.String, java.lang.String, org.eclipse.fennec.event.atlas.southbound.common.TransportContext)
+	 */
+	@Override
+	public IngestResult ingest(byte[] payload, String formatHint, String source, TransportContext transport) {
 		requireNonNull(payload, "Payload must not be null");
 		String origin = source == null || source.isBlank() ? "<unknown source>" : source;
 		String format = resolveFormat(formatHint, payload);
@@ -365,7 +401,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 		int applied = 0;
 		try {
 			for (EObject root : roots) {
-				applied += instancePusher.pushInstance(root);
+				applied += instancePusher.pushInstance(envelope(resource, root, origin, format, transport));
 			}
 		} catch (RuntimeException e) {
 			// pushInstance fails as a whole when the gateway itself is unavailable. Contain
@@ -403,6 +439,81 @@ public class PayloadIngestImpl implements PayloadIngest {
 	}
 
 	/**
+	 * Wraps one deserialized root in a CloudEvents envelope.
+	 * <p>
+	 * The envelope is added to the resource the payload was read from <em>before</em> the root
+	 * is handed to {@code setData}, and that order is the point: {@code data} is a containment
+	 * reference, so setting it takes the root out of the resource's contents. With the
+	 * envelope in the resource the root stays reachable through it - {@code eResource()} keeps
+	 * answering, an {@code href} inside the payload still resolves, and the resource set whose
+	 * package registry an envelope-rooted expression will need is still the one the payload
+	 * was loaded with.
+	 * <p>
+	 * What this fills is what the ingest knows: the data, the schema it was read as, the
+	 * content type it was read from, and the time it arrived. The source is the adapter's, and
+	 * so are the type and the extensions, which arrive in <code>transport</code>.
+	 * @return the envelope, never <code>null</code>
+	 */
+	private CloudEvent envelope(Resource resource, EObject root, String origin, String format,
+			TransportContext transport) {
+		CloudEvent event = CloudEventsFactory.eINSTANCE.createCloudEvent();
+		// Per root rather than per payload: a CloudEvent describes one occurrence, which is
+		// what keeps dataschema meaningful when a payload carries roots of different types.
+		event.setEventId(UUID.randomUUID().toString());
+		event.setSource(origin);
+		event.setType(eventType(transport));
+		event.setTime(new Date());
+		event.setDatacontenttype(mediaType(format));
+		event.setDataschema(dataschema(root.eClass()));
+		if (transport != null && !transport.extensions().isEmpty()) {
+			event.getExtensions().putAll(transport.extensions());
+		}
+		resource.getContents().add(event);
+		event.setData(root);
+		return event;
+	}
+
+	/**
+	 * @return the configured event type, or {@link PayloadIngest#DEFAULT_EVENT_TYPE} - the
+	 * attribute is required by the envelope model and this runtime has nothing to derive it
+	 * from
+	 */
+	private static String eventType(TransportContext transport) {
+		if (transport == null || transport.type() == null || transport.type().isBlank()) {
+			return DEFAULT_EVENT_TYPE;
+		}
+		return transport.type().trim();
+	}
+
+	/**
+	 * Names the EClass a payload was read as, as {@code <nsURI>#//<EClass>} - the same shape
+	 * {@code codec.rootType} is configured in, so one spelling answers both "what did this
+	 * channel send" and "what should it be read as".
+	 * <p>
+	 * Built from the nsURI rather than taken from {@code EcoreUtil.getURI}, which for a model
+	 * loaded from a document - everything a Model Atlas delivers - reports that document's URI
+	 * instead.
+	 */
+	private static String dataschema(EClass eClass) {
+		EPackage ePackage = eClass.getEPackage();
+		return ePackage == null ? eClass.getName() : ePackage.getNsURI() + "#//" + eClass.getName();
+	}
+
+	/**
+	 * @return the media type the payload was actually read as. The resolved format is used
+	 * rather than the hint the adapter passed, so the envelope reports how the bytes were
+	 * read and not what they were announced as - the two differ whenever the format was
+	 * detected or an unrecognized hint fell back to XMI
+	 */
+	private static String mediaType(String format) {
+		return switch (format) {
+			case FORMAT_JSON -> "application/json";
+			case FORMAT_XMI -> "application/xml";
+			default -> "application/" + format;
+		};
+	}
+
+	/**
 	 * Reports a payload that could not be turned into objects: at warning level, unless the
 	 * {@link UnknownModelHandler} says it is currently collecting that channel's payloads on
 	 * purpose.
@@ -426,7 +537,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 	 * handler that misbehaves here must not cost the log message, let alone the ingest
 	 */
 	private boolean isCollecting(String origin) {
-		UnknownModelHandler handler = unknownModelHandler;
+		UnknownModelHandler handler = unknownModelHandler.get();
 		if (handler == null) {
 			return false;
 		}
@@ -453,7 +564,7 @@ public class PayloadIngestImpl implements PayloadIngest {
 	 * this is a side channel, not a second result.
 	 */
 	private IngestResult offerUnknown(IngestResult result, byte[] payload, String format, String origin) {
-		UnknownModelHandler handler = unknownModelHandler;
+		UnknownModelHandler handler = unknownModelHandler.get();
 		if (handler == null) {
 			return result;
 		}

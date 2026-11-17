@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The dragino battery mapping with a selector, used by CloudEventIngestTest (#97).
+
+  It serves the topic tree 'a/b/#', except 'a/b/ignored/#'. That shape is the point of the
+  exclude: an MQTT topic filter is positive only - '+' and '#' add topics and nothing
+  removes one - so "everything under a/b except this one branch" cannot be written as a
+  filter at all. Without the exclude, a general mapping keeps applying where a specific one
+  replaces it, both write the same resource, and which value survives depends on
+  registration order.
+-->
+<mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    xsi:schemaLocation="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="dragino-selected">
+  <timestamp>
+    <featurePath
+        xsi:type="ecore:EReference"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/rxInfo"/>
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//RxInfo/time"/>
+  </timestamp>
+  <!--
+    Named from the devEui rather than the deduplicationId, so this mapping answers a provider
+    id of its own. It is not a property of selectors: two mappings that both match both apply,
+    and if they also share a provider id they must share a model, which is what a UNIFIED
+    profile is for. Two models claiming one provider id is a clash in the twin.
+  -->
+  <name name="Dragino LSE01 Selected">
+    <featurePath
+        xsi:type="ecore:EReference"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/deviceInfo"/>
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//DeviceInfo/devEui"/>
+  </name>
+  <providerClasses
+      href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink"/>
+  <selector source="a/b/#" sourceExcludes="a/b/ignored/#"/>
+  <services
+      mid="battery">
+    <name name="Battery"/>
+    <resources
+        name="Battery Level"
+        unit="V"
+        timestamp="//@timestamp"
+        mid="level">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink/object"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DecodedObject/batV"/>
+    </resources>
+  </services>
+  <admin mid="admin">
+    <name name="Admin"/>
+    <providerPackage
+        href="https://eclipse.org/fennec/lorawan/dragino#/"/>
+  </admin>
+</mapping:ProviderMapping>

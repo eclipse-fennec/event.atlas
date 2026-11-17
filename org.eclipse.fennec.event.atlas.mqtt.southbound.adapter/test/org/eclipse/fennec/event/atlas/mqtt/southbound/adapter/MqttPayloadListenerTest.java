@@ -15,6 +15,7 @@ package org.eclipse.fennec.event.atlas.mqtt.southbound.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +31,7 @@ import java.util.Dictionary;
 
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.TransportContext;
 import org.eclipse.sensinact.gateway.southbound.mqtt.api.IMqttMessage;
 import org.eclipse.sensinact.gateway.southbound.mqtt.api.IMqttMessageListener;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,11 +117,32 @@ public class MqttPayloadListenerTest {
 		whenRegistering();
 		listener.activate(bundleContext, config(new String[] { "sensors/#" }, "", "xmi"));
 		when(message.getPayload()).thenReturn("<payload/>".getBytes(StandardCharsets.UTF_8));
-		when(payloadIngest.ingest(any(), any(), any())).thenReturn(IngestResult.applied(1, 1));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.applied(1, 1));
 
 		listener.onMqttMessage("broker-1", "sensors/a/telemetry", message);
 
-		verify(payloadIngest).ingest(any(byte[].class), eq("xmi"), eq("sensors/a/telemetry"));
+		verify(payloadIngest).ingest(any(byte[].class), eq("xmi"), eq("sensors/a/telemetry"),
+				any(TransportContext.class));
+	}
+
+	@Test
+	@DisplayName("The envelope's transport detail names the broker that delivered the message")
+	void onMqttMessage_carriesBrokerAndChannel() {
+		whenRegistering();
+		// no mqtt.handler.id: the adapter listens to every broker, so only the message says
+		// which one a payload came from
+		listener.activate(bundleContext, config(new String[] { "sensors/#" }, "", "xmi"));
+		when(message.getPayload()).thenReturn("<payload/>".getBytes(StandardCharsets.UTF_8));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenReturn(IngestResult.applied(1, 1));
+		ArgumentCaptor<TransportContext> transport = ArgumentCaptor.forClass(TransportContext.class);
+
+		listener.onMqttMessage("broker-1", "sensors/a/telemetry", message);
+
+		verify(payloadIngest).ingest(any(byte[].class), any(), any(), transport.capture());
+		assertEquals("broker-1", transport.getValue().extensions().get(MqttPayloadListener.EXTENSION_BROKER));
+		assertEquals("test-channel", transport.getValue().extensions().get(MqttPayloadListener.EXTENSION_CHANNEL));
+		assertEquals(MqttPayloadListener.DEFAULT_EVENT_TYPE, transport.getValue().type(),
+				"the default names this adapter, not the messaging library behind it");
 	}
 
 	@Test
@@ -131,7 +154,7 @@ public class MqttPayloadListenerTest {
 
 		listener.onMqttMessage("broker-2", "sensors/a", message);
 
-		verify(payloadIngest, never()).ingest(any(), any(), any());
+		verify(payloadIngest, never()).ingest(any(), any(), any(), any());
 	}
 
 	@Test
@@ -143,7 +166,7 @@ public class MqttPayloadListenerTest {
 
 		listener.onMqttMessage("broker-1", "sensors/a", message);
 
-		verify(payloadIngest, never()).ingest(any(), any(), any());
+		verify(payloadIngest, never()).ingest(any(), any(), any(), any());
 	}
 
 	@Test
@@ -152,7 +175,7 @@ public class MqttPayloadListenerTest {
 		whenRegistering();
 		listener.activate(bundleContext, config(new String[] { "sensors/#" }, "", "xmi"));
 		when(message.getPayload()).thenReturn("<payload/>".getBytes(StandardCharsets.UTF_8));
-		when(payloadIngest.ingest(any(), any(), any())).thenThrow(new RuntimeException("boom"));
+		when(payloadIngest.ingest(any(), any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
 		assertDoesNotThrow(() -> listener.onMqttMessage("broker-1", "sensors/a", message));
 	}
@@ -199,6 +222,11 @@ public class MqttPayloadListenerTest {
 			@Override
 			public String name() {
 				return "test-channel";
+			}
+
+			@Override
+			public String cloudEvents_type() {
+				return MqttPayloadListener.DEFAULT_EVENT_TYPE;
 			}
 		};
 	}

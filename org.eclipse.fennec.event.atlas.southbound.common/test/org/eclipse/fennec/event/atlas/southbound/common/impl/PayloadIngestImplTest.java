@@ -15,12 +15,16 @@ package org.eclipse.fennec.event.atlas.southbound.common.impl;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +60,7 @@ import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult;
 import org.eclipse.fennec.event.atlas.southbound.common.IngestResult.Outcome;
 import org.eclipse.fennec.event.atlas.southbound.common.PayloadIngest;
+import org.eclipse.fennec.event.atlas.southbound.common.TransportContext;
 import org.eclipse.fennec.event.atlas.southbound.common.UnknownModelHandler;
 import org.eclipse.fennec.event.atlas.southbound.common.UnknownPayload;
 import org.junit.jupiter.api.AfterEach;
@@ -63,8 +68,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import io.cloudevents.model.ce.CloudEvent;
 
 /**
  * Unit tests for {@link PayloadIngestImpl}. The {@link ResourceSetFactory} is stubbed with
@@ -107,7 +115,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("The routine success path logs nothing at INFO or above (issue #58)")
 	void ingest_whenApplied_logsNothingAtInfoOrAbove() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		List<LogRecord> captured = captureIngestLog();
 
 		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
@@ -124,7 +132,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("The success line is still available at FINE, for deliberate diagnosis")
 	void ingest_whenApplied_stillReportsTheDetailAtFine() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		List<LogRecord> captured = captureIngestLog();
 
 		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
@@ -175,7 +183,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("A payload whose model resolves and whose mapping applies reports APPLIED")
 	void ingest_withKnownModelAndMapping_reportsApplied() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -183,13 +191,13 @@ public class PayloadIngestImplTest {
 		assertEquals(1, result.roots());
 		assertEquals(1, result.mappingsApplied());
 		assertTrue(result.isApplied());
-		verify(instancePusher).pushInstance(any(EObject.class));
+		verify(instancePusher).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test
 	@DisplayName("A payload that deserializes but has no registered mapping reports NO_MAPPING")
 	void ingest_withoutMapping_reportsNoMappingAndNamesTheEClass() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(0);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(0);
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -207,7 +215,7 @@ public class PayloadIngestImplTest {
 
 		assertEquals(Outcome.MODEL_UNKNOWN, result.outcome());
 		assertEquals(UNKNOWN_NS_URI, result.detail(), "The unresolvable nsURI must be reported");
-		verify(instancePusher, never()).pushInstance(any());
+		verify(instancePusher, never()).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test
@@ -218,13 +226,13 @@ public class PayloadIngestImplTest {
 
 		assertEquals(Outcome.PARSE_ERROR, result.outcome());
 		assertNotNull(result.detail());
-		verify(instancePusher, never()).pushInstance(any());
+		verify(instancePusher, never()).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test
 	@DisplayName("A gateway failure is contained and reported as PUSH_FAILED, not rethrown")
 	void ingest_whenPushFails_reportsPushFailedWithoutThrowing() {
-		when(instancePusher.pushInstance(any(EObject.class)))
+		when(instancePusher.pushInstance(any(CloudEvent.class)))
 				.thenThrow(new IllegalStateException("gateway thread unavailable"));
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
@@ -242,7 +250,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("Media types and blank hints resolve to a usable format")
 	void ingest_withMediaTypeHint_stillDeserializes() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 
 		// "application/xml; charset=utf-8" and null must both land on XMI
 		assertEquals(Outcome.APPLIED,
@@ -257,7 +265,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("Every ingest uses a fresh ResourceSet")
 	void ingest_usesAFreshResourceSetPerPayload() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		java.util.List<ResourceSet> created = new java.util.ArrayList<>();
 		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
 			ResourceSet rs = createResourceSet();
@@ -302,7 +310,7 @@ public class PayloadIngestImplTest {
 	// AUTO exists so one channel can carry both encodings -- a broker topic tree where some
 	// publishers send XMI and others JSON.
 	void ingest_withAutoFormat_detectsXmiFromTheLeadingAngleBracket() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_AUTO, "sensors/test");
 
@@ -314,7 +322,7 @@ public class PayloadIngestImplTest {
 	@DisplayName("FORMAT_AUTO looks past a UTF-8 BOM")
 	// Publishers emit a BOM, and XML permits it before the declaration.
 	void ingest_withAutoFormat_skipsAByteOrderMark() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		byte[] xmi = sensorXmi();
 		byte[] prefixed = new byte[xmi.length + 3];
 		prefixed[0] = (byte) 0xEF;
@@ -332,7 +340,7 @@ public class PayloadIngestImplTest {
 	// Whitespace is legal before a root element (though NOT before an XML declaration, which is
 	// why this payload carries none) and before a pretty-printed JSON document.
 	void ingest_withAutoFormat_skipsLeadingWhitespace() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		byte[] payload = ("\n  <test:Sensor xmlns:test=\"" + KNOWN_NS_URI + "\" value=\"21.5\"/>")
 				.getBytes(StandardCharsets.UTF_8);
 
@@ -351,7 +359,7 @@ public class PayloadIngestImplTest {
 
 		assertEquals(Outcome.FORMAT_UNSUPPORTED, result.outcome());
 		assertEquals(PayloadIngest.FORMAT_JSON, result.detail(), "The unreadable format must be named");
-		verify(instancePusher, never()).pushInstance(any());
+		verify(instancePusher, never()).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test
@@ -372,13 +380,13 @@ public class PayloadIngestImplTest {
 
 		assertEquals(Outcome.FORMAT_UNSUPPORTED, result.outcome());
 		assertEquals(PayloadIngest.FORMAT_JSON, result.detail());
-		verify(instancePusher, never()).pushInstance(any());
+		verify(instancePusher, never()).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test
 	@DisplayName("A JSON payload is read by the factory registered for the json extension")
 	void ingest_withJsonCodecRegistered_usesItAndPushes() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
 			ResourceSet resourceSet = createResourceSet();
 			// stands in for org.eclipse.fennec.codec, which registers a Resource.Factory
@@ -402,7 +410,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("An explicit format hint still wins over detection")
 	void ingest_withExplicitFormat_stillHonoursTheHint() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -415,7 +423,7 @@ public class PayloadIngestImplTest {
 	// family whose payloads carry no stable discriminator anywhere - a ChirpStack uplink, whose
 	// deduplicationId is a fresh UUID - can never answer. The channel says what it receives.
 	void rootType_isPassedForTheMatchingChannel() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		List<Map<?, ?>> options = captureLoadOptions();
 		ingest.activate(config("iotraffic/#=" + KNOWN_NS_URI + "#//Sensor"));
 
@@ -428,7 +436,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("A payload from a channel no pattern matches is read without a root type")
 	void rootType_isNotPassedForOtherChannels() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		List<Map<?, ?>> options = captureLoadOptions();
 		ingest.activate(config("iotraffic/#=" + KNOWN_NS_URI + "#//Sensor"));
 
@@ -438,12 +446,14 @@ public class PayloadIngestImplTest {
 	}
 
 	@Test
-	@DisplayName("The first matching pattern wins, and a malformed entry only costs itself")
+	@DisplayName("The first matching filter wins, and a malformed entry only costs itself")
 	void rootType_firstMatchWinsAndMalformedEntriesAreIgnored() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		List<Map<?, ?>> options = captureLoadOptions();
-		ingest.activate(config("no-equals-sign", "rest/counter=" + KNOWN_NS_URI + "#//Sensor",
-				"rest/*=" + KNOWN_NS_URI + "#//Other"));
+		// an entry with no '=', an entry whose filter misplaces '#', then the two that parse -
+		// the first of which must win although the second would match too
+		ingest.activate(config("no-equals-sign", "rest/#/counter=" + KNOWN_NS_URI + "#//Other",
+				"rest/counter=" + KNOWN_NS_URI + "#//Sensor", "rest/+=" + KNOWN_NS_URI + "#//Other"));
 
 		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "rest/counter");
 
@@ -453,14 +463,76 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("A root type this runtime does not have leaves the payload to the runtime's own typing")
 	void unknownRootType_isReportedAndSkipped() {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		List<Map<?, ?>> options = captureLoadOptions();
-		ingest.activate(config("rest/*=http://example.org/southbound/nowhere/1.0#//Nope"));
+		ingest.activate(config("rest/+=http://example.org/southbound/nowhere/1.0#//Nope"));
 
 		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "rest/counter");
 
 		assertEquals(Outcome.APPLIED, result.outcome(), "a missing root type must not fail the ingest");
 		assertNull(options.get(0).get("CODEC_ROOT_TYPE"));
+	}
+
+	// ------------------------------------------------------------------------------------
+	// The shared source matcher (step 3 of the envelope plan). codec.rootType used to carry a
+	// dialect of its own in which '*' and '#' both meant "any text" anywhere; it reads MQTT
+	// topic filters now, the same class a mapping's selector will.
+	// ------------------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("A filter reads as MQTT: '+' is one level, so a deeper source does not match")
+	void rootType_singleLevelWildcard_doesNotSpanLevels() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("iotraffic/+=" + KNOWN_NS_URI + "#//Sensor"));
+
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "iotraffic/jena/uplink");
+
+		assertNull(options.get(0).get("CODEC_ROOT_TYPE"),
+				"'+' is exactly one level - the old dialect would have matched this");
+	}
+
+	@Test
+	@DisplayName("'#' still covers a whole topic tree, and its root as well")
+	void rootType_multiLevelWildcard_coversTheTreeAndItsRoot() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("iotraffic/#=" + KNOWN_NS_URI + "#//Sensor"));
+
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "iotraffic/jena/uplink");
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "iotraffic");
+
+		assertEquals(sensorEClass(), options.get(0).get("CODEC_ROOT_TYPE"));
+		assertEquals(sensorEClass(), options.get(1).get("CODEC_ROOT_TYPE"), "'a/#' matches 'a' too");
+	}
+
+	@Test
+	@DisplayName("A filter carrying '*' is warned about, because it silently stopped being a wildcard")
+	void rootType_withStar_warnsAboutTheChangedDialect() {
+		List<LogRecord> captured = captureIngestLog();
+
+		ingest.activate(config("rest/*=" + KNOWN_NS_URI + "#//Sensor"));
+
+		// it is legal MQTT and still compiles, so nothing would otherwise report that it now
+		// matches only the literal source "rest/*"
+		assertTrue(captured.stream().anyMatch(record -> record.getLevel() == Level.WARNING
+				&& record.getMessage().contains("rest/*") && record.getMessage().contains("'*'")),
+				"activation must name the entry: " + captured.stream().map(LogRecord::getMessage).toList());
+	}
+
+	@Test
+	@DisplayName("A malformed filter is ignored with a reason, and the other entries still type their channel")
+	void rootType_withMalformedFilter_isIgnoredWithAReason() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		List<LogRecord> captured = captureIngestLog();
+		List<Map<?, ?>> options = captureLoadOptions();
+		ingest.activate(config("a/#/c=" + KNOWN_NS_URI + "#//Sensor", "rest/counter=" + KNOWN_NS_URI + "#//Sensor"));
+
+		ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "rest/counter");
+
+		assertTrue(captured.stream().anyMatch(record -> record.getLevel() == Level.WARNING
+				&& record.getMessage().contains("a/#/c")), "the ignored entry must be named");
+		assertEquals(sensorEClass(), options.get(0).get("CODEC_ROOT_TYPE"), "the other entry still works");
 	}
 
 	/**
@@ -508,9 +580,146 @@ public class PayloadIngestImplTest {
 		};
 	}
 
+	// ------------------------------------------------------------------------------------
+	// The CloudEvents envelope (issue #96). The ingest fills what it knows - the data, the
+	// schema it read it as, the content type, the time - and the adapter's source, type and
+	// extensions are carried through untouched.
+	// ------------------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("Every root is pushed wrapped in an envelope carrying the source it arrived on")
+	void ingest_wrapsTheRootInAnEnvelope() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "a/b/c");
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		CloudEvent event = envelope.getValue();
+		assertEquals("a/b/c", event.getSource(), "the topic a message arrived on is its source");
+		assertEquals(KNOWN_NS_URI + "#//Sensor", event.getDataschema(),
+				"dataschema names the EClass the payload was read as, by nsURI");
+		assertEquals(sensorEClass(), event.getData().eClass());
+		assertNotNull(event.getEventId());
+		assertNotNull(event.getTime());
+		assertEquals("1.0", event.getSpecVersion());
+	}
+
+	@Test
+	@DisplayName("Without a transport context the envelope still carries the default event type")
+	void ingest_withoutTransportContext_usesTheDefaultEventType() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "a/b/c");
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		// The attribute is required by the envelope model, so there is no "leave it out"
+		assertEquals(PayloadIngest.DEFAULT_EVENT_TYPE, envelope.getValue().getType());
+		assertTrue(envelope.getValue().getExtensions().isEmpty());
+	}
+
+	@Test
+	@DisplayName("The adapter's event type and extensions reach the envelope")
+	void ingest_withTransportContext_carriesTypeAndExtensions() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "a/b/c",
+				new TransportContext("de.jena.ilsa.signal", Map.of("mqtt.broker", "jena", "mqtt.channel", "ilsa")));
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		CloudEvent event = envelope.getValue();
+		assertEquals("de.jena.ilsa.signal", event.getType());
+		assertEquals("jena", event.getExtensions().get("mqtt.broker"));
+		assertEquals("ilsa", event.getExtensions().get("mqtt.channel"));
+	}
+
+	@Test
+	@DisplayName("A blank event type falls back to the default rather than writing an empty one")
+	void ingest_withBlankEventType_fallsBackToTheDefault() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "a/b/c", new TransportContext("  ", Map.of()));
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		assertEquals(PayloadIngest.DEFAULT_EVENT_TYPE, envelope.getValue().getType());
+	}
+
+	@Test
+	@DisplayName("The envelope joins the resource the payload was read from")
+	void ingest_envelopeJoinsThePayloadResource() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "a/b/c");
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		CloudEvent event = envelope.getValue();
+		// data is a containment reference, so wrapping takes the root out of the resource's
+		// contents. Unless the envelope is in that resource, eResource() goes null and an
+		// href inside the payload stops resolving.
+		assertNotNull(event.eResource(), "the envelope must be in the payload's resource");
+		assertSame(event.eResource(), event.getData().eResource(), "the payload must keep that resource");
+		assertSame(event, event.getData().eContainer());
+		assertSame(event.eResource().getResourceSet(), event.getData().eResource().getResourceSet());
+	}
+
+	@Test
+	@DisplayName("A payload with several roots yields one envelope each, same source, distinct ids")
+	void ingest_withSeveralRoots_buildsOneEnvelopeEach() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		IngestResult result = ingest.ingest(twoSensorsXmi(), PayloadIngest.FORMAT_XMI, "a/b/c");
+
+		assertEquals(Outcome.APPLIED, result.outcome());
+		verify(instancePusher, times(2)).pushInstance(envelope.capture());
+		List<CloudEvent> events = envelope.getAllValues();
+		assertEquals(2, events.size());
+		// A CloudEvent describes one occurrence, so the roots do not share one envelope
+		assertNotEquals(events.get(0).getEventId(), events.get(1).getEventId());
+		assertEquals("a/b/c", events.get(0).getSource());
+		assertEquals("a/b/c", events.get(1).getSource());
+		assertNotSame(events.get(0).getData(), events.get(1).getData());
+	}
+
+	@Test
+	@DisplayName("The content type reports how the payload was read, not what it was announced as")
+	void ingest_withUnrecognizedHint_reportsTheFormatItFellBackTo() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), "application/octet-stream", "a/b/c");
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		assertEquals("application/xml", envelope.getValue().getDatacontenttype());
+	}
+
+	@Test
+	@DisplayName("A payload with no source still gets an envelope - the attribute is required")
+	void ingest_withoutSource_reportsTheUnknownOrigin() {
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
+		ArgumentCaptor<CloudEvent> envelope = ArgumentCaptor.forClass(CloudEvent.class);
+
+		ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, null);
+
+		verify(instancePusher).pushInstance(envelope.capture());
+		assertEquals("<unknown source>", envelope.getValue().getSource(),
+				"the same placeholder the log messages use, rather than an empty required attribute");
+	}
+
 	private static byte[] sensorXmi() {
 		return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 				+ "<test:Sensor xmlns:test=\"" + KNOWN_NS_URI + "\" value=\"21.5\"/>")
+						.getBytes(StandardCharsets.UTF_8);
+	}
+
+	private static byte[] twoSensorsXmi() {
+		return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+				+ "<xmi:XMI xmi:version=\"2.0\" xmlns:xmi=\"http://www.omg.org/XMI\" xmlns:test=\"" + KNOWN_NS_URI
+				+ "\"><test:Sensor value=\"21.5\"/><test:Sensor value=\"22.5\"/></xmi:XMI>")
 						.getBytes(StandardCharsets.UTF_8);
 	}
 
@@ -590,7 +799,7 @@ public class PayloadIngestImplTest {
 		assertEquals(Outcome.MODEL_UNKNOWN, unknownModel.outcome());
 		assertEquals(UNKNOWN_NS_URI, unknownModel.detail());
 		assertEquals(Outcome.PARSE_ERROR, parseError.outcome());
-		verify(instancePusher, never()).pushInstance(any());
+		verify(instancePusher, never()).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test
@@ -600,7 +809,7 @@ public class PayloadIngestImplTest {
 	// a hook wired to MODEL_UNKNOWN alone would never fire for an MQTT/JSON sensor at all.
 	void ingest_withUntypedJson_offersTheHandlerAnEmptyOutcome() throws Exception {
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 		inject(ingest, "resourceSetFactory", (ResourceSetFactory) () -> {
 			ResourceSet resourceSet = new ResourceSetImpl();
 			// stands in for the Fennec codec meeting a payload no typeMapping discriminator
@@ -632,7 +841,7 @@ public class PayloadIngestImplTest {
 	@DisplayName("An XMI payload naming an unresolvable nsURI fires the hook with MODEL_UNKNOWN and that nsURI")
 	void ingest_withUnresolvableModel_offersTheHandlerTheNsUri() throws Exception {
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		IngestResult result = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -649,7 +858,7 @@ public class PayloadIngestImplTest {
 	// It may be the model that is wrong rather than the data.
 	void ingest_withMalformedPayload_offersTheHandlerAParseError() throws Exception {
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		IngestResult result = ingest.ingest("this is not xmi at all".getBytes(StandardCharsets.UTF_8),
 				PayloadIngest.FORMAT_XMI, "sensors/test");
@@ -662,7 +871,7 @@ public class PayloadIngestImplTest {
 	@DisplayName("A handler that throws changes neither the result nor the caller's control flow")
 	void ingest_whenHandlerThrows_doesNotAffectTheResult() throws Exception {
 		RecordingHandler handler = new RecordingHandler(new IllegalStateException("inference service unreachable"));
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		IngestResult result = ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -671,7 +880,7 @@ public class PayloadIngestImplTest {
 		handler.awaitPayload();
 		// and the hand-off thread survives it, so the next payload is still offered
 		RecordingHandler next = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", next);
+		ingest.bindUnknownModelHandler(next);
 		ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 		assertEquals(Outcome.MODEL_UNKNOWN, next.awaitPayload().outcome());
 	}
@@ -683,7 +892,7 @@ public class PayloadIngestImplTest {
 	void ingest_withBlockingHandler_returnsWithoutWaiting() throws Exception {
 		CountDownLatch entered = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
-		inject(ingest, "unknownModelHandler", (UnknownModelHandler) payload -> {
+		ingest.bindUnknownModelHandler((UnknownModelHandler) payload -> {
 			entered.countDown();
 			try {
 				release.await(5, TimeUnit.SECONDS);
@@ -716,7 +925,7 @@ public class PayloadIngestImplTest {
 		CountDownLatch entered = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
 		AtomicInteger offered = new AtomicInteger();
-		inject(ingest, "unknownModelHandler", (UnknownModelHandler) payload -> {
+		ingest.bindUnknownModelHandler((UnknownModelHandler) payload -> {
 			offered.incrementAndGet();
 			entered.countDown();
 			try {
@@ -760,7 +969,7 @@ public class PayloadIngestImplTest {
 	// A missing codec bundle is a deployment gap - no model would fix it.
 	void ingest_withUnsupportedFormat_doesNotOfferTheHandler() throws Exception {
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		IngestResult result = ingest.ingest(sensorJson(), PayloadIngest.FORMAT_JSON, "sensors/test");
 
@@ -773,9 +982,9 @@ public class PayloadIngestImplTest {
 	// The model exists, the sensinact mapping does not - a different problem, and inferring a
 	// model for a payload that already deserialized would be actively wrong.
 	void ingest_withoutMapping_doesNotOfferTheHandler() throws Exception {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(0);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(0);
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -786,9 +995,9 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("An applied payload does not fire the hook")
 	void ingest_whenApplied_doesNotOfferTheHandler() throws Exception {
-		when(instancePusher.pushInstance(any(EObject.class))).thenReturn(1);
+		when(instancePusher.pushInstance(any(CloudEvent.class))).thenReturn(1);
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		IngestResult result = ingest.ingest(sensorXmi(), PayloadIngest.FORMAT_XMI, "sensors/test");
 
@@ -802,7 +1011,7 @@ public class PayloadIngestImplTest {
 	// channel's payloads on purpose - to infer a model from them - one warning per payload turns
 	// commissioning a new sensor into what looks like an outage.
 	void ingest_whileHandlerIsCollecting_logsTheDropAtFineInsteadOfWarning() throws Exception {
-		inject(ingest, "unknownModelHandler", collectingHandler("sensors/collected"));
+		ingest.bindUnknownModelHandler(collectingHandler("sensors/collected"));
 		Logger logger = Logger.getLogger(PayloadIngestImpl.class.getName());
 		List<LogRecord> logged = new ArrayList<>();
 		Handler capture = new Handler() {
@@ -843,7 +1052,7 @@ public class PayloadIngestImplTest {
 	@Test
 	@DisplayName("A handler that fails to answer isCollecting does not affect the ingest")
 	void ingest_whenIsCollectingThrows_stillReportsTheOutcome() {
-		inject(ingest, "unknownModelHandler", new UnknownModelHandler() {
+		ingest.bindUnknownModelHandler(new UnknownModelHandler() {
 
 			@Override
 			public void onUnknownModel(UnknownPayload payload) {
@@ -882,7 +1091,7 @@ public class PayloadIngestImplTest {
 	// source is what a collector groups payloads by, so it must never be null.
 	void ingest_withoutSource_reportsAPlaceholderSource() throws Exception {
 		RecordingHandler handler = new RecordingHandler();
-		inject(ingest, "unknownModelHandler", handler);
+		ingest.bindUnknownModelHandler(handler);
 
 		ingest.ingest(unknownModelXmi(), PayloadIngest.FORMAT_XMI, null);
 
@@ -909,7 +1118,7 @@ public class PayloadIngestImplTest {
 
 		assertEquals(Outcome.EMPTY, result.outcome());
 		assertEquals(0, result.roots());
-		verify(instancePusher, never()).pushInstance(any());
+		verify(instancePusher, never()).pushInstance(any(CloudEvent.class));
 	}
 
 	@Test

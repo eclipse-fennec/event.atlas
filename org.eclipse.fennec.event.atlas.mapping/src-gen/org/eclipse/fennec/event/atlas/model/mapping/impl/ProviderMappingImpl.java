@@ -32,6 +32,7 @@ import org.eclipse.emf.ecore.util.InternalEList;
 import org.eclipse.fennec.event.atlas.model.mapping.AdminMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingPackage;
 import org.eclipse.fennec.event.atlas.model.mapping.MappingProfile;
+import org.eclipse.fennec.event.atlas.model.mapping.MappingSelector;
 import org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping;
 import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
 
@@ -48,6 +49,7 @@ import org.eclipse.fennec.event.atlas.model.mapping.ServiceMapping;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ProviderMappingImpl#getAdmin <em>Admin</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ProviderMappingImpl#isProviderTimestamp <em>Provider Timestamp</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ProviderMappingImpl#getProfile <em>Profile</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.impl.ProviderMappingImpl#getSelector <em>Selector</em>}</li>
  * </ul>
  *
  * @generated
@@ -112,6 +114,16 @@ public class ProviderMappingImpl extends MappingImpl implements ProviderMapping 
 	 * @ordered
 	 */
 	protected MappingProfile profile;
+
+	/**
+	 * The cached value of the '{@link #getSelector() <em>Selector</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see #getSelector()
+	 * @generated
+	 * @ordered
+	 */
+	protected MappingSelector selector;
 
 	/**
 	 * <!-- begin-user-doc -->
@@ -272,12 +284,59 @@ public class ProviderMappingImpl extends MappingImpl implements ProviderMapping 
 	 * @generated
 	 */
 	@Override
+	public MappingSelector getSelector() {
+		return selector;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public NotificationChain basicSetSelector(MappingSelector newSelector, NotificationChain msgs) {
+		MappingSelector oldSelector = selector;
+		selector = newSelector;
+		if (eNotificationRequired()) {
+			ENotificationImpl notification = new ENotificationImpl(this, Notification.SET, MappingPackage.PROVIDER_MAPPING__SELECTOR, oldSelector, newSelector);
+			if (msgs == null) msgs = notification; else msgs.add(notification);
+		}
+		return msgs;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
+	public void setSelector(MappingSelector newSelector) {
+		if (newSelector != selector) {
+			NotificationChain msgs = null;
+			if (selector != null)
+				msgs = ((InternalEObject)selector).eInverseRemove(this, EOPPOSITE_FEATURE_BASE - MappingPackage.PROVIDER_MAPPING__SELECTOR, null, msgs);
+			if (newSelector != null)
+				msgs = ((InternalEObject)newSelector).eInverseAdd(this, EOPPOSITE_FEATURE_BASE - MappingPackage.PROVIDER_MAPPING__SELECTOR, null, msgs);
+			msgs = basicSetSelector(newSelector, msgs);
+			if (msgs != null) msgs.dispatch();
+		}
+		else if (eNotificationRequired())
+			eNotify(new ENotificationImpl(this, Notification.SET, MappingPackage.PROVIDER_MAPPING__SELECTOR, newSelector, newSelector));
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	@Override
 	public NotificationChain eInverseRemove(InternalEObject otherEnd, int featureID, NotificationChain msgs) {
 		switch (featureID) {
 			case MappingPackage.PROVIDER_MAPPING__SERVICES:
 				return ((InternalEList<?>)getServices()).basicRemove(otherEnd, msgs);
 			case MappingPackage.PROVIDER_MAPPING__ADMIN:
 				return basicSetAdmin(null, msgs);
+			case MappingPackage.PROVIDER_MAPPING__SELECTOR:
+				return basicSetSelector(null, msgs);
 		}
 		return super.eInverseRemove(otherEnd, featureID, msgs);
 	}
@@ -301,6 +360,8 @@ public class ProviderMappingImpl extends MappingImpl implements ProviderMapping 
 			case MappingPackage.PROVIDER_MAPPING__PROFILE:
 				if (resolve) return getProfile();
 				return basicGetProfile();
+			case MappingPackage.PROVIDER_MAPPING__SELECTOR:
+				return getSelector();
 		}
 		return super.eGet(featureID, resolve, coreType);
 	}
@@ -331,6 +392,9 @@ public class ProviderMappingImpl extends MappingImpl implements ProviderMapping 
 			case MappingPackage.PROVIDER_MAPPING__PROFILE:
 				setProfile((MappingProfile)newValue);
 				return;
+			case MappingPackage.PROVIDER_MAPPING__SELECTOR:
+				setSelector((MappingSelector)newValue);
+				return;
 		}
 		super.eSet(featureID, newValue);
 	}
@@ -358,6 +422,9 @@ public class ProviderMappingImpl extends MappingImpl implements ProviderMapping 
 			case MappingPackage.PROVIDER_MAPPING__PROFILE:
 				setProfile((MappingProfile)null);
 				return;
+			case MappingPackage.PROVIDER_MAPPING__SELECTOR:
+				setSelector((MappingSelector)null);
+				return;
 		}
 		super.eUnset(featureID);
 	}
@@ -380,6 +447,8 @@ public class ProviderMappingImpl extends MappingImpl implements ProviderMapping 
 				return providerTimestamp != PROVIDER_TIMESTAMP_EDEFAULT;
 			case MappingPackage.PROVIDER_MAPPING__PROFILE:
 				return profile != null;
+			case MappingPackage.PROVIDER_MAPPING__SELECTOR:
+				return selector != null;
 		}
 		return super.eIsSet(featureID);
 	}

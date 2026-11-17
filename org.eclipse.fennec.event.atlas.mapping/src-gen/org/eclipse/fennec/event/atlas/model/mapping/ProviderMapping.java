@@ -33,6 +33,7 @@ import org.osgi.annotation.versioning.ProviderType;
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#getAdmin <em>Admin</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#isProviderTimestamp <em>Provider Timestamp</em>}</li>
  *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#getProfile <em>Profile</em>}</li>
+ *   <li>{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#getSelector <em>Selector</em>}</li>
  * </ul>
  *
  * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getProviderMapping()
@@ -141,5 +142,30 @@ public interface ProviderMapping extends Mapping {
 	 * @generated
 	 */
 	void setProfile(MappingProfile value);
+
+	/**
+	 * Returns the value of the '<em><b>Selector</b></em>' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * <!-- begin-model-doc -->
+	 * The MappingSelector for this provider. When the object to be pushed is a CloudEvent and this field is set, then the mapping is selected based on this selector.
+	 * <!-- end-model-doc -->
+	 * @return the value of the '<em>Selector</em>' containment reference.
+	 * @see #setSelector(MappingSelector)
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingPackage#getProviderMapping_Selector()
+	 * @model containment="true"
+	 * @generated
+	 */
+	MappingSelector getSelector();
+
+	/**
+	 * Sets the value of the '{@link org.eclipse.fennec.event.atlas.model.mapping.ProviderMapping#getSelector <em>Selector</em>}' containment reference.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @param value the new value of the '<em>Selector</em>' containment reference.
+	 * @see #getSelector()
+	 * @generated
+	 */
+	void setSelector(MappingSelector value);
 
 } // ProviderMapping

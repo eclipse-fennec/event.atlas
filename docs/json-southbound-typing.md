@@ -75,10 +75,20 @@ Since 2026-10-23 a channel can say what it receives instead (pid
 }
 ```
 
-- Entries are `<source pattern>=<nsURI>#//EClass`. The pattern is matched whole against the
-  ingest source — `rest/<channel>` for the REST adapter, the MQTT topic for the MQTT one —
-  with `*` and `#` standing for any text, so a topic filter can be pasted in as written. The
-  first matching entry wins.
+- Entries are `<source filter>=<nsURI>#//EClass`. The filter is an **MQTT topic filter**,
+  matched against the ingest source — `rest/<channel>` for the REST adapter, the MQTT topic for
+  the MQTT one — so a filter can be pasted in as the broker configuration writes it. `+` is
+  exactly one level, `#` is the remaining levels and must be the last one (and `a/#` matches
+  `a` itself). The first matching entry wins.
+  - **The dialect changed on 2026-11-17.** It used to be a pattern of its own in which `*` and
+    `#` both stood for "any text" anywhere, so `rest/*` matched `rest/counter` and `a/#/c` was
+    accepted. Now `*` is an ordinary character — legal MQTT, matching only itself — and a
+    misplaced `#` is refused. Replace a `*` with `+` for one level or `#` for the rest. An
+    entry that still carries a `*` is **warned about at activation** rather than failing
+    quietly, and a filter that does not parse is reported and ignored, so the other entries
+    keep typing their channels.
+  - The same `SourceFilter` class reads a mapping selector's source patterns, so one filter
+    means one thing everywhere in the runtime.
 - The class is resolved against the **resource set's package registry**, i.e. the runtime's own
   models, and handed to the codec as an EClass instance. A class this runtime does not have is
   reported once and the payload is read as it would have been without the entry — never a

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TrafiCam - the detections, ENVELOPE-ROOTED (topic 5g/traficam/<cam>/<class>, windowed).
+
+  The CloudEvent twin of traficam-detections-mapping.xmi. The camera comes out of the topic
+  instead of out of TrafiCamDetections.camId.
+
+  READ THIS FIRST. Like the configuration flow, TrafiCam pushes directly - the adapter reads
+  binary EMF and calls InstancePusher. This mapping applies to nothing until that call
+  becomes pushInstance(CloudEvent) with the topic in `source`.
+
+  A SECOND THING THIS FLOW MAKES AWKWARD. The window is flushed per class, so one window
+  produces several messages on several topics - 5g/traficam/<cam>/<class> - while the
+  payload TrafiCamDetections carries the classes itself. The camera is the third segment of
+  every one of them, so the provider id is stable either way; the CLASS segment is not used
+  here, because the service name comes from ObservedClass.classId, one per element.
+
+  DEPLOY ONE SET OR THE OTHER - see ilsa-signal-state-ce-mapping.xmi.
+
+  CHECK THE SEGMENT INDEX. `at(3)` reads the camera from 5g/traficam/<cam>/<class>, which is
+  what the payload-rooted original documents as the segment the adapter copies. The
+  configuration flow uses the FOURTH segment of a different topic.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="traficam-detections-ce"
+    providerTimestamp="true">
+
+  <name expression="self.source.tokenize('/')->at(3)"/>
+
+  <!-- The flush time, not the envelope's `time`: CloudEvent/time is when the ingest read
+       the message, while this is when the window closed - and that is what stamps every
+       value the window carries. -->
+  <timestamp>
+    <featurePath xsi:type="ecore:EReference"
+        href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+    <featurePath xsi:type="ecore:EAttribute"
+        href="https://jena.de/models/traficam/1.0#//TrafiCamDetections/time"/>
+  </timestamp>
+
+  <profile href="traficam-profile.xmi#traficam"/>
+
+  <providerClasses href="https://cloudevents.io/1.0.2#//CloudEvent"/>
+
+  <selector
+      source="5g/traficam/#"
+      dataschema="https://jena.de/models/traficam/1.0#//TrafiCamDetections"/>
+
+  <!-- One service per object class. Only the referencedResource path changed: its first
+       step names CloudEvent/data, and from the second step on it navigates the payload. -->
+  <services mid="class">
+    <name>
+      <featurePath xsi:type="ecore:EAttribute"
+          href="https://jena.de/models/traficam/1.0#//ObservedClass/classId"/>
+    </name>
+    <serviceEClass href="https://model.data.jena.de/sensinact/traficam/1.0#//ObservedObjects"/>
+
+    <referencedResource exclude="false">
+      <featurePath xsi:type="ecore:EReference"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="https://jena.de/models/traficam/1.0#//TrafiCamDetections/classes"/>
+    </referencedResource>
+
+    <!-- From here down the source is an ObservedClass, so nothing changes. -->
+    <resources mid="objects">
+      <valueMapping functionId="udp.traficam.detections">
+        <featurePath xsi:type="ecore:EReference"
+            href="https://jena.de/models/traficam/1.0#//ObservedClass/objects"/>
+      </valueMapping>
+    </resources>
+
+    <resources mid="classificationName">
+      <valueMapping>
+        <featurePath xsi:type="ecore:EAttribute"
+            href="https://jena.de/models/traficam/1.0#//ObservedClass/classificationName"/>
+      </valueMapping>
+    </resources>
+  </services>
+
+  <admin mid="admin">
+    <name name="Admin"/>
+  </admin>
+</sensinactMapping:ProviderMapping>

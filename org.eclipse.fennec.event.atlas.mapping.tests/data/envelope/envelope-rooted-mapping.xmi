@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  An envelope-rooted mapping, used by CloudEventIngestTest (#97).
+
+  providerClasses names ce::CloudEvent, which is how a mapping declares its root: the object
+  every feature path starts from is the envelope, not the payload. The topic is then one
+  ordinary step, CloudEvent/source - which is the whole point, because a payload-rooted
+  mapping cannot reach the envelope at all.
+
+  It carries a selector, and an envelope-rooted mapping should: saying CloudEvent claims
+  every message in the runtime, of every model, so without one this mapping would try to
+  read the envelope of every payload any adapter ingests. Registration warns when one is
+  missing, naming the mid.
+
+  The payload is reachable below `data`, but a feature path is the wrong tool there - `data`
+  is typed EObject, so there is no declared feature to navigate. OCL with an explicit cast
+  is: self.data.oclAsType(dragino::DraginoLSE01Uplink).deduplicationId. This mapping stays
+  on the envelope's own attributes, which is the case the UDP adapters need.
+-->
+<mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="envelope-rooted">
+  <name name="envelope-probe"/>
+  <providerClasses
+      href="https://cloudevents.io/1.0.2#//CloudEvent"/>
+  <selector source="a/b/#"/>
+  <services
+      mid="message">
+    <name name="Message"/>
+    <resources
+        name="source"
+        mid="source">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/source"/>
+    </resources>
+    <resources
+        name="type"
+        mid="type">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/type"/>
+    </resources>
+    <resources
+        name="dataschema"
+        mid="dataschema">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/dataschema"/>
+    </resources>
+    <!-- Reading INTO the payload. `data` is typed EObject, so there is no declared
+         feature for a path to name - but m2x resolves an unresolved property on the
+         runtime type at evaluation, so no oclAsType cast is needed. -->
+    <resources
+        name="deduplicationId"
+        mid="deduplicationId">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+      <valueMapping expression="self.data.deduplicationId"/>
+    </resources>
+    <!-- A feature path CROSSING data: `data` is a declared feature of CloudEvent, so the
+         first step names it and the rest navigates the payload's own EClass. -->
+    <resources
+        name="batteryLevel"
+        mid="batteryLevel">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink/object"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DecodedObject/batV"/>
+    </resources>
+  </services>
+  <!--
+    One service per collection element, from an envelope root. The referencedResource path
+    crosses `data` the same way: its first step is CloudEvent/data and the rest navigates
+    the payload. This is the shape ilsa-configuration and traficam-detections need.
+  -->
+  <services mid="gateway">
+    <name expression="self.gatewayId"/>
+    <referencedResource exclude="false">
+      <featurePath xsi:type="ecore:EReference"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="https://eclipse.org/fennec/lorawan#//UplinkMessage/rxInfo"/>
+    </referencedResource>
+    <resources name="rssi" mid="rssi">
+      <eType xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
+      <valueFeature xsi:type="ecore:EAttribute"
+          href="https://eclipse.org/fennec/lorawan#//RxInfo/rssi"/>
+    </resources>
+  </services>
+
+  <!-- Required: ProviderModelSensinactMapper.mapProvider needs an admin mapping to build a
+       provider model at all. Nothing below it is read here. -->
+  <admin mid="admin">
+    <name name="Admin"/>
+    <providerPackage
+        href="https://cloudevents.io/1.0.2#/"/>
+  </admin>
+</mapping:ProviderMapping>

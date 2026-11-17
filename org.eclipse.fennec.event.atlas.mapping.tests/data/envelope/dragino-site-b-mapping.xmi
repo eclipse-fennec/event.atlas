@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The SAME EClass as dragino-envelope-mapping.xmi and dragino-selected-mapping.xmi, mapped
+  differently because it arrives on a different topic. This is issue #97's case in one file
+  pair: one device family, one message type, several sites, each needing its own provider
+  naming and its own target model.
+
+  Nothing about it is envelope-ROOTED. The mapping stays payload-rooted - providerClasses
+  still names the dragino uplink - and the selector alone does the discriminating. The
+  envelope is what the selector is matched against, not what the mapping reads.
+--><mapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:mapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    xsi:schemaLocation="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="dragino-site-b">
+  <timestamp>
+    <featurePath
+        xsi:type="ecore:EReference"
+        href="https://eclipse.org/fennec/lorawan#//UplinkMessage/rxInfo"/>
+    <featurePath
+        xsi:type="ecore:EAttribute"
+        href="https://eclipse.org/fennec/lorawan#//RxInfo/time"/>
+  </timestamp>
+  <!-- A constant name: this site's messages build their own provider, which is the other
+       half of what issue #97 asks for - "each topic needs its own provider naming". -->
+  <name name="site-b-sensor"/>
+
+  <providerClasses
+      href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink"/>
+  <selector source="x/y/#"/>
+  <services
+      mid="battery">
+    <name name="Battery"/>
+    <resources
+        name="Battery Level"
+        unit="V"
+        timestamp="//@timestamp"
+        mid="level">
+      <eType
+          xsi:type="ecore:EDataType"
+          href="http://www.eclipse.org/emf/2002/Ecore#//EDouble"/>
+      <valueFeature
+          xsi:type="ecore:EReference"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DraginoLSE01Uplink/object"/>
+      <valueFeature
+          xsi:type="ecore:EAttribute"
+          href="https://eclipse.org/fennec/lorawan/dragino#//DecodedObject/batV"/>
+    </resources>
+  </services>
+  <admin mid="admin">
+    <name name="Admin"/>
+    <providerPackage
+        href="https://eclipse.org/fennec/lorawan/dragino#/"/>
+  </admin>
+</mapping:ProviderMapping>

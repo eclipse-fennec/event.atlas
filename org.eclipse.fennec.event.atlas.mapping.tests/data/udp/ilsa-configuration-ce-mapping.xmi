@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ILSA - the intersection configuration, ENVELOPE-ROOTED (topic .../config/retained).
+
+  The CloudEvent twin of ilsa-configuration-mapping.xmi. The payload-rooted original has no
+  open item - TLConfiguration carries intersectionId natively - so this version exists for
+  one reason: to keep the PAIR consistent. Both ILSA mappings share one UNIFIED profile and
+  must answer the same provider id, so if the signal-state flow takes its id from the topic,
+  this one has to as well.
+
+  That is also the thing to verify before deploying the pair: the third topic segment and
+  TLConfiguration.intersectionId must be the same string. They are what the adapter copies
+  between today, so they should be - but nothing here can check it, and a mismatch builds
+  two providers instead of one.
+
+  DEPLOY ONE SET OR THE OTHER - see ilsa-signal-state-ce-mapping.xmi for why.
+
+  WHAT CHANGED FROM THE PAYLOAD-ROOTED ORIGINAL, and nothing else did:
+    - providerClasses names ce::CloudEvent
+    - a selector, including the dataschema that tells this flow from the signal state
+    - the provider name comes from the topic
+    - the referencedResource path gained CloudEvent/data as its first step
+    - the three admin expressions gained a `data.` segment, because the admin's source is
+      the root and the root is the envelope now
+
+  What did NOT change is everything inside <services>: a referencedResource makes each
+  SIGNAL the service source, so the name expression, the observedArea converter and the two
+  metadata paths all still start at a TLSignal.
+-->
+<sensinactMapping:ProviderMapping
+    xmi:version="2.0"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:sensinactMapping="https://fennec.eclipse.org/event.atlas/mapping/1.0"
+    mid="ilsa-configuration-ce"
+    providerTimestamp="true">
+
+  <!-- CHECK THE SEGMENT INDEX against the real config topic. The signal-state flow
+       publishes under 5g/ilsa/<intersection>/..., and this one is documented as
+       .../config/retained in the same tree, so the intersection is the third segment. -->
+  <name expression="self.source.tokenize('/')->at(3)"/>
+
+  <profile href="ilsa-profile.xmi#ilsa"/>
+
+  <providerClasses href="https://cloudevents.io/1.0.2#//CloudEvent"/>
+
+  <selector
+      source="5g/ilsa/#"
+      dataschema="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration"/>
+
+  <!--
+    One block, one service for each signal, exactly as the original: the path keeps the
+    collection and the name is produced, so the engine makes one service per element.
+
+    The only edit is the first step. `data` is a feature of CloudEvent, so a feature path
+    crosses it by naming it - including the path of a referencedResource, which is what
+    picks each service's source element (pinned by CloudEventIngestTest).
+  -->
+  <services mid="signal">
+    <name expression="self.id.replaceAll('/', '_')"/>
+    <serviceEClass href="https://model.data.jena.de/sensinact/ilsa/1.0#//Signal"/>
+
+    <referencedResource exclude="false">
+      <featurePath xsi:type="ecore:EReference"
+          href="https://cloudevents.io/1.0.2#//CloudEvent/data"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLConfiguration/subcircles"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//Subcircle/serialPorts"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//SerialPort/modules"/>
+      <featurePath xsi:type="ecore:EReference"
+          href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLModule/signals"/>
+    </referencedResource>
+
+    <!-- From here down the source is a TLSignal, so nothing changes. -->
+    <resources mid="observedArea">
+      <valueMapping converterId="udp.geojson.featurecollection">
+        <featurePath xsi:type="ecore:EReference"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/observedArea"/>
+      </valueMapping>
+    </resources>
+
+    <resources mid="color">
+      <metadata key="type">
+        <featurePath xsi:type="ecore:EAttribute"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/signalType"/>
+      </metadata>
+      <metadata key="signalGroup">
+        <featurePath xsi:type="ecore:EReference"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignal/signalGroup"/>
+        <featurePath xsi:type="ecore:EAttribute"
+            href="http://jena.de/udp/trafficos/trafficlight/1.1.1#//TLSignalGroup/id"/>
+      </metadata>
+    </resources>
+
+  </services>
+
+  <admin mid="admin">
+    <!--
+      The admin's source is the root, which is the envelope here - so each expression needs
+      the `data.` segment the payload-rooted original did not. `bbox.at(n)` still needs the
+      OclOperation the model bundle contributes, and ocl.customOperationsEnabled=true on PID
+      DefaultOclEngine; the envelope changes nothing about that.
+    -->
+    <name name="Admin"/>
+    <friendlyNameMapping expression="'ILSA ' + self.data.intersectionName"/>
+    <longitudeMapping expression="self.data.geoJson.bbox.at(1)"/>
+    <latitudeMapping expression="self.data.geoJson.bbox.at(2)"/>
+
+  </admin>
+</sensinactMapping:ProviderMapping>

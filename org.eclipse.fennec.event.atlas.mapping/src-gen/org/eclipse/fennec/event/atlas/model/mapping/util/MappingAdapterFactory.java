@@ -190,6 +190,10 @@ public class MappingAdapterFactory extends AdapterFactoryImpl {
 				return createReferenceResourceBindingAdapter();
 			}
 			@Override
+			public Adapter caseMappingSelector(MappingSelector object) {
+				return createMappingSelectorAdapter();
+			}
+			@Override
 			public Adapter caseEModelElement(EModelElement object) {
 				return createEModelElementAdapter();
 			}
@@ -590,6 +594,20 @@ public class MappingAdapterFactory extends AdapterFactoryImpl {
 	 * @generated
 	 */
 	public Adapter createReferenceResourceBindingAdapter() {
+		return null;
+	}
+
+	/**
+	 * Creates a new adapter for an object of class '{@link org.eclipse.fennec.event.atlas.model.mapping.MappingSelector <em>Selector</em>}'.
+	 * <!-- begin-user-doc -->
+	 * This default implementation returns null so that we can easily ignore cases;
+	 * it's useful to ignore a case when inheritance will catch all the cases anyway.
+	 * <!-- end-user-doc -->
+	 * @return the new adapter.
+	 * @see org.eclipse.fennec.event.atlas.model.mapping.MappingSelector
+	 * @generated
+	 */
+	public Adapter createMappingSelectorAdapter() {
 		return null;
 	}
 

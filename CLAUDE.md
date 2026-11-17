@@ -165,8 +165,15 @@ Two bndruns live in `…mapping.runtime` (`…mapping/launch.bndrun` is an older
   also reports a missing factory as `FORMAT_UNSUPPORTED` (HTTP 501) instead of parsing on.
 - **A JSON channel can declare the type it receives: `codec.rootType` on
   `event.atlas.southbound.ingest`** (since 2026-10-23), entries
-  `<source pattern>=<nsURI>#//EClass` matched against the ingest source (`rest/<channel>`, or
-  the MQTT topic), `*` and `#` wildcards, first match wins. It exists because the codec
+  `<source filter>=<nsURI>#//EClass` matched against the ingest source (`rest/<channel>`, or
+  the MQTT topic), first match wins. **Since 2026-11-17 the filter is a real MQTT topic
+  filter**, read by `SourceFilter` in `…event.atlas.mapping` - the runtime's one answer to
+  "does this source match this pattern", shared with the mapping selector so a filter pasted
+  from a broker configuration means the same in both. `+` is one level, `#` is the remainder
+  and only the last level (`a/#` matches `a` too), and **`*` is an ordinary character now**:
+  it used to mean "any text", it is legal MQTT so it still compiles, and an entry carrying one
+  is therefore warned about at activation instead of silently matching nothing. A filter that
+  does not parse is reported and ignored - one entry, not the channel. It exists because the codec
   resolves a JSON root type from **one** discriminator path per runtime
   (`TypeDiscriminatorRegistry`, `getAnyDiscriminatorPath`), which a family whose payloads carry
   no stable value anywhere cannot answer — a ChirpStack uplink's `deduplicationId` is a fresh
@@ -886,6 +893,104 @@ important thing to know, and the part that changed most recently:
   describes the value's history, not its description. A metadata failure is logged and never
   fails the push. `mapResourceMetadata` runs before the value for exactly that reason, because
   the change-rule branch returns. Guard: `ResourceMetadataMappingTest`.
+- **Every southbound payload arrives in a CloudEvents envelope since 2026-11-17** (#96, step 2
+  of `xdp`'s `envelope-mapping-selection-plan.md`). `PayloadIngest.ingest` gained a fourth
+  parameter, a `TransportContext` record carrying what only the adapter knows - the event
+  `type` and the extension attributes (`mqtt.broker`/`mqtt.channel`, `rest.channel`) - and wraps
+  every deserialized root in an `io.cloudevents.model.ce.CloudEvent` from `common.models`,
+  filling `source` (the topic, or `rest/<channel>`), `dataschema` (`<nsURI>#//<EClass>`, built
+  from the nsURI because `EcoreUtil.getURI` reports the *document* URI for a model loaded from
+  one), `datacontenttype` (the format it was *read* as, not the hint it arrived with) and
+  `time`. `InstancePusher.pushInstance(CloudEvent)` is the second entry point;
+  `pushInstance(EObject)` delegates to it for a `CloudEvent`, because Java picks an overload
+  statically. **Nothing reads the envelope yet** - an enveloped push still applies the mappings
+  of `data.eClass()` - which is why `CloudEventIngestTest` has to read it through a
+  `ValueFunction` standing in for the selector of #97.
+  - **`type` is a deployment choice, and each adapter defaults its own.** The key is
+    `cloudEvents.type` - the spelling `org.gecko.messaging` uses - but the defaults are
+    `org.eclipse.fennec.event.atlas.{mqtt,rest}.message`, and the ingest's own fallback for a
+    call with no transport context is `…event.atlas.message`. A shared default naming the
+    messaging library was rejected: a posted payload and a published message are not the same
+    occurrence, and a `type` selector should separate them without parsing the source. The key
+    name is borrowed from a CloudEvents-aware messaging layer so a deployment never meets two
+    spellings; **whether this repository ever adopts such a layer is open** - see the transport
+    section of `xdp`'s `envelope-mapping-selection-plan.md`. If one is adopted, its own default
+    would apply and the config bundles would have to set the key explicitly.
+  - **A mapping can select on the envelope since 2026-11-17** (#97). `ProviderMapping.selector`
+    is a containment of `MappingSelector` (`source` + `sourceExcludes`, both multi-valued, plus
+    `type` and `dataschema`); `CompiledSelector` in `…mapping.impl` is the one place that
+    decides, and `InstancePusherImpl.select` filters the candidate list the EClass lookup
+    returned. Four rules, each of which prevents a silent failure:
+    - **Every matching mapping applies; nothing is ranked.** A mapping without a selector keeps
+      serving every message of its EClass, so a general mapping names the sites a specific one
+      replaces with `sourceExcludes` - a topic filter is positive only and cannot say "except".
+      "Most specific wins" was rejected: it breaks the compositional case a `UNIFIED` profile
+      builds on. **This rule is under review** - with two or more selector-less mappings for
+      one EClass, `sourceExcludes` scales with generals x exceptions and the generals may not
+      be editable at all. Four options, with costs, in the *"should an enveloped message reach
+      payload-rooted mappings at all?"* section of `xdp`'s `envelope-mapping-selection-plan.md`;
+      nothing is implemented and the behaviour above stands.
+    - **A selector never matches a push without an envelope**, so `pushInstance(EObject)`
+      applies no mapping that carries one. Not a special case - there is nothing to match. Every
+      mapping shipped here carries no selector, which is why the OSGi tests still push bare
+      EObjects.
+    - **An absent `dataschema` on the envelope is no match, not a wildcard.**
+    - **An empty selector and a malformed filter are refused at registration**, by
+      `ProviderMappingRegistryImpl.refusedSelector`, which also guards the programmatic
+      `registerModelMapping`. An empty one would match every message *and* exclude the mapping
+      from a bare push - one mapping behaving as two.
+    The selector is compiled per push rather than cached: it is a split of one or two short
+    filters against a gateway round trip, and a cache would have to be invalidated with the
+    mapping. `InstancePusherImpl`'s "no mapping registered" line now distinguishes "none
+    registered" from "none selected" - the two need different fixes and read alike otherwise.
+  - **A mapping declares its own root, and `providerClasses` is the slot** (#97, 2026-11-17).
+    A domain EClass roots it at the payload - every mapping that existed before, unchanged.
+    `ce::CloudEvent` roots it at the **envelope**, so the topic is one feature path step
+    (`CloudEvent/source`) and an adapter no longer has to copy a topic segment into a transient
+    model attribute. `pushInstance(CloudEvent)` does **two** lookups -
+    `getProviderMapping(data.eClass())` and `getProviderMapping(CLOUD_EVENT)` - and hands each
+    mapping the root it declared, in one gateway pass (`RootedMapping`). `pushInstance(EObject)`
+    builds no envelope, so an envelope-rooted mapping never fires on a programmatic push: one
+    that builds a provider id out of a topic segment would otherwise write a nonsense name into
+    the twin, silently, and the OSGi tests push bare EObjects.
+    - **An envelope-rooted mapping without a selector is warned about at registration**, naming
+      the mid (`ProviderMappingRegistryImpl.isEnvelopeRooted`), because saying `CloudEvent`
+      claims every message of every model. Warned, not refused - a one-family runtime may want
+      it, and the degradation is noise rather than corruption.
+    - **Reading below `data` needs neither a cast nor a different mechanism**, and the plan
+      was wrong about this (corrected 2026-11-17, with tests). `data` is typed `EObject`, so it
+      declares no payload features - but it *is* a feature of `CloudEvent`, so a feature path
+      crosses it by **naming it as the first step** and navigating on; `navigateFeaturePath`
+      and `expandSources` are dynamic `eGet` loops that never consult a static type, so a
+      `referencedResource` crosses it too and one block still makes one service per element.
+      An expression needs no `oclAsType` either: m2x hands a property it cannot resolve
+      statically to the evaluator, which looks it up on the **runtime** type
+      (`strictPropertyResolution` is off, and `OclExpressionEvaluator` never sets it). The cast
+      still works and is the explicit form, but it costs the package name of a foreign model.
+      What *is* weaker below `data` is registration-time validation.
+    - **The envelope's id attribute is `eventId`, not `id`.** Converting a mapping to an
+      envelope root is therefore not a copy: `self.id…` stops parsing (logged, falls back to the
+      literal), while `type`, `subject`, `time` and `source` parse *silently against the wrong
+      object* - all four are plausible payload attribute names.
+    - A feature path reaches the **whole** topic, never one segment, because `source` is a flat
+      `EString`. A segment needs OCL string operations or a `ValueFunction`; there is no index.
+    - `ProviderModelSensinactMapper.mapProvider` does `requireNonNull(adminMapping)` with no
+      message, so a mapping without an `<admin>` fails registration with a bare NPE. Every
+      mapping here carries one; an envelope-rooted one must too.
+  - **The envelope joins the resource the payload was read from.** `data` is containment, so
+    wrapping takes the root out of `resource.getContents()`; without the envelope in that
+    resource `eResource()` goes null, an `href` in the payload stops resolving and the package
+    registry an envelope-rooted OCL expression needs is gone.
+  - **A project that merely *calls* `pushInstance` needs `io.cloudevents.model` on its
+    `-buildpath`** - javac resolves an overload only when it can see every candidate
+    (`…mapping.test.component` failed to compile on exactly this). The bytecode still names
+    `pushInstance(EObject)`, so bnd computes no package import: only `…mapping` and
+    `…southbound.common` import `io.cloudevents.model.ce` at runtime.
+  - The bundle comes from the **`fennecEMFModels` library index** (`io.cloudevents.model`
+    1.0.2-SNAPSHOT), not from a `central.mvn` pin, and is in all three bndruns' `-runbundles`.
+    That makes it the third `-runbundles` entry reachable only through a library - see the trap
+    under *Workspace & OSGi conventions*; one `central.mvn` line decouples it if that index ever
+    goes missing.
 - **`TimestampStrategy` is still not read by anything.** The user guide says so instead of
   documenting it as working.
 - All twin interaction happens on the SensiNact **`GatewayThread`** (via

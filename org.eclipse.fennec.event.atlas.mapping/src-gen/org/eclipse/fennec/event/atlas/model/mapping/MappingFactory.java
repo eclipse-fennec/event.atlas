@@ -243,6 +243,15 @@ public interface MappingFactory extends EFactory {
 	ReferenceResourceBinding createReferenceResourceBinding();
 
 	/**
+	 * Returns a new object of class '<em>Selector</em>'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return a new object of class '<em>Selector</em>'.
+	 * @generated
+	 */
+	MappingSelector createMappingSelector();
+
+	/**
 	 * Returns the package supported by this factory.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
