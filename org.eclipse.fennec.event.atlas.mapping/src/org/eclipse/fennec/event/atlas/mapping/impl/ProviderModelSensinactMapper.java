@@ -778,6 +778,17 @@ public class ProviderModelSensinactMapper {
 		EStructuralFeature lastFeature = featurePath.get(featurePath.size() - 1);
 		EClassifier targetType = lastFeature.getEType();
 
+		// A feature with no type is an unresolved proxy: the model it belongs to is not in this
+		// runtime. The registry parks such a mapping before it gets here, so this is the last
+		// line of defence - and a warning naming the feature beats a NullPointerException.
+		if (targetType == null) {
+			logger.warning(String.format(
+					"The feature path for %s ends in %s, which has no type - it is an unresolved proxy, so its "
+							+ "model is not deployed. Not mapping", contextDescription,
+					EcoreUtil.getURI(lastFeature)));
+			return null;
+		}
+
 		// Check if target is the Ecore EPackage (which we don't map)
 		if (targetType.getEPackage().getName().equals("ecore")) {
 			logger.warning(String.format("ReferenceMapping target is the Ecore EPackage for %s - not mapping", contextDescription));

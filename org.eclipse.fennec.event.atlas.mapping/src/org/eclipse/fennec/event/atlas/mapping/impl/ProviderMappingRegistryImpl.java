@@ -301,6 +301,14 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 			}
 			return Optional.empty();
 		}
+		List<String> unresolvedReferences = unresolvedReferences(mapping);
+		if (!unresolvedReferences.isEmpty()) {
+			if (!quiet) {
+				defer(entry, report, String.format("it points at %s, which is not resolvable yet - is that model "
+						+ "deployed?", unresolvedReferences));
+			}
+			return Optional.empty();
+		}
 		String refusedSelector = refusedSelector(mapping);
 		if (refusedSelector != null) {
 			if (!quiet) {
@@ -543,7 +551,51 @@ public class ProviderMappingRegistryImpl implements ProviderMappingRegistry, EOb
 		return eClass.getEStructuralFeature(path[1]);
 	}
 
-	private static String proxyUriOf(EClass proxy) {
+	/**
+	 * The proxies left anywhere in the mapping tree once the resolvable ones have been
+	 * replaced: the models a feature path, a target EClass or a metadata path names and this
+	 * runtime does not have yet.
+	 * <p>
+	 * The provider classes and the service EClasses are checked before this and report
+	 * themselves; the profile is checked after and is no model, so it is skipped here. What is
+	 * left is mostly feature paths, which used to reach the mapper unchecked - where the last
+	 * feature of a path has no type to read, and a missing model became a NullPointerException
+	 * rather than something a deployer can act on.
+	 * @param mapping the mapping, after {@link #resolveAgainstBoundPackages(ProviderMapping)}
+	 * @return the proxy URIs, in encounter order, empty where everything resolves
+	 */
+	private List<String> unresolvedReferences(ProviderMapping mapping) {
+		List<String> unresolved = new ArrayList<>();
+		Iterator<EObject> objects = EcoreUtil.getAllContents(List.of(mapping), false);
+		while (objects.hasNext()) {
+			EObject object = objects.next();
+			for (EReference reference : object.eClass().getEAllReferences()) {
+				if (reference.isContainment() || reference.isDerived() || !object.eIsSet(reference)) {
+					continue;
+				}
+				// Read resolving: what is still a proxy here is what the mapper would fail on.
+				Object value = object.eGet(reference, true);
+				if (reference.isMany()) {
+					((List<?>) value).forEach(element -> collectProxy(element, unresolved));
+				} else {
+					collectProxy(value, unresolved);
+				}
+			}
+		}
+		return unresolved;
+	}
+
+	private static void collectProxy(Object value, List<String> unresolved) {
+		if (value instanceof MappingProfile || !(value instanceof EObject object) || !object.eIsProxy()) {
+			return;
+		}
+		String proxyUri = proxyUriOf(object);
+		if (!unresolved.contains(proxyUri)) {
+			unresolved.add(proxyUri);
+		}
+	}
+
+	private static String proxyUriOf(EObject proxy) {
 		URI proxyUri = ((InternalEObject) proxy).eProxyURI();
 		return proxyUri == null ? proxy.toString() : proxyUri.toString();
 	}
