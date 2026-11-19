@@ -13,9 +13,22 @@
    */
 
   /* Mappings come from the Model Atlas service. The file provider below stays as the registry's
-   * initial content, so mounted XMIs still seed it; the Atlas provider syncs on top. */
+   * initial content, so mounted XMIs still seed it; the Atlas provider syncs on top.
+   *
+   * A RUNTIME WITHOUT AN ATLAS. `base.uri` is required by the client, so this block cannot be
+   * configured away - but a workspace launch that takes its models from bundles instead (and
+   * therefore has no Atlas to talk to) can make it harmless with two system properties:
+   *
+   *   -DEVENTATLAS_ATLAS_MODE=LAZY                 no pre-fetch sweep at activation
+   *   -DEVENTATLAS_ATLAS_DRIFT_INTERVAL_MS=0       no drift watcher (0 disables it)
+   *
+   * Both read env first, then a -D, then the image default - the same chain as the mapping and
+   * profile directories below, and for the same reason: a dev machine cannot set the container
+   * environment. Without them an unreachable Atlas is harmless but loud: `mode.strict` is false,
+   * so an EAGER activation against nothing logs rather than fails, and the drift watcher repeats
+   * it on every interval. */
   "org.eclipse.fennec.model.atlas.rest.client~atlas": {
-    "base.uri": "$[env:EVENTATLAS_ATLAS_BASE_URI;default=http://localhost:8086/atlas/rest]",
+    "base.uri": "$[env:EVENTATLAS_ATLAS_BASE_URI;default=$[prop:EVENTATLAS_ATLAS_BASE_URI;default=http://localhost:8086/atlas/rest]]",
     "scope.allow.list": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
     "default.scope": "$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]",
     /* Domain EPackages come from the Atlas too, not from model bundles baked into the image.
@@ -23,7 +36,7 @@
      * name is the scope's final stage - "release" in the jena scope, NOT the client default
      * "released". They reach both the codec and the mapping sync through the OSGi framework
      * EPackage.Registry - the metadata whiteboard - which is all this block configures. */
-    "mode": "EAGER",
+    "mode": "$[env:EVENTATLAS_ATLAS_MODE;default=$[prop:EVENTATLAS_ATLAS_MODE;default=EAGER]]",
     "eager.scopes": ["$[env:EVENTATLAS_ATLAS_SCOPE;default=jena]"],
     "eager.stages": ["$[env:EVENTATLAS_ATLAS_STAGE;default=release]"],
     /* No `register.in.global.registry` and no `nsuri.deny.list`: both came out on 2026-09-08,
@@ -55,7 +68,7 @@
      *
      * Verified in inference.bndrun on 2026-09-08 (`published 14 EPackage(s)`, no
      * ClassCastException, `1 mapping(s) applied`). NOT yet re-verified in this image. */
-    "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000;type=Long]"
+    "drift.check.interval.ms": "$[env:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=$[prop:EVENTATLAS_ATLAS_DRIFT_INTERVAL_MS;default=10000];type=Long]"
   },
 
   /* The directory is a placeholder so a workspace launch can point it at a seed folder in the
