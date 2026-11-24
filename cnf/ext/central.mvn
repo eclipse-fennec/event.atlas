@@ -38,19 +38,19 @@ com.google.code.findbugs:jsr305:3.0.2
 # needs; sensinact.maven only indexes them at 4.1.93.Final, which lives on Maven Central and
 # not in the Eclipse SensiNact repos - so they must be listed HERE, at the same version as the
 # rest of the netty set (netty modules must not be mixed across versions).
-io.netty:netty-buffer:4.1.133.Final
-io.netty:netty-codec:4.1.133.Final
-io.netty:netty-codec-http:4.1.133.Final
-io.netty:netty-codec-http2:4.1.133.Final
-io.netty:netty-codec-mqtt:4.1.133.Final
-io.netty:netty-codec-socks:4.1.133.Final
-io.netty:netty-common:4.1.133.Final
-io.netty:netty-handler:4.1.133.Final
-io.netty:netty-handler-proxy:4.1.133.Final
-io.netty:netty-resolver:4.1.133.Final
-io.netty:netty-transport:4.1.133.Final
-io.netty:netty-transport-classes-epoll:4.1.133.Final
-io.netty:netty-transport-native-unix-common:4.1.133.Final
+io.netty:netty-buffer:4.1.137.Final
+io.netty:netty-codec:4.1.137.Final
+io.netty:netty-codec-http:4.1.137.Final
+io.netty:netty-codec-http2:4.1.137.Final
+io.netty:netty-codec-mqtt:4.1.137.Final
+io.netty:netty-codec-socks:4.1.137.Final
+io.netty:netty-common:4.1.137.Final
+io.netty:netty-handler:4.1.137.Final
+io.netty:netty-handler-proxy:4.1.137.Final
+io.netty:netty-resolver:4.1.137.Final
+io.netty:netty-transport:4.1.137.Final
+io.netty:netty-transport-classes-epoll:4.1.137.Final
+io.netty:netty-transport-native-unix-common:4.1.137.Final
 
 # EMF XSD model + XSDEcoreBuilder (WSDL/XSD -> Ecore for the SOAP utility). Ships OSGi
 # metadata; requires org.eclipse.emf.ecore [2.41,3.0) — aligned with the workspace EMF.
@@ -209,16 +209,17 @@ io.dropwizard.metrics:metrics-core:4.2.37
 # Jackson 3 - the whole northbound chain (sensinact rest, sensorthings rest.gateway +
 # mqtt, query-handler, resource.selector, the Model Atlas rest client) imports
 # tools.jackson.core / tools.jackson.databind [3.1,4), and the REST layer additionally
-# the Jakarta-RS JSON provider. Keep all four artifacts on the same 3.2.x version.
+# the Jakarta-RS JSON provider. Keep all of them on the same 3.x version as the
+# fennecCodec library, which brings jackson-core/databind in as well.
 # 3.2 (not 3.1) is a floor since the EMF JSON codec landed: org.eclipse.fennec.codec
 # and .codec.api import tools.jackson.core / .databind as [3.2,4).
-tools.jackson.core:jackson-core:3.2.2
-tools.jackson.core:jackson-databind:3.2.2
-tools.jackson.jakarta.rs:jackson-jakarta-rs-base:3.2.2
-tools.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:3.2.2
+tools.jackson.core:jackson-core:3.3.0
+tools.jackson.core:jackson-databind:3.3.0
+tools.jackson.jakarta.rs:jackson-jakarta-rs-base:3.3.0
+tools.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:3.3.0
 # ... and the xmlbind annotations module the provider's JacksonXmlBindJsonProvider
 # instantiates reflectively (optional import, so it must be required explicitly).
-tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.2.2
+tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.3.0
 
 # Jackson 2 leftovers. jackson-core is imported by sensinact's esri.geometry ([2.9,3)),
 # which resource.selector.impl (the query handler's filter factory) drags into the docker
@@ -226,7 +227,7 @@ tools.jackson.module:jackson-module-jakarta-xmlbind-annotations:3.2.2
 # package at 2.x. Every sensinact DTO bundle imports it as [2.21,3) and the EMF JSON codec
 # (org.eclipse.fennec.codec) as [2.22,3) - so 2.22 is a floor, not a preference, and this
 # artifact does NOT track the jackson-core version above.
-com.fasterxml.jackson.core:jackson-core:2.19.2
+com.fasterxml.jackson.core:jackson-core:2.22.3
 com.fasterxml.jackson.core:jackson-annotations:2.22
 
 # The SensiNact history timescale-provider's runtime closure. cnf/ext/sensinact.maven pins
