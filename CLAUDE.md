@@ -59,7 +59,19 @@ Requires **Java 21** (`javac.source/target: 21` in `cnf/ext/fennec.bnd`). bnd to
 ./gradlew perfTest               # @Tag("perf") only — excluded from `build`
 ./gradlew remoteTest             # @Tag("remote") only — excluded from `build`
 ./gradlew :org.eclipse.fennec.event.atlas.mapping.runtime:export.eventatlas.runtime_docker  # docker runtime jar
+./gradlew sbom                   # CycloneDX SBOM of the docker runtime → …mapping.runtime/generated/sbom/
+./gradlew bndUpdates             # report: newer versions in the .mvn indexes (micro policy)
 ```
+
+**SBOM and vulnerability scan (#105).** `./gradlew sbom` fetches the `org.gecko.bnd.sbom`
+exporter (a snapshot from Sonatype's Central Snapshots) into `cnf/cache/sbom-exporter/` and
+exports `eventatlas.runtime_docker.bndrun` with it — the resolved `-runbundles` plus framework,
+i.e. what goes into the image, not the build tools. The bndrun includes `cnf/sbom/plugin.bnd`
+only once that jar exists, so resolve, build and export never need it. `.github/workflows/sbom.yml`
+scans the SBOM with Trivy and **fails on fixable HIGH/CRITICAL findings**; `bndVulnerabilities`
+(`-PbndUpdateTrivy=<trivy.json> -PbndUpdateSbom=<sbom.cdx.json>`) names the smallest fixing
+version within the policy. A fix is a version bump in `cnf/ext/central.mvn` plus a re-resolve of
+the three runtime bndruns. The SBOM target list is `sbomBndruns` in the root `build.gradle`.
 
 Baseline as of 2026-10-23: `./gradlew clean build` is green — **80 OSGi tests, 0 `@Disabled`**
 — plus **270 plain-JUnit tests** across ten projects. The
@@ -819,8 +831,8 @@ EPackages a runtime maps must be registered in that runtime.
   build up on its own, breaking every resolve until the index caught up) and every
   third-party bundle the northbound chain drags in: Jackson 3 (`tools.jackson.core:jackson-core`
   + `jackson-databind`, `jackson-jakarta-rs-*`, `jackson-module-jakarta-xmlbind-annotations`, all
-  on one 3.2.x version — 3.2 is a floor, the Fennec codec imports `tools.jackson.*` as
-  `[3.2,4)`), Jackson 2 `jackson-core` for esri.geometry, Jackson 2 `jackson-annotations`
+  on one version, the one the `fennecCodec` library index carries for core/databind (3.3.0 as of
+  2026-11-24) — 3.2 is a floor, the Fennec codec imports `tools.jackson.*` as `[3.2,4)`), Jackson 2 `jackson-core` for esri.geometry, Jackson 2 `jackson-annotations`
   **2.22** (Jackson 3 left `com.fasterxml.jackson.annotation` at 2.x and it is imported as
   `[2.21,3)` by the sensinact DTO bundles and `[2.22,3)` by the codec, so it does not track
   jackson-core's version), netty, and dropwizard `metrics-core`.
@@ -921,6 +933,9 @@ the protected **`main`** branch. Workflows delegate to **SHA-pinned reusable wor
   and pushes `docker.io/eclipsefennec/event.atlas` and `ghcr.io/eclipse-fennec/event.atlas`
   (amd64 + arm64/v8), tagged `snapshot`/`latest` plus that version. Needs the
   `DOCKER_USERNAME`/`DOCKER_API_TOKEN` secrets and `packages: write` (GHCR).
+- `sbom.yml` — `./gradlew assemble sbom`, Trivy scan of the docker runtime's SBOM, bnd update
+  reports in the job summary and the `sbom` artifact (kept 90 days); fails on fixable
+  HIGH/CRITICAL. Runs on PRs, pushes to `main`/`snapshot` and weekly (Monday) on `snapshot`.
 - `docs.yml` — `workflow_dispatch` only; plus `scorecard.yml` and `dependency-review.yml`.
 
 Branch protection and secret scanning live in the EF-managed `eclipse-fennec/.eclipsefdn`
