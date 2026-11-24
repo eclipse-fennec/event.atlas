@@ -27,6 +27,7 @@ import org.eclipse.fennec.event.atlas.mapping.ChangeRuleFilter;
 import org.eclipse.fennec.event.atlas.mapping.ExpressionEvaluator;
 import org.eclipse.fennec.event.atlas.mapping.InstancePusher;
 import org.eclipse.fennec.event.atlas.mapping.ProviderMappingRegistry;
+import org.eclipse.fennec.event.atlas.mapping.SensinactMapperConstants;
 import org.eclipse.fennec.event.atlas.mapping.ValueConverterRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueFunctionRegistry;
 import org.eclipse.fennec.event.atlas.mapping.ValueMapperFactory;
@@ -48,10 +49,22 @@ import io.cloudevents.model.ce.CloudEvent;
 /**
  * Default {@link InstancePusher}: resolves mappings via the {@link ProviderMappingRegistry}
  * and applies each on the sensinact {@link GatewayThread}.
+ * <p>
+ * <b>The PID is here so a deployment can gate it.</b> This component takes configuration under
+ * {@link SensinactMapperConstants#INSTANCE_PUSHER_PID} as well as under its component name, and
+ * it carries - as every component does - an implicit {@code osgi.ds.satisfying.condition}
+ * reference defaulted to the framework's True condition (OSGi cmpn 112.3.13). A runtime whose
+ * mappings carry expressions points that at
+ * {@link ExpressionEvaluatorReadyCondition}, because the {@code ExpressionEvaluator} reference
+ * below is optional: without it this pusher is satisfied with no expression language deployed
+ * and maps payloads whose expressions silently produce nothing. The policy belongs to the
+ * deployment, not here - a runtime whose mappings carry no expression wants neither the wait
+ * nor the coupling.
+ *
  * @author Ilenia Salvadori
  * @since 29.07.2026
  */
-@Component
+@Component(configurationPid = { SensinactMapperConstants.INSTANCE_PUSHER_PID, Component.NAME })
 public class InstancePusherImpl implements InstancePusher {
 
 	private static final Logger logger = Logger.getLogger(InstancePusherImpl.class.getName());

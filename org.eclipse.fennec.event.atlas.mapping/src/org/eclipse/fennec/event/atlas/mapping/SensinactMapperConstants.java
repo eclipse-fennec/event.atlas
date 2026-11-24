@@ -29,4 +29,22 @@ public interface SensinactMapperConstants {
 	String SENSINACT_MAPPING_DESCRIPTION = "sensinact.mapping.description";
 	
 	String SENSINACT_MAPPING_METADATA_ANNOTATION_SOURCE = "sensinact.mapping.metadata";
+
+	/**
+	 * {@code osgi.condition.id} of the Condition published while an
+	 * {@link ExpressionEvaluator} is deployed.
+	 * <p>
+	 * A runtime whose mappings carry expressions points the instance pusher's satisfying
+	 * condition at this, on PID {@code event.atlas.instance.pusher}, so that nothing is pushed
+	 * before expressions can be evaluated. See
+	 * {@code org.eclipse.fennec.event.atlas.mapping.impl.ExpressionEvaluatorReadyCondition}.
+	 */
+	String EXPRESSION_EVALUATOR_CONDITION_ID = "org.eclipse.fennec.event.atlas.mapping.expression.evaluator";
+
+	/**
+	 * Configuration PID of the instance pusher, so that a deployment can reach its component
+	 * properties - in particular {@code osgi.ds.satisfying.condition.target} - without naming
+	 * an implementation class.
+	 */
+	String INSTANCE_PUSHER_PID = "event.atlas.instance.pusher";
 }

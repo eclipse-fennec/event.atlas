@@ -30,6 +30,7 @@ Bundle-Version: 1.0.0.SNAPSHOT
 
 -buildpath: \
 	org.osgi.util.promise;version=latest,\
+	org.osgi.service.condition;version=latest,\
 	io.cloudevents.model;version=latest,\
 	com.fasterxml.jackson.core.jackson-annotations;version=latest,\
 	org.eclipse.fennec.emf.osgi.eobject.registry;version=latest,\
